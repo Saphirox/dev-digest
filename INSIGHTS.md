@@ -15,10 +15,13 @@ coming back graduates into the root CLAUDE.md as a standing rule.
 ## Codebase Patterns
 
 - 2026-09-16 · Before building a "missing" feature, `grep -rn 'DROP COLUMN' server/src/db/migrations/` — the course starter carves lesson features out with a LATE migration while leaving the producing code intact. `0009_complex_runaways.sql` drops `agent_runs.cost_usd`, yet `usage.cost` still flows from `openrouter.ts` → `ReviewOutcome.costUsd`; only the persist step is cut (`run-executor.ts:213` destructures `outcome` without `costUsd`). The feature is a re-wire, not a build.
+- 2026-09-17 · Treat the shared dev database as the reverted integration branch's answer key: `docker exec devdigest-postgres psql -U devdigest -d devdigest -c '\d <table>'` shows the columns, indexes and CHECK constraints that branch concluded it needed. Re-deriving the `agent_runs` cost index independently produced SQL identical to the live `agent_runs_pr_ran_at_idx` byte for byte — cheap corroboration before committing a design guess.
 
 ## Tool & Library Notes
 
 - 2026-09-16 · A fresh worktree has node_modules in `server/` ONLY; install `reviewer-core/` too before booting or typechecking the server. tsconfig aliases `@devdigest/reviewer-core` to its SOURCE, so the engine's own runtime deps must exist: without them the API dies at boot with `ERR_MODULE_NOT_FOUND: Cannot find package 'openai'`, and `tsc` reports phantom `unknown is not assignable to T` errors in `server/src/adapters/llm/{openai,anthropic}.ts` that vanish once the deps are there — don't debug those files.
+- 2026-09-17 · `reviewer-core` is an **npm** package (`package-lock.json`; `scripts/dev.sh:81` runs `npm ci` there) while `server`/`client` use pnpm. Running `pnpm install` in it silently writes a competing `reviewer-core/pnpm-lock.yaml` — check `git status` before committing; pnpm also scaffolds a `pnpm-workspace.yaml` in every package it touches.
+- 2026-09-17 · The branch under an emdash worktree can be switched by tooling MID-SESSION: work started on `emdash/mighty-seas-sneeze-030k8` and committed onto `feature/01-lab-run-findings` without any checkout of mine. The session-start git snapshot goes stale — run `git rev-parse --abbrev-ref HEAD` right before committing and before reporting where work landed. Recovery is just `git branch -f <intended> <sha> && git checkout <intended>`.
 
 ## Recurring Errors & Fixes
 
@@ -30,5 +33,6 @@ coming back graduates into the root CLAUDE.md as a standing rule.
 - 2026-09-16 · Spec + plan for the Run Cost feature (`docs/specs/run-cost.md`) — no code changed; +3 insights (Codebase Patterns ×1 root, client ×1, reviewer-core ×1)
 - 2026-09-16 · Implemented Run Cost across server + client (9 steps, all 3 screens verified in-browser) — +3 insights (Tool & Library Notes, Recurring Errors ×2)
 - 2026-09-17 · Ran the stack + skill review pass (drizzle/react) over the Run Cost diff — 1 bug found and fixed; +3 insights (root What Doesn't Work, server Codebase Patterns, client Codebase Patterns)
+- 2026-09-17 · Committed the Run Cost work as 7 commits, moved them onto the intended branch, added the agent_runs index — +4 insights (root Codebase Patterns, Tool & Library Notes ×2, server Codebase Patterns)
 
 ## Open Questions
