@@ -1,0 +1,20 @@
+# repo-intel — Insights
+
+Append-only log of non-obvious lessons from working in this module, written
+for the next agent. Agents append via the `engineering-insights` skill
+(`.claude/skills/engineering-insights/`); humans prune. A lesson that keeps
+coming back graduates into this module's CLAUDE.md as a standing rule.
+
+## What Works
+
+## What Doesn't Work
+
+## Codebase Patterns
+
+## Tool & Library Notes
+
+## Recurring Errors & Fixes
+
+## Session Notes
+
+## Open Questions
