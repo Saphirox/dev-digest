@@ -30,6 +30,13 @@ export function FindingsPanel({
 
   const shown = React.useMemo(() => visibleFindings(findings, hideLow), [findings, hideLow]);
 
+  // Toggling "hide low confidence" can shrink the list past the focused index,
+  // which would leave no card highlighted and make a/d silently no-op on an
+  // undefined finding — re-anchor at the top whenever the list changes.
+  React.useEffect(() => {
+    setFocusIdx(0);
+  }, [shown]);
+
   // j/k navigation + a/d shortcuts on the focused finding (keyboard).
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
