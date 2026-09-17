@@ -170,6 +170,12 @@ export const PrMeta = z.object({
   updated_at: z.string().nullish(),
   // Latest-review score (list endpoint only; null/absent until reviewed).
   score: z.number().int().nullish(),
+  /**
+   * Cost (USD) of the LATEST completed run on this PR — list endpoint only.
+   * `nullish` like `score`: PrMeta doubles as the GitHub adapter's shape
+   * (`listPullRequests`), which knows nothing about cost.
+   */
+  cost_usd: z.number().nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 

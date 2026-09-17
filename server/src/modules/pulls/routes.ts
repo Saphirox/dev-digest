@@ -129,6 +129,28 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
+    // Latest-run COST per PR for the list's cost column — same read-time
+    // grouping as the score above. Only COMPLETED runs qualify: a run still in
+    // flight has no cost yet, and a failed one never will.
+    //
+    // Deliberately the latest run's cost, NOT a sum over the PR's runs: the
+    // number here has to match a single row the user can find in the PR's
+    // timeline. (A "Review all" over N agents therefore shows one agent's cost.)
+    const latestCostByPr = new Map<string, number | null>();
+    if (prIds.length > 0) {
+      const costRows = await container.db
+        .select({ prId: t.agentRuns.prId, costUsd: t.agentRuns.costUsd })
+        .from(t.agentRuns)
+        .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')))
+        .orderBy(desc(t.agentRuns.ranAt));
+      // Newest-first → first seen per PR is the latest completed run. A null
+      // cost on that run stays null (shown as "—"); we do NOT fall through to
+      // an older run, or the column would stop describing the latest review.
+      for (const c of costRows) {
+        if (c.prId && !latestCostByPr.has(c.prId)) latestCostByPr.set(c.prId, c.costUsd);
+      }
+    }
+
     const now = Date.now();
     return rows.map((r) => {
       const review = latestReviewByPr.get(r.id);
@@ -153,6 +175,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
+        cost_usd: latestCostByPr.get(r.id) ?? null,
       };
     });
   });

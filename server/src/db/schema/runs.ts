@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, jsonb, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, doublePrecision, jsonb, timestamp } from 'drizzle-orm/pg-core';
 import { workspaces } from './core';
 import { agents } from './agents';
 import { pullRequests } from './pulls';
@@ -18,6 +18,15 @@ export const agentRuns = pgTable('agent_runs', {
   durationMs: integer('duration_ms'),
   tokensIn: integer('tokens_in'),
   tokensOut: integer('tokens_out'),
+  /**
+   * Run cost in USD, resolved ONCE when the run completes (real `usage.cost`
+   * from OpenRouter, else tokens × price from the PriceBook / static table).
+   * Stored as a total rather than recomputed from tokens on read: model prices
+   * move, and a historical run must not silently re-price itself.
+   * NULL = unknown (failed run, or a model with no price) → UI shows "—",
+   * never "$0.00" — free and unknown are different things.
+   */
+  costUsd: doublePrecision('cost_usd'),
   status: text('status'),
   /** Failure reason when status='failed' (LLM/API error, timeout, quota, …). */
   error: text('error'),

@@ -80,6 +80,9 @@ export class ReviewRunExecutor {
             durationMs: 0,
             tokensIn: 0,
             tokensOut: 0,
+            // null, NOT 0: the cost is UNKNOWN, not free. A failed run must
+            // render "—" rather than a reassuring "$0.00".
+            costUsd: null,
             findingsCount: 0,
             grounding: '0/0 passed',
             error: msg,
@@ -210,7 +213,7 @@ export class ReviewRunExecutor {
           if (this.container.runBus.isCancelled(runId)) throw new RunCancelledError();
         },
       });
-      const { tokensIn, tokensOut, grounding } = outcome;
+      const { tokensIn, tokensOut, grounding, costUsd } = outcome;
 
       const keptFindings = outcome.review.findings;
 
@@ -245,6 +248,7 @@ export class ReviewRunExecutor {
         durationMs,
         tokensIn,
         tokensOut,
+        costUsd,
         findingsCount: findingRows.length,
         grounding,
         score: outcome.review.score,
@@ -265,6 +269,7 @@ export class ReviewRunExecutor {
           duration_ms: durationMs,
           tokens_in: tokensIn,
           tokens_out: tokensOut,
+          cost_usd: costUsd,
           findings: findingRows.length,
           grounding,
         },
@@ -300,6 +305,8 @@ export class ReviewRunExecutor {
           durationMs: Date.now() - start,
           tokensIn: 0,
           tokensOut: 0,
+          // Unknown, not free — see the note in failAll above.
+          costUsd: null,
           findingsCount: 0,
           grounding: '0/0 passed',
           error: msg,
