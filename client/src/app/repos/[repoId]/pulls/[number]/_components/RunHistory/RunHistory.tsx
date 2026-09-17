@@ -3,6 +3,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
+import { RunCostBadge } from "@/components/run-cost-badge";
 import type { RunSummary, PrCommit } from "@devdigest/shared";
 
 /**
@@ -197,6 +198,22 @@ export function RunHistory({
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>
               {r.ran_at && <span>{new Date(r.ran_at).toLocaleTimeString()}</span>}
+              {/* Usage only once the run has settled: an in-flight run has no
+                  cost yet, and a failed one shows its error instead. */}
+              {settled && (r.tokens_in != null || r.cost_usd != null) && (
+                <RunCostBadge
+                  variant="inline"
+                  cost={r.cost_usd}
+                  // null, not 0, when neither side was recorded: a run whose
+                  // token counts are unknown must not claim "0 tok" just
+                  // because its cost is known.
+                  tokens={
+                    r.tokens_in == null && r.tokens_out == null
+                      ? null
+                      : (r.tokens_in ?? 0) + (r.tokens_out ?? 0)
+                  }
+                />
+              )}
             </div>
             <button
               type="button"
