@@ -129,25 +129,34 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
-    // Latest-run COST per PR for the list's cost column — same read-time
-    // grouping as the score above. Only COMPLETED runs qualify: a run still in
-    // flight has no cost yet, and a failed one never will.
+    // TOTAL COST per PR for the list's cost column — same read-time grouping as
+    // the score above. Only COMPLETED runs qualify: a run still in flight has no
+    // cost yet, and a failed one never will.
     //
-    // Deliberately the latest run's cost, NOT a sum over the PR's runs: the
-    // number here has to match a single row the user can find in the PR's
-    // timeline. (A "Review all" over N agents therefore shows one agent's cost.)
-    const latestCostByPr = new Map<string, number | null>();
+    // The column answers "what has reviewing this PR cost so far", so it sums
+    // every successful run rather than reporting one of them. A "Review all"
+    // over N agents therefore shows the whole pass, not one agent's share — the
+    // per-run figures stay visible on the PR's timeline.
+    //
+    // Null handling follows the same rule as everywhere else in the cost UI:
+    // null means UNKNOWN, not zero. A PR with no completed runs, or whose runs
+    // all pre-date cost tracking, stays null and renders "—"; runs with a
+    // recorded cost are summed and any null contributors are skipped.
+    const totalCostByPr = new Map<string, number | null>();
     if (prIds.length > 0) {
       const costRows = await container.db
         .select({ prId: t.agentRuns.prId, costUsd: t.agentRuns.costUsd })
         .from(t.agentRuns)
-        .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')))
-        .orderBy(desc(t.agentRuns.ranAt));
-      // Newest-first → first seen per PR is the latest completed run. A null
-      // cost on that run stays null (shown as "—"); we do NOT fall through to
-      // an older run, or the column would stop describing the latest review.
+        .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')));
       for (const c of costRows) {
-        if (c.prId && !latestCostByPr.has(c.prId)) latestCostByPr.set(c.prId, c.costUsd);
+        if (!c.prId) continue;
+        if (c.costUsd == null) {
+          // Register the PR so it exists in the map, but don't turn an unknown
+          // into a 0 — only a real number may replace the null.
+          if (!totalCostByPr.has(c.prId)) totalCostByPr.set(c.prId, null);
+          continue;
+        }
+        totalCostByPr.set(c.prId, (totalCostByPr.get(c.prId) ?? 0) + c.costUsd);
       }
     }
 
@@ -175,7 +184,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
-        cost_usd: latestCostByPr.get(r.id) ?? null,
+        cost_usd: totalCostByPr.get(r.id) ?? null,
       };
     });
   });
