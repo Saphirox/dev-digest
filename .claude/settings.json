@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '%s\\n' '{\"systemMessage\":\"engineering-insights: run the end-of-task wrap-up before calling this done — re-read the INSIGHTS.md of every module you touched and append only genuinely new, substantive entries (a gotcha, root cause, dead end, tool quirk, or a decision and its reason), each with file:line and the date. Learned nothing new? Write nothing.\"}'",
+            "statusMessage": "Insights wrap-up reminder"
+          }
+        ]
+      }
+    ]
+  }
+}
