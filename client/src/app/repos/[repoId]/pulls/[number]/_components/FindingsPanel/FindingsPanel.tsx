@@ -5,11 +5,12 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Toggle, EmptyState } from "@devdigest/ui";
-import type { FindingRecord } from "@devdigest/shared";
+import type { FindingRecord, Severity } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
 import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
 import { KEY_TO_ACTION } from "./constants";
-import { visibleFindings } from "./helpers";
+import { visibleFindings, countBySeverity } from "./helpers";
+import { SeverityPills } from "./SeverityPills";
 import { s } from "./styles";
 
 export function FindingsPanel({
@@ -27,8 +28,20 @@ export function FindingsPanel({
   const action = useFindingAction();
   const [hideLow, setHideLow] = React.useState(false);
   const [focusIdx, setFocusIdx] = React.useState(0);
+  const [severity, setSeverity] = React.useState<Severity | null>(null);
 
-  const shown = React.useMemo(() => visibleFindings(findings, hideLow), [findings, hideLow]);
+  // Counted BEFORE the severity filter but AFTER "hide low confidence", so a
+  // pill's number always equals the cards rendered below it — including while
+  // the toggle is on. Counting raw `findings` would over-count there.
+  const afterConfidence = React.useMemo(
+    () => visibleFindings(findings, hideLow),
+    [findings, hideLow],
+  );
+  const counts = React.useMemo(() => countBySeverity(afterConfidence), [afterConfidence]);
+  const shown = React.useMemo(
+    () => (severity ? afterConfidence.filter((f) => f.severity === severity) : afterConfidence),
+    [afterConfidence, severity],
+  );
 
   // Toggling "hide low confidence" can shrink the list past the focused index,
   // which would leave no card highlighted and make a/d silently no-op on an
@@ -54,6 +67,8 @@ export function FindingsPanel({
 
   return (
     <div>
+      <SeverityPills counts={counts} value={severity} onChange={setSeverity} />
+
       <div style={s.toolbar}>
         <div style={s.toggleGroup}>
           {t("panel.hideLowConfidence")}
