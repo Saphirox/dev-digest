@@ -41,12 +41,38 @@ not a separate package.
   "clean up" what looks unused.
 - Migrations are **not** applied on boot — `cd server && pnpm db:migrate`.
 
+## Naming conventions
+
+| Thing | Convention | Example |
+|---|---|---|
+| Package name | `@devdigest/<short>` — not the folder name | `server/` → `@devdigest/api`, `client/` → `@devdigest/web` |
+| Server module | one folder per feature under `src/modules/<feature>/`, registered in `modules/index.ts` | `modules/reviews/routes.ts` |
+| Adapter | `src/adapters/<port>/<impl>.ts`, port name singular | `adapters/llm/openrouter.ts`, `adapters/secrets/local.ts` |
+| DB schema | one file per domain in `src/db/schema/<domain>.ts`; shared columns in `_shared.ts` | `schema/runs.ts` |
+| Migration | `NNNN_<snake_case>.sql`, 4-digit sequential prefix, drizzle-generated name — never renumbered | `0011_petite_molecule_man.sql` |
+| Contract | zod schema and its inferred type share one name | `export const PrMeta = z.object({…})` + `export type PrMeta = z.infer<typeof PrMeta>` |
+| Client route | `src/app/**/page.tsx`; pages stay thin | `app/repos/[repoId]/pulls/[number]/page.tsx` |
+| Client feature component | colocated folder `_components/<Name>/` holding `<Name>.tsx` + optional `constants.ts`, `helpers.ts`, `styles.ts`, `index.ts`, `<Name>.test.tsx` | `_components/FindingCard/` |
+| Cross-route component | `src/components/<kebab-name>/` | `components/findings-preview/` |
+| Client test | colocated `<Name>.test.tsx` beside the component | `FindingCard.test.tsx` |
+| Server test | lives in `server/test/`, **not** beside the source | `test/reviews-helpers.test.ts` |
+| Server DB-backed test | **must** end `.it.test.ts` or the unit/integration split breaks | `test/agents-versions.it.test.ts` |
+| e2e flow | `e2e/specs/NN-name.flow.json` | `04-pr-findings.flow.json` |
+| i18n | one namespace file per feature area, keys addressed by dot path | `messages/en/prReview.json` → `t("list.columns.cost")` |
+| Severity CSS token | `--<sev>` plus a `--<sev>-bg` tint | `--crit` / `--crit-bg` |
+
 ## Do not touch
 
 - `server/src/vendor/shared/**` and `client/src/vendor/shared/**` — hand-vendored,
   not generated; if you edit contracts, update both sides deliberately.
 - Merged files under `server/src/db/migrations/` — immutable; add a new
   migration rather than editing an old one.
+- **Lock files** — `client/pnpm-lock.yaml`, `server/pnpm-lock.yaml`,
+  `reviewer-core/package-lock.json`, `e2e/package-lock.json`. Never hand-edit
+  one, and never cross the package managers: `server`/`client` are pnpm,
+  `reviewer-core`/`e2e` are npm. Running `pnpm install` inside an npm package
+  silently writes a competing `pnpm-lock.yaml` (and a stray
+  `pnpm-workspace.yaml`) — check `git status` before committing.
 - `e2e/specs/*.flow.json` and the `devdigest_pgdata` Docker volume — see
   [e2e/CLAUDE.md](e2e/CLAUDE.md) before touching either.
 
