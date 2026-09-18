@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
@@ -113,8 +113,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
 
     // Latest-review SCORE per PR for the list's score ring. Computed on read
     // from reviews (no FK denorm); the list is small, so one IN-query + JS
-    // grouping is cheap. (The per-severity FINDINGS breakdown is intentionally
-    // not surfaced on the list — findings live on the PR detail page.)
+    // grouping is cheap.
     const prIds = rows.map((r) => r.id);
     const latestReviewByPr = new Map<string, { score: number | null }>();
     if (prIds.length > 0) {
@@ -160,6 +159,33 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
+    // Per-severity FINDINGS breakdown for the list's FINDINGS column, which
+    // shows severity chips and previews a PR's findings on hover. Same read-time
+    // grouping as score and cost above: one IN-query over reviews joined to
+    // their findings, counted in JS.
+    //
+    // Counts cover every review on the PR, not just the latest — the column
+    // answers "what is outstanding on this PR", and a finding raised by an
+    // earlier agent is still outstanding. Dismissed findings are excluded:
+    // acting on one should remove it from the count.
+    const findingsByPr = new Map<string, { CRITICAL: number; WARNING: number; SUGGESTION: number }>();
+    if (prIds.length > 0) {
+      const findingRows = await container.db
+        .select({ prId: t.reviews.prId, severity: t.findings.severity })
+        .from(t.findings)
+        .innerJoin(t.reviews, eq(t.findings.reviewId, t.reviews.id))
+        .where(and(inArray(t.reviews.prId, prIds), isNull(t.findings.dismissedAt)));
+      for (const f of findingRows) {
+        if (!f.prId) continue;
+        const bucket =
+          findingsByPr.get(f.prId) ?? { CRITICAL: 0, WARNING: 0, SUGGESTION: 0 };
+        if (f.severity === 'CRITICAL' || f.severity === 'WARNING' || f.severity === 'SUGGESTION') {
+          bucket[f.severity] += 1;
+        }
+        findingsByPr.set(f.prId, bucket);
+      }
+    }
+
     const now = Date.now();
     return rows.map((r) => {
       const review = latestReviewByPr.get(r.id);
@@ -185,6 +211,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
         cost_usd: totalCostByPr.get(r.id) ?? null,
+        findings: findingsByPr.get(r.id) ?? null,
       };
     });
   });

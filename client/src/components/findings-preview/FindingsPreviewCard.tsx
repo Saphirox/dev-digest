@@ -5,8 +5,8 @@
 "use client";
 
 import React from "react";
-import { Icon, SeverityBadge, CategoryTag, type Severity, type Category } from "@devdigest/ui";
-import type { FindingRecord } from "@devdigest/shared";
+import { Icon, SeverityBadge, CategoryTag, type Severity as UiSeverity, type Category } from "@devdigest/ui";
+import type { FindingRecord, Severity } from "@devdigest/shared";
 import { s } from "./styles";
 
 /** Display order for severity chips and for sorting the preview list. */
@@ -40,6 +40,16 @@ function ConfidencePct({ value }: { value: number }) {
   );
 }
 
+/** Count findings per severity. Callers pass the list that is actually being
+ *  represented, so a chip's number always matches what it stands for. */
+export function countBySeverity(findings: FindingRecord[]): Record<Severity, number> {
+  const counts = { CRITICAL: 0, WARNING: 0, SUGGESTION: 0 } as Record<Severity, number>;
+  for (const f of findings) {
+    if ((PREVIEW_SEVERITIES as readonly string[]).includes(f.severity)) counts[f.severity] += 1;
+  }
+  return counts;
+}
+
 export function FindingsPreviewCard({
   findings,
   title,
@@ -62,7 +72,7 @@ export function FindingsPreviewCard({
       {findings.map((f) => (
         <div key={f.id} style={s.item}>
           <div style={s.head}>
-            <SeverityBadge severity={f.severity as Severity} compact />
+            <SeverityBadge severity={f.severity as UiSeverity} compact />
             <span style={s.itemTitle}>{f.title}</span>
             <CategoryTag category={f.category as Category} />
           </div>

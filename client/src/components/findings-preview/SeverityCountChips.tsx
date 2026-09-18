@@ -8,15 +8,15 @@
 
 import React from "react";
 import { Icon, SEV } from "@devdigest/ui";
-import type { FindingRecord } from "@devdigest/shared";
+import type { Severity } from "@devdigest/shared";
 import { PREVIEW_SEVERITIES } from "./FindingsPreviewCard";
 import { s } from "./styles";
 
-export function SeverityCountChips({ findings }: { findings: FindingRecord[] }) {
+export function SeverityCountChips({ counts }: { counts: Record<Severity, number> }) {
   return (
     <>
       {PREVIEW_SEVERITIES.map((sev) => {
-        const count = findings.filter((f) => f.severity === sev).length;
+        const count = counts[sev] ?? 0;
         if (count === 0) return null;
         const I = Icon[SEV[sev].icon];
         return (

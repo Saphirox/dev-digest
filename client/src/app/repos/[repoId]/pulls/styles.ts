@@ -22,6 +22,12 @@ export const s = {
   } satisfies CSSProperties,
   rowIcon: (color: string): CSSProperties => ({ color, flexShrink: 0 }),
   rowTitleWrap: { minWidth: 0 } satisfies CSSProperties,
+  findingsCell: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  } satisfies CSSProperties,
   rowTitle: (hover: boolean): CSSProperties => ({
     fontSize: 14,
     fontWeight: 550,

@@ -7,6 +7,7 @@ import { RunCostBadge } from "@/components/run-cost-badge";
 import {
   FindingsPreviewCard,
   SeverityCountChips,
+  countBySeverity,
   sortBySeverity,
 } from "@/components/findings-preview";
 import type { RunSummary, PrCommit, ReviewRecord, FindingRecord } from "@devdigest/shared";
@@ -238,7 +239,7 @@ export function RunHistory({
                       }}
                       onMouseLeave={() => setPreview(null)}
                     >
-                      <SeverityCountChips findings={runFindings} />
+                      <SeverityCountChips counts={countBySeverity(runFindings)} />
                       {(r.blockers ?? 0) > 0 && (
                         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
                           {t("runStatus.blockers", { count: r.blockers ?? 0 })}

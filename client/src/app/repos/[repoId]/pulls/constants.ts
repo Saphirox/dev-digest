@@ -27,7 +27,7 @@ export const SIZE_COLOR: Record<string, string> = {
  *  sync with COLUMN_KEYS below AND with the cells rendered by PRRow — the
  *  three are only related through this template, so a column added to one
  *  without the others silently shifts every header off its cell. */
-export const GRID = "1fr 132px 92px 60px 118px 76px 78px";
+export const GRID = "1fr 132px 92px 60px 120px 118px 76px 78px";
 
 /** Line-count thresholds for the S/M/L size bucket. */
 export const SIZE_SMALL_MAX = 100;
@@ -47,6 +47,7 @@ export const COLUMN_KEYS: string[] = [
   "author",
   "size",
   "score",
+  "findings",
   "status",
   "cost",
   "updated",

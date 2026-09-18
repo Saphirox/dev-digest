@@ -176,6 +176,19 @@ export const PrMeta = z.object({
    * (`listPullRequests`), which knows nothing about cost.
    */
   cost_usd: z.number().nullish(),
+  /**
+   * Per-severity finding counts for the list's FINDINGS column — list endpoint
+   * only, and `nullish` for the same reason as `score`/`cost_usd`: PrMeta also
+   * types the GitHub adapter's `listPullRequests`, which knows nothing about
+   * findings. Excludes dismissed findings.
+   */
+  findings: z
+    .object({
+      CRITICAL: z.number().int(),
+      WARNING: z.number().int(),
+      SUGGESTION: z.number().int(),
+    })
+    .nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 
