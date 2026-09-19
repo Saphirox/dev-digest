@@ -6,20 +6,8 @@
 
 import React from "react";
 import { Icon, SeverityBadge, CategoryTag, type Severity as UiSeverity, type Category } from "@devdigest/ui";
-import type { FindingRecord, Severity } from "@devdigest/shared";
+import type { FindingRecord } from "@devdigest/shared";
 import { s } from "./styles";
-
-/** Display order for severity chips and for sorting the preview list. */
-export const PREVIEW_SEVERITIES = ["CRITICAL", "WARNING", "SUGGESTION"] as const;
-
-/** Findings sorted CRITICAL → WARNING → SUGGESTION (unknown severities last). */
-export function sortBySeverity(findings: FindingRecord[]): FindingRecord[] {
-  const rank = (sev: string) => {
-    const i = PREVIEW_SEVERITIES.indexOf(sev as (typeof PREVIEW_SEVERITIES)[number]);
-    return i === -1 ? PREVIEW_SEVERITIES.length : i;
-  };
-  return [...findings].sort((a, b) => rank(a.severity) - rank(b.severity));
-}
 
 /**
  * Confidence readout — a local copy of @devdigest/ui's ConfidenceNum, minus its
@@ -38,16 +26,6 @@ function ConfidencePct({ value }: { value: number }) {
       {pct}% conf
     </span>
   );
-}
-
-/** Count findings per severity. Callers pass the list that is actually being
- *  represented, so a chip's number always matches what it stands for. */
-export function countBySeverity(findings: FindingRecord[]): Record<Severity, number> {
-  const counts = { CRITICAL: 0, WARNING: 0, SUGGESTION: 0 } as Record<Severity, number>;
-  for (const f of findings) {
-    if ((PREVIEW_SEVERITIES as readonly string[]).includes(f.severity)) counts[f.severity] += 1;
-  }
-  return counts;
 }
 
 export function FindingsPreviewCard({

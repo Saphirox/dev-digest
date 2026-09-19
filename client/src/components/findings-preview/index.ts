@@ -1,7 +1,2 @@
-export {
-  FindingsPreviewCard,
-  PREVIEW_SEVERITIES,
-  sortBySeverity,
-  countBySeverity,
-} from "./FindingsPreviewCard";
+export { FindingsPreviewCard } from "./FindingsPreviewCard";
 export { SeverityCountChips } from "./SeverityCountChips";

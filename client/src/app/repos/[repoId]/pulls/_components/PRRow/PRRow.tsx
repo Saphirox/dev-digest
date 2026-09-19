@@ -6,11 +6,8 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Icon, Avatar, Badge, CircularScore } from "@devdigest/ui";
 import { RunCostBadge } from "@/components/run-cost-badge";
-import {
-  FindingsPreviewCard,
-  SeverityCountChips,
-  sortBySeverity,
-} from "@/components/findings-preview";
+import { FindingsPreviewCard, SeverityCountChips } from "@/components/findings-preview";
+import { sortBySeverity } from "@/lib/severity";
 import { usePrReviews } from "@/lib/hooks/reviews";
 import type { PrMeta } from "@/lib/types";
 import { SIZE_COLOR, STATUS_META } from "../../constants";

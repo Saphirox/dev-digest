@@ -4,12 +4,8 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
 import { RunCostBadge } from "@/components/run-cost-badge";
-import {
-  FindingsPreviewCard,
-  SeverityCountChips,
-  countBySeverity,
-  sortBySeverity,
-} from "@/components/findings-preview";
+import { FindingsPreviewCard, SeverityCountChips } from "@/components/findings-preview";
+import { countBySeverity, sortBySeverity } from "@/lib/severity";
 import type { RunSummary, PrCommit, ReviewRecord, FindingRecord } from "@devdigest/shared";
 
 /**

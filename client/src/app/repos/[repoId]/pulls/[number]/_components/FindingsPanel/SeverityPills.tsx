@@ -10,7 +10,7 @@ import React from "react";
 // below casts rather than widening this component's props.
 import { SeverityBadge, type Severity as UiSeverity } from "@devdigest/ui";
 import type { Severity } from "@devdigest/shared";
-import { SEVERITY_KEYS } from "./helpers";
+import { SEVERITIES } from "@/lib/severity";
 import { s } from "./styles";
 
 export function SeverityPills({
@@ -23,7 +23,7 @@ export function SeverityPills({
   value: Severity | null;
   onChange: (next: Severity | null) => void;
 }) {
-  const present = SEVERITY_KEYS.filter((k) => counts[k] > 0);
+  const present = SEVERITIES.filter((k) => counts[k] > 0);
   if (present.length === 0) return null;
 
   return (
