@@ -1,0 +1,37 @@
+diff --git a/src/routes/invoices.ts b/src/routes/invoices.ts
+index 8800891..3c82b27 100644
+--- a/src/routes/invoices.ts
++++ b/src/routes/invoices.ts
+@@ -2,24 +2,23 @@ import type { FastifyInstance } from 'fastify';
+ import { z } from 'zod';
+ 
+ const ListQuery = z.object({
+-  customerId: z.string(),
+-  status: z.enum(['open', 'paid', 'void']).optional(),
++  customer: z.string(),
++  status: z.enum(['open', 'paid']),
+   limit: z.coerce.number().int().min(1).max(100).default(20),
+ });
+ 
+ const Invoice = z.object({
+   id: z.string(),
+   customerId: z.string(),
+-  amountCents: z.number().int(),
+-  currency: z.string(),
+-  status: z.enum(['open', 'paid', 'void']),
+-  dueDate: z.string(),
++  amount: z.number(),
++  status: z.enum(['open', 'paid']),
++  dueDate: z.number(),
+ });
+ 
+ export async function invoiceRoutes(app: FastifyInstance) {
+-  app.get('/invoices', { schema: { querystring: ListQuery } }, async (req) => {
+-    const query = ListQuery.parse(req.query);
++  app.post('/invoices/search', { schema: { body: ListQuery } }, async (req) => {
++    const query = ListQuery.parse(req.body);
+     const rows = await app.db.invoices.list(query);
+-    return z.array(Invoice).parse(rows);
++    return { items: z.array(Invoice).parse(rows) };
+   });
+ }
