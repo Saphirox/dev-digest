@@ -11,7 +11,7 @@ import { AppShell } from "../../../../components/app-shell";
 import { useAgent, useAgents } from "../../../../lib/hooks/agents";
 import { AgentsRail } from "../AgentsRail";
 import { CreateAgentModal, type AgentTemplate } from "../CreateAgentModal";
-import { VALID_TABS } from "./constants";
+import { resolveTab } from "../AgentEditor";
 import { AgentsShellContext } from "./context";
 import { s } from "./styles";
 
@@ -19,8 +19,7 @@ export function AgentsLayout({ children }: { children: React.ReactNode }) {
   const t = useTranslations("agents");
   const params = useParams<{ id?: string }>();
   const agentId = params?.id;
-  const requested = useSearchParams().get("tab") ?? "";
-  const tab = VALID_TABS.includes(requested) ? requested : "config";
+  const tab = resolveTab(useSearchParams().get("tab"));
   const agents = useAgents();
   const { data: agent } = useAgent(agentId);
   // `undefined` = closed; `null` = open, from scratch; a template = prefilled.

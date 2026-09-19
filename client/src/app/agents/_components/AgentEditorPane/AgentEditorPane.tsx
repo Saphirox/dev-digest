@@ -7,15 +7,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ErrorState, Skeleton } from "@devdigest/ui";
 import { useAgent } from "../../../../lib/hooks/agents";
-import { AgentEditor } from "../AgentEditor";
-import { VALID_TABS } from "../AgentsLayout";
+import { AgentEditor, resolveTab } from "../AgentEditor";
 import { s } from "./styles";
 
 export function AgentEditorPane({ agentId }: { agentId: string }) {
   const t = useTranslations("agents");
   const router = useRouter();
-  const requested = useSearchParams().get("tab") ?? "";
-  const tab = VALID_TABS.includes(requested) ? requested : "config";
+  const tab = resolveTab(useSearchParams().get("tab"));
   const { data: agent, isLoading, isError, refetch } = useAgent(agentId);
 
   if (isLoading) {

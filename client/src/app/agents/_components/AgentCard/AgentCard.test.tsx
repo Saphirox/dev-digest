@@ -56,6 +56,13 @@ describe("AgentCard (smoke)", () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
+  it("Enter on the enabled switch does not open the agent", () => {
+    const onClick = vi.fn();
+    renderWithIntl(<AgentCard ag={AGENT} onClick={onClick} onToggle={() => {}} />);
+    fireEvent.keyDown(screen.getByRole("switch"), { key: "Enter" });
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
   it("falls back to a translated placeholder when description is empty", () => {
     renderWithIntl(<AgentCard ag={{ ...AGENT, description: "" }} />);
     expect(screen.getByText("No description")).toBeInTheDocument();

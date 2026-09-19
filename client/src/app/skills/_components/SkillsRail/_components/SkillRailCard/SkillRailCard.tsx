@@ -49,7 +49,7 @@ export function SkillRailCard({
         <span className="mono" style={s.name}>
           {skill.name}
         </span>
-        <div onClick={(e) => e.stopPropagation()} title={t("rail.toggle")}>
+        <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} title={t("rail.toggle")}>
           <Toggle on={skill.enabled} onChange={onToggle} size={14} />
         </div>
       </div>

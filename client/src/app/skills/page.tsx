@@ -1,7 +1,7 @@
-import { SkillsLayout } from "./_components/SkillsLayout";
+import { SkillPane } from "./_components/SkillPane";
 
-/* Route: /skills (Skills Lab). Thin route entry — the rail of skills with no
-   skill selected; the layout, rail and editor live under _components/. */
+/* Route: /skills (Skills Lab). Thin route entry — no skill selected; the rail
+   comes from app/skills/layout.tsx. */
 export default function SkillsPage() {
-  return <SkillsLayout />;
+  return <SkillPane />;
 }

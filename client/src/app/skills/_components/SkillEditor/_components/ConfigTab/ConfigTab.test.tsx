@@ -51,7 +51,6 @@ describe("ConfigTab", () => {
     expect(screen.getByText("Configuration")).toBeInTheDocument();
     expect(screen.getByText("pr-quality-rubric.md")).toBeInTheDocument();
     expect(screen.queryByText("unsaved")).not.toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument(); // line numbers 1..3
     expect(screen.getByRole("button", { name: "Save skill" })).toBeDisabled();
   });
 

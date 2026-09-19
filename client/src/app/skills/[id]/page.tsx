@@ -1,11 +1,11 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { SkillsLayout } from "../_components/SkillsLayout";
+import { SkillPane } from "../_components/SkillPane";
 
-/* Route: /skills/:id (Skill editor). Thin route entry — same layout as
-   /skills with this skill open; the tab lives in ?tab=. */
+/* Route: /skills/:id (Skill editor). Thin route entry — this skill open in the
+   pane; the rail comes from app/skills/layout.tsx and the tab lives in ?tab=. */
 export default function SkillPage() {
   const { id } = useParams<{ id: string }>();
-  return <SkillsLayout skillId={id} />;
+  return <SkillPane skillId={id} />;
 }

@@ -1,5 +1,3 @@
-"use client";
-
 import { AgentsLayout } from "./_components/AgentsLayout";
 
 /* Layout for /agents and /agents/:id. Mounted once for the whole section, so

@@ -69,15 +69,11 @@ describe("SkillsTab", () => {
   it("lists every workspace skill, enabled ones first in prompt order, and counts them", () => {
     renderTab();
     expect(screen.getByText("2 of 4 enabled")).toBeInTheDocument();
+    // The name each row shows, top to bottom.
     const order = within(screen.getByRole("list", { name: "Skills" }))
       .getAllByRole("listitem")
-      .map((li) => li.getAttribute("data-testid"));
-    expect(order).toEqual([
-      "skill-row-pr-quality-rubric",
-      "skill-row-secret-leakage-gate",
-      "skill-row-no-then-chains",
-      "skill-row-test-coverage-nudge",
-    ]);
+      .map((li) => all.find((sk) => li.textContent?.includes(sk.name))?.name);
+    expect(order).toEqual(["pr-quality-rubric", "secret-leakage-gate", "no-then-chains", "test-coverage-nudge"]);
   });
 
   it("ticking a skill links it at the end of the prompt", () => {

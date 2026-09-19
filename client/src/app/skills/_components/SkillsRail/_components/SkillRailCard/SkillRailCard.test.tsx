@@ -59,6 +59,7 @@ describe("SkillRailCard", () => {
     renderCard({ onOpen, onToggle });
     fireEvent.click(screen.getByRole("switch"));
     expect(onToggle).toHaveBeenCalledWith(false);
+    fireEvent.keyDown(screen.getByRole("switch"), { key: "Enter" });
     expect(onOpen).not.toHaveBeenCalled();
   });
 

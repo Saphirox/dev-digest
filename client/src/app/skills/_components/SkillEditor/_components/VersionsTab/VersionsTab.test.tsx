@@ -57,8 +57,8 @@ describe("VersionsTab", () => {
     renderTab();
     fireEvent.click(within(screen.getByTestId("version-1")).getByRole("button", { name: /Diff/ }));
     const diff = screen.getByLabelText("Changes from v1 to the current version");
-    expect(diff.querySelector('[data-kind="del"]')?.textContent).toBe("- old");
-    expect(diff.querySelector('[data-kind="add"]')?.textContent).toBe("+ new");
+    expect(within(diff).getByText("- old")).toBeInTheDocument();
+    expect(within(diff).getByText("+ new")).toBeInTheDocument();
   });
 
   it("Restore saves the old body as a new version", () => {

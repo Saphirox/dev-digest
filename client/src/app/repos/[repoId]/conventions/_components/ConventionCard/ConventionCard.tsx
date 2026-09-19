@@ -9,7 +9,7 @@ import { useTranslations } from "next-intl";
 import { Badge, Button, Icon, ProgressBar } from "@devdigest/ui";
 import type { ConventionCandidate, ConventionStatus } from "@devdigest/shared";
 import { useToast } from "@/lib/toast";
-import { HIGH_CONFIDENCE, evidenceLabel } from "./helpers";
+import { evidenceLabel, isHighConfidence } from "./helpers";
 import { s } from "./styles";
 
 export function ConventionCard({
@@ -79,7 +79,7 @@ export function ConventionCard({
         <div style={s.metaRow}>
           <span>{t("card.confidence")}</span>
           <div style={s.bar}>
-            <ProgressBar value={pct} color={c.confidence >= HIGH_CONFIDENCE ? "var(--ok)" : "var(--warn)"} />
+            <ProgressBar value={pct} color={isHighConfidence(c) ? "var(--ok)" : "var(--warn)"} />
           </div>
           <span style={s.pct}>{pct}%</span>
           {c.occurrences != null && <span>{t("card.seenIn", { count: c.occurrences })}</span>}

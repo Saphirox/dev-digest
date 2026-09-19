@@ -49,8 +49,8 @@ export function ConfigTab({ agent, onDeleted }: { agent: Agent; onDeleted: () =>
     setRepoIntel(agent.repo_intel);
     setEnabled(agent.enabled);
   };
-  // Reset local form when switching agents.
-  React.useEffect(reset, [agent.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Switching agents remounts this tab (key={agent.id} in AgentEditor), so the
+  // form starts from the new agent; `reset` is only for Cancel.
 
   const promptTokens = approxTokens(systemPrompt);
 

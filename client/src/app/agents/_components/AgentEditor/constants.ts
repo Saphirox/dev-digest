@@ -12,3 +12,5 @@ export const TABS: readonly EditorTab[] = [
   { key: "config", labelKey: "editor.tabs.config", icon: "Settings" },
   { key: "skills", labelKey: "editor.tabs.skills", icon: "Sparkles" },
 ];
+
+export const TAB_KEYS = TABS.map((tb) => tb.key);

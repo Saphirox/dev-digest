@@ -1,4 +1,5 @@
 import type { ConventionCandidate } from "@devdigest/shared";
+import { HIGH_CONFIDENCE } from "./constants";
 
 /** `src/api/users.ts:23-31`, or `:23` for one line, or just the path. */
 export function evidenceLabel(c: Pick<ConventionCandidate, "evidence_path" | "evidence_line" | "evidence_line_end">): string {
@@ -7,5 +8,7 @@ export function evidenceLabel(c: Pick<ConventionCandidate, "evidence_path" | "ev
   return end > c.evidence_line ? `${c.evidence_path}:${c.evidence_line}-${end}` : `${c.evidence_path}:${c.evidence_line}`;
 }
 
-/** Green from this confidence up, amber below (the mock's 91% / 78%). */
-export const HIGH_CONFIDENCE = 0.8;
+/** Whether the confidence bar shows green (high) rather than amber. */
+export function isHighConfidence(c: Pick<ConventionCandidate, "confidence">): boolean {
+  return c.confidence >= HIGH_CONFIDENCE;
+}

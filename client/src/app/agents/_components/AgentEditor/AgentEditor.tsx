@@ -39,7 +39,7 @@ export function AgentEditor({
         <Tabs tabs={tabs} value={tab} onChange={onTab} pad="0 24px" />
       </div>
       <div style={s.body}>
-        {tab === "skills" ? <SkillsTab agent={agent} /> : <ConfigTab agent={agent} onDeleted={onDeleted} />}
+        {tab === "skills" ? <SkillsTab agent={agent} /> : <ConfigTab key={agent.id} agent={agent} onDeleted={onDeleted} />}
       </div>
     </div>
   );
