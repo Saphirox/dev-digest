@@ -19,6 +19,7 @@ pnpm db:migrate      # apply migrations (NOT run on boot)
 pnpm db:seed         # idempotent demo data
 pnpm test            # unit + integration (see below)
 pnpm typecheck
+pnpm arch:check      # onion layering rules (dependency-cruiser); must stay 0 errors
 ```
 
 ## Map
@@ -35,6 +36,9 @@ pnpm typecheck
 
 ## Non-default conventions
 
+- **Onion layering.** Imports point inward only: `routes.ts` → `service.ts` →
+  ports ← `repository.ts`/`adapters/*`. No Drizzle in routes or services.
+  Checked by `pnpm arch:check`.
 - No keys required to boot — `loadConfig` marks every secret optional; set
   keys via Settings UI or `server/.env` at runtime.
 - Secrets never touch `AppConfig`/DB — only `LocalSecretsProvider`
