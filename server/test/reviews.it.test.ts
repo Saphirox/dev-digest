@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startPg, dockerAvailable, type PgFixture } from './helpers/pg.js';
-import { waitForPrRuns } from './helpers/runs.js';
+import { waitForPrRuns, waitForRunTrace } from './helpers/runs.js';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/platform/config.js';
 import { seed } from '../src/db/seed.js';
@@ -209,6 +209,61 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     expect(run!.findingsCount).toBe(1);
     expect(run!.grounding).toBe('1/2 passed');
 
+    await app.close();
+  });
+
+  it('an enabled skill reaches the prompt and the trace with its tokens; a disabled one does not', async () => {
+    const app = await appWith(REVIEW_FIXTURE);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Skilled', provider: 'openai', model: 'gpt-4.1', system_prompt: 'sec' },
+      })
+    ).json();
+    const skill = (
+      await app.inject({
+        method: 'POST',
+        url: '/skills',
+        payload: {
+          name: 'boundary-cases',
+          description: 'Use when tests change',
+          type: 'rubric',
+          body: 'Flag tests that only cover the happy path.',
+        },
+      })
+    ).json();
+
+    const runWith = async (linkEnabled: boolean) => {
+      await app.inject({
+        method: 'POST',
+        url: `/agents/${agent.id}/skills`,
+        payload: { skills: [{ skill_id: skill.id, enabled: linkEnabled }] },
+      });
+      const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+      const res = await app.inject({
+        method: 'POST',
+        url: `/pulls/${pr.id}/review`,
+        payload: { agentId: agent.id },
+      });
+      await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+      const runId = res.json().runs[0].run_id;
+      await waitForRunTrace(pg.handle.db, runId);
+      return (await app.inject({ method: 'GET', url: `/runs/${runId}/trace` })).json();
+    };
+
+    const on = await runWith(true);
+    expect(on.prompt_assembly.skills).toBe(
+      '### boundary-cases\nFlag tests that only cover the happy path.',
+    );
+    expect(on.prompt_assembly.user).toContain('## Skills / rules');
+    expect(on.prompt_assembly.skills_tokens).toBeGreaterThan(0);
+    expect(on.log.some((e: { msg: string }) => e.msg.startsWith('skills: 1 attached'))).toBe(true);
+
+    const off = await runWith(false);
+    expect(off.prompt_assembly.skills ?? null).toBeNull();
+    expect(off.prompt_assembly.skills_tokens ?? null).toBeNull();
+    expect(off.prompt_assembly.user).not.toContain('## Skills / rules');
     await app.close();
   });
 

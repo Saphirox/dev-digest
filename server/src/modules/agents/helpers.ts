@@ -1,6 +1,13 @@
-import type { Agent, AgentVersion, CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
+import type {
+  Agent,
+  AgentSkillDetail,
+  AgentVersion,
+  CiFailOn,
+  Provider,
+  ReviewStrategy,
+} from '@devdigest/shared';
 import { AgentVersionConfig } from '@devdigest/shared';
-import type { AgentRow, AgentVersionRow } from './repository.js';
+import type { AgentRow, AgentVersionRow, LinkedSkillRow } from './repository.js';
 
 /**
  * Pure helpers for the agents module — DB row ⇄ DTO mapping and the
@@ -23,6 +30,24 @@ export function toAgentDto(row: AgentRow): Agent {
     strategy: row.strategy as ReviewStrategy,
     ci_fail_on: row.ciFailOn as CiFailOn,
     repo_intel: row.repoIntel,
+  };
+}
+
+/** A linked skill as the agent's Skills tab shows it: skill fields + link fields. */
+export function toAgentSkillDetail(link: LinkedSkillRow): AgentSkillDetail {
+  const { skill } = link;
+  return {
+    id: skill.id,
+    name: skill.name,
+    description: skill.description,
+    type: skill.type,
+    source: skill.source,
+    body: skill.body,
+    enabled: skill.enabled,
+    version: skill.version,
+    evidence_files: skill.evidenceFiles ?? null,
+    order: link.order,
+    link_enabled: link.enabled,
   };
 }
 

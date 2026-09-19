@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { taskLine } from '../src/modules/reviews/helpers.js';
+import { taskLine, toSkillPromptBlock } from '../src/modules/reviews/helpers.js';
 
 /**
  * Unit coverage for the review task-line. The key invariant: our trusted
@@ -20,5 +20,13 @@ describe('taskLine', () => {
     const line = taskLine(pull);
     expect(line).toMatch(/never .*withhold .*(or downgrade )?.*security/i);
     expect(line).toMatch(/review the entire diff/i);
+  });
+});
+
+describe('toSkillPromptBlock', () => {
+  it('heads the body with the skill name and trims it', () => {
+    expect(toSkillPromptBlock({ name: 'semver', body: '\nBump major on breaks.\n\n' })).toBe(
+      '### semver\nBump major on breaks.',
+    );
   });
 });
