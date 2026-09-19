@@ -161,7 +161,7 @@ export type SkillVersion = z.infer<typeof SkillVersion>;
 export const SkillImportRequest = z.object({
   filename: z.string().min(1).max(255),
   /** File bytes, base64 — keeps the API JSON-only (no multipart plugin). */
-  content_b64: z.string().min(1),
+  content_b64: z.string().min(1).base64(),
 });
 export type SkillImportRequest = z.infer<typeof SkillImportRequest>;
 

@@ -62,4 +62,6 @@ export const conventions = pgTable('conventions', {
     sql`${t.category} in ('naming', 'structure', 'errors', 'testing', 'imports', 'typing', 'api', 'general')`,
   ),
   statusCk: check('conventions_status_ck', sql`${t.status} in ('pending', 'accepted', 'rejected')`),
+  evidenceLineCk: check('conventions_evidence_line_ck', sql`${t.evidenceLine} >= 1`),
+  occurrencesCk: check('conventions_occurrences_ck', sql`${t.occurrences} >= 0`),
 }));

@@ -269,18 +269,21 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .from(t.skills)
       .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, sk.name)));
     if (!skill) {
-      [skill] = await db
-        .insert(t.skills)
-        .values({
-          workspaceId,
-          name: sk.name,
-          description: sk.description,
-          type: sk.type,
-          source: 'manual',
-          body: sk.body,
-        })
-        .returning();
-      await db.insert(t.skillVersions).values({ skillId: skill!.id, version: 1, body: sk.body });
+      skill = await db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(t.skills)
+          .values({
+            workspaceId,
+            name: sk.name,
+            description: sk.description,
+            type: sk.type,
+            source: 'manual',
+            body: sk.body,
+          })
+          .returning();
+        await tx.insert(t.skillVersions).values({ skillId: row!.id, version: 1, body: sk.body });
+        return row!;
+      });
     }
     const [agent] = await db
       .select()

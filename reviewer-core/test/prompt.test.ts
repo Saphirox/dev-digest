@@ -85,6 +85,6 @@ describe('assemblePrompt — ## Skills / rules', () => {
   it('omits the section when there are no skills', () => {
     expect(userOf({ system: 'sys', diff: 'DIFF' })).not.toContain('## Skills / rules');
     expect(userOf({ system: 'sys', diff: 'DIFF', skills: [] })).not.toContain('## Skills / rules');
-    expect(assemblePrompt({ system: 'sys', diff: 'DIFF' }).assembly.skills ?? null).toBeNull();
+    expect(assemblePrompt({ system: 'sys', diff: 'DIFF' }).assembly.skills).toBeNull();
   });
 });

@@ -106,6 +106,13 @@
       "when": 1789835128098,
       "tag": "0014_chubby_hercules",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1789843567701,
+      "tag": "0015_daffy_thaddeus_ross",
+      "breakpoints": true
     }
   ]
 }
