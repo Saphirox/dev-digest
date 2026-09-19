@@ -24,20 +24,28 @@ export function useFindingKeyboardNav(
     setFocusIdx(0);
   }
 
-  // Reads the latest shown/focus/onAction without re-subscribing on every move.
-  const onKeyDown = React.useEffectEvent((e: KeyboardEvent) => {
-    const tag = (e.target as HTMLElement)?.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA") return;
-    if (e.key === "j") setFocusIdx((i) => Math.min(i + 1, shown.length - 1));
-    else if (e.key === "k") setFocusIdx((i) => Math.max(i - 1, 0));
-    else {
-      const action = KEY_TO_ACTION[e.key];
-      const finding = shown[focusIdx];
-      if (action && finding) onAction(finding, action);
-    }
+  // The listener reads the latest shown/focus/onAction through a ref, so it is
+  // subscribed once instead of on every move. (Not React.useEffectEvent: that
+  // is React 19.2, but Next 15's App Router runs its own bundled React without
+  // it, so the hook crashed in the browser while unit tests passed.)
+  const latest = React.useRef({ shown, focusIdx, onAction });
+  React.useEffect(() => {
+    latest.current = { shown, focusIdx, onAction };
   });
 
   React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const { shown, focusIdx, onAction } = latest.current;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "j") setFocusIdx((i) => Math.min(i + 1, shown.length - 1));
+      else if (e.key === "k") setFocusIdx((i) => Math.max(i - 1, 0));
+      else {
+        const action = KEY_TO_ACTION[e.key];
+        const finding = shown[focusIdx];
+        if (action && finding) onAction(finding, action);
+      }
+    };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);

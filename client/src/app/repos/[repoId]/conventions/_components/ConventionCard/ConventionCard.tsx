@@ -1,7 +1,8 @@
 /* ConventionCard — one extracted convention: the rule, the evidence it was
-   grounded in, confidence, how often the pattern occurs, and Accept / Reject
-   toggles (clicking an active one returns it to pending) plus Edit, which
-   edits the rule in place (so does clicking the rule). */
+   grounded in, confidence, how often the pattern occurs, an Accept toggle
+   (clicking it again returns the rule to pending), Reject, which deletes the
+   candidate, and Edit, which edits the rule in place (so does clicking the
+   rule). */
 "use client";
 
 import React from "react";
@@ -15,17 +16,19 @@ import { s } from "./styles";
 export function ConventionCard({
   convention: c,
   onStatus,
+  onReject,
   onRule,
 }: {
   convention: ConventionCandidate;
   onStatus: (status: ConventionStatus) => void;
+  /** Dismiss the candidate; the parent deletes it. */
+  onReject: () => void;
   onRule: (rule: string) => void;
 }) {
   const t = useTranslations("conventions");
   const toast = useToast();
   const [draft, setDraft] = React.useState<string | null>(null);
   const accepted = c.status === "accepted";
-  const rejected = c.status === "rejected";
   const pct = Math.round(c.confidence * 100);
 
   const commit = () => {
@@ -40,7 +43,7 @@ export function ConventionCard({
   };
 
   return (
-    <article style={s.card(accepted, rejected)} aria-label={c.rule}>
+    <article style={s.card(accepted)} aria-label={c.rule}>
       <div style={s.main}>
         {draft === null ? (
           <button type="button" style={s.rule} title={t("card.edit")} onClick={() => setDraft(c.rule)}>
@@ -97,14 +100,8 @@ export function ConventionCard({
         >
           {accepted ? t("card.accepted") : t("card.accept")}
         </Button>
-        <Button
-          kind={rejected ? "danger" : "ghost"}
-          icon="X"
-          full
-          aria-pressed={rejected}
-          onClick={() => onStatus(rejected ? "pending" : "rejected")}
-        >
-          {rejected ? t("card.rejected") : t("card.reject")}
+        <Button kind="ghost" icon="X" full onClick={onReject}>
+          {t("card.reject")}
         </Button>
         <Button kind="ghost" icon="Edit" full disabled={draft !== null} onClick={() => setDraft(c.rule)}>
           {t("card.editButton")}

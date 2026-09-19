@@ -30,7 +30,6 @@
     "accepted": "Accepted",
     "accept": "Accept",
     "reject": "Reject",
-    "rejected": "Rejected",
     "copy": "Copy snippet",
     "copied": "Snippet copied",
     "seenIn": "{count, plural, one {seen in # file} other {seen in # files}}",

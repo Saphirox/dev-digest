@@ -6,6 +6,7 @@ import messages from "../../../../../../../messages/en/conventions.json";
 import { ToastProvider } from "../../../../../../lib/toast";
 
 const updateMutate = vi.fn();
+const deleteMutate = vi.fn();
 let conventions: ConventionCandidate[] = [];
 // Fixed per test run: a changing timestamp would look like a new scan (and re-sort).
 const LAST_SCAN = new Date(Date.now() - 3_600_000).toISOString();
@@ -26,6 +27,7 @@ vi.mock("@/lib/hooks/conventions", () => ({
   }),
   useExtractConventions: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateConvention: () => ({ mutate: updateMutate }),
+  useDeleteConvention: () => ({ mutate: deleteMutate }),
   useConventionSkillDraft: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
@@ -58,6 +60,7 @@ function renderView() {
 
 beforeEach(() => {
   updateMutate.mockReset();
+  deleteMutate.mockReset();
   lastScan = LAST_SCAN;
 });
 afterEach(cleanup);
@@ -69,6 +72,15 @@ describe("ConventionsView", () => {
     expect(screen.getByText("payments-api")).toBeInTheDocument();
     expect(screen.getByText("Detected from 14 sample files · last scan 1 hour ago")).toBeInTheDocument();
     expect(screen.getByText("1 of 2 accepted")).toBeInTheDocument();
+  });
+
+  it("Reject deletes the convention; rows rejected earlier are not listed", () => {
+    conventions = [c("1", "pending", "naming"), c("2", "rejected", "errors")];
+    renderView();
+    expect(screen.queryByText("Rule 2")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    expect(deleteMutate).toHaveBeenCalledWith("1");
+    expect(updateMutate).not.toHaveBeenCalled();
   });
 
   it("filters by category chip", () => {

@@ -25,15 +25,16 @@ const C: ConventionCandidate = {
 
 function renderCard(c: ConventionCandidate = C) {
   const onStatus = vi.fn();
+  const onReject = vi.fn();
   const onRule = vi.fn();
   render(
     <NextIntlClientProvider locale="en" messages={{ conventions: messages }}>
       <ToastProvider>
-        <ConventionCard convention={c} onStatus={onStatus} onRule={onRule} />
+        <ConventionCard convention={c} onStatus={onStatus} onReject={onReject} onRule={onRule} />
       </ToastProvider>
     </NextIntlClientProvider>,
   );
-  return { onStatus, onRule };
+  return { onStatus, onReject, onRule };
 }
 
 describe("ConventionCard", () => {
@@ -46,15 +47,21 @@ describe("ConventionCard", () => {
     expect(screen.getByText("seen in 7 files")).toBeInTheDocument();
   });
 
-  it("accepts and rejects; clicking the active state returns it to pending", () => {
+  it("Accept toggles between accepted and pending", () => {
     const { onStatus } = renderCard();
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
-    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
-    expect(onStatus.mock.calls).toEqual([["accepted"], ["rejected"]]);
+    expect(onStatus).toHaveBeenCalledWith("accepted");
     cleanup();
     const again = renderCard({ ...C, status: "accepted" });
     fireEvent.click(screen.getByRole("button", { name: "Accepted" }));
     expect(again.onStatus).toHaveBeenCalledWith("pending");
+  });
+
+  it("Reject dismisses the candidate instead of marking it", () => {
+    const { onStatus, onReject } = renderCard();
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    expect(onReject).toHaveBeenCalledTimes(1);
+    expect(onStatus).not.toHaveBeenCalled();
   });
 
   it("edits the rule inline: Enter saves, Escape cancels", () => {

@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 /** Co-located styles for ConventionCard (matches the Conventions mock). */
 export const s = {
-  card: (accepted: boolean, rejected: boolean): CSSProperties => ({
+  card: (accepted: boolean): CSSProperties => ({
     display: "flex",
     gap: 20,
     padding: "18px 20px 16px 22px",
@@ -10,7 +10,6 @@ export const s = {
     border: "1px solid var(--border)",
     borderLeft: `3px solid ${accepted ? "var(--ok)" : "var(--border)"}`,
     background: "var(--bg-elevated)",
-    opacity: rejected ? 0.55 : 1,
   }),
   main: { flex: 1, minWidth: 0 } satisfies CSSProperties,
   rule: {

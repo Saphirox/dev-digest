@@ -1,5 +1,6 @@
 /* hooks/conventions.ts — React Query hooks for the Conventions page: list,
-   scan, accept / reject / edit, and the skill draft built from accepted ones. */
+   scan, accept / edit, reject (which deletes), and the skill draft built from
+   accepted ones. */
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -31,7 +32,7 @@ export function useExtractConventions(repoId: string) {
   });
 }
 
-/** Accept / reject / edit one convention. Optimistic; rolled back on error. */
+/** Accept / edit one convention. Optimistic; rolled back on error. */
 export function useUpdateConvention(repoId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -49,6 +50,29 @@ export function useUpdateConvention(repoId: string) {
       return { previous };
     },
     onError: (_e, _v, ctx) => {
+      if (ctx?.previous) qc.setQueryData(key(repoId), ctx.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: key(repoId) }),
+  });
+}
+
+/** Reject = delete: the card disappears at once (rolled back on error). */
+export function useDeleteConvention(repoId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del<{ ok: boolean }>(`/conventions/${id}`),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: key(repoId) });
+      const previous = qc.getQueryData<ConventionList>(key(repoId));
+      if (previous) {
+        qc.setQueryData<ConventionList>(key(repoId), {
+          ...previous,
+          conventions: previous.conventions.filter((c) => c.id !== id),
+        });
+      }
+      return { previous };
+    },
+    onError: (_e, _id, ctx) => {
       if (ctx?.previous) qc.setQueryData(key(repoId), ctx.previous);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: key(repoId) }),

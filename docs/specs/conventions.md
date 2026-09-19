@@ -34,10 +34,13 @@ is then attached to agents in **Agents → Skills**.
    multiplied by 0.7. A pattern matching nothing is wrong, so the count is
    treated as unknown.
 5. **Dedupe and store.** Duplicates of each other, and of rules already
-   accepted or rejected, are dropped. A re-scan replaces only **pending** rows:
-   accepted rules stay and rejected ones never come back.
-6. **Review.** Accept / reject (clicking the active state returns it to
-   pending), edit the rule inline, filter by category.
+   accepted, are dropped. A re-scan replaces only **pending** rows: accepted
+   rules stay. A rejected rule is deleted (step 6), so a later scan may propose
+   it again; rows rejected before that change are hidden and still count as
+   duplicates.
+6. **Review.** Accept (clicking it again returns the rule to pending), **Reject
+   = delete** (the candidate disappears at once), edit the rule inline, filter
+   by category.
 7. **Skill.** `POST /repos/:id/conventions/skill` builds a draft from the
    accepted rules (`<repo>-conventions`, one section per rule with its
    `Detected in file:line` snippet). The user edits it in the modal and saves it
@@ -70,8 +73,10 @@ Most raw candidates are noise; the goal is more findings that survive review.
 2. **Sample beyond the top-ranked files.** Rank favours central modules; tests,
    routes and components carry their own conventions. Add a second pass over one
    file per directory kind (tests, routes, UI, scripts), or stratify by extension.
-3. **Learn from rejections.** Pass the last N rejected rules into the prompt as
-   "not conventions here", so re-scans stop proposing the same kind of noise.
+3. **Learn from rejections.** Rejecting now deletes the row, so nothing
+   remembers it. Keep a small list of dismissed rules (a settings row, or a
+   hidden `dismissed` status), skip them when deduping, and pass the last N to the
+   prompt as "not conventions here", so re-scans stop proposing the same noise.
 4. **Diff-aware re-scan.** Re-scan only files changed since `last_scan_at`, and
    mark accepted rules whose evidence no longer exists as *stale*.
 5. **Confidence calibration.** Track the accept rate per category and per model

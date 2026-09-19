@@ -13,6 +13,7 @@ import { RepoNotFound } from "@/components/repo-not-found";
 import {
   useConventionSkillDraft,
   useConventions,
+  useDeleteConvention,
   useExtractConventions,
   useUpdateConvention,
 } from "@/lib/hooks/conventions";
@@ -32,12 +33,14 @@ export function ConventionsView({ repoId }: { repoId: string }) {
   const { data, isLoading, isError, refetch } = useConventions(repoId);
   const extract = useExtractConventions(repoId);
   const update = useUpdateConvention(repoId);
+  const remove = useDeleteConvention(repoId);
   const draft = useConventionSkillDraft(repoId);
   const [category, setCategory] = React.useState<ConventionCategory | null>(null);
   const [skillDraft, setSkillDraft] = React.useState<ConventionSkillDraft | null>(null);
 
-  const all = data?.conventions ?? [];
-  // Sorted once per scan (accepted, pending, rejected); accepting or rejecting
+  // Rejecting deletes a candidate; rows rejected before that change stay hidden.
+  const all = (data?.conventions ?? []).filter((c) => c.status !== "rejected");
+  // Sorted once per scan (accepted first, then pending); accepting or rejecting
   // keeps the order, so cards don't jump. A new scan or a reload sorts again.
   const scanKey = data?.last_scan_at ?? null;
   const [frozen, setFrozen] = React.useState<{ scan: string | null; ids: string[] } | null>(null);
@@ -144,6 +147,7 @@ export function ConventionsView({ repoId }: { repoId: string }) {
                   key={c.id}
                   convention={c}
                   onStatus={(status) => update.mutate({ id: c.id, patch: { status } })}
+                  onReject={() => remove.mutate(c.id)}
                   onRule={(rule) => update.mutate({ id: c.id, patch: { rule } })}
                 />
               ))}
