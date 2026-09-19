@@ -102,7 +102,7 @@
     "emptyTitle": "No pull requests",
     "emptyAllBody": "No open PRs found for this repo yet. Refresh to sync from GitHub.",
     "emptyStatusBody": "No PRs with status “{status}”.",
-    "findingsInPr": "{count} findings in this run"
+    "findingsInPr": "{count} open findings in this PR"
   },
   "timeline": {
     "goToReview": "Jump to this run’s findings below",

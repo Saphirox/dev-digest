@@ -79,6 +79,8 @@ describe("FindingsCell", () => {
 
     const cell = screen.getByLabelText("1 Critical").parentElement!;
     fireEvent.mouseEnter(cell);
+    // Headed as the PR's findings — this card spans every review, not one run.
+    expect(screen.getByText("2 open findings in this PR")).toBeInTheDocument();
     const titles = screen.getAllByText(/^Finding /).map((el) => el.textContent);
     expect(titles).toEqual(["Finding c", "Finding w"]);
 
