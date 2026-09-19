@@ -1,8 +1,8 @@
 ---
 name: frontend-ui-architecture
-description: "Frontend UI architecture and code organization for React and Next.js (App Router): where components, hooks, constants, helpers, utils, types, API calls and business logic live, and how to split them. Use whenever you create a new component, page, feature or hook; decide where a file or function belongs; extract a constant, helper or util; move logic out of a component; split a large component; set up or restructure folders; review a frontend PR for structure; or answer 'where should X go' questions. Trigger on phrases like folder structure, project structure, colocation, feature folder, _components, lib vs utils, helpers.ts, constants.ts, barrel/index.ts, business logic in components, container/presentational, Data Access Layer, server actions placement, even when the user does not say 'architecture'. Not for render performance, hook-misuse bugs or RSC mechanics — those live in react-best-practices and next-best-practices."
+description: "Frontend UI architecture and code organization for React and Next.js (App Router): where components, hooks, constants, helpers, utils, types, API calls and business logic live, how to name them, and how to split them. Use whenever you create a new component, page, feature or hook; decide where a file or function belongs; extract a constant, helper or util; move logic out of a component; split a large component; set up or restructure folders; review a frontend PR for structure; or answer 'where should X go' questions. Trigger on phrases like folder structure, naming convention, file naming, project structure, colocation, feature folder, _components, lib vs utils, helpers.ts, constants.ts, barrel/index.ts, business logic in components, container/presentational, Data Access Layer, server actions placement, even when the user does not say 'architecture'. Not for render performance, hook-misuse bugs or RSC mechanics — those live in react-best-practices and next-best-practices."
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   updated: "2026-09-19"
 ---
 
@@ -106,6 +106,24 @@ Use the narrowest row that fits. "Local" means the component's own folder.
 ```
 
 Only create the optional files when they have content. An empty `helpers.ts` is noise.
+
+### Naming conventions
+
+Defaults, matching DevDigest's `client/` (Step 0 still wins where a project differs):
+
+| Thing | Convention | DevDigest example |
+|---|---|---|
+| Route files (App Router) | Next.js reserved names only: `page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`. Dynamic segments in brackets | `app/repos/[repoId]/pulls/[number]/page.tsx` |
+| Route-private folder | `_components/` (the `_` opts it out of routing) | `app/repos/[repoId]/pulls/[number]/_components/` |
+| Component folder + file | PascalCase, folder and file share the name | `_components/FindingCard/FindingCard.tsx` |
+| Shared (cross-route) component folder | kebab-case under `src/components/`; the file inside stays PascalCase | `components/run-cost-badge/RunCostBadge.tsx` |
+| Hook | camelCase with a `use` prefix, one hook per file | `FindingsPanel/useFindingsFilter.ts` |
+| Colocated support files | fixed lowercase names: `helpers.ts`, `constants.ts`, `styles.ts`, `index.ts`, `types.ts` | `FindingsPanel/helpers.ts` |
+| Shared module in `lib/` | kebab-case, named for what it does (never `utils.ts`) | `lib/format-usd.ts`, `lib/severity.ts` |
+| Test | the source file's name + `.test.ts(x)`, beside it | `RunCostBadge.test.tsx`, `lib/severity.test.ts` |
+| Constant | `SCREAMING_SNAKE_CASE` for module-level literals and lookup tables | `SEVERITIES` (`lib/severity.ts`), `COLUMNS` (`pulls/constants.ts`) |
+| Exports | named exports in new code; `export default` only where Next.js requires it (`page.tsx`, `layout.tsx`). `RunTraceDrawer` and `ReviewRunAccordion` still default-export — convert them when touched | `export function FindingCard(…)` |
+| i18n | one namespace file per feature area, keys by dot path | `messages/en/prReview.json` → `t("list.columns.cost")` |
 
 ---
 
