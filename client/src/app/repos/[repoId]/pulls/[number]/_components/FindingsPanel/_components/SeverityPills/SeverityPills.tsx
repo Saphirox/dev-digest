@@ -5,12 +5,13 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 // `Severity` comes from the CONTRACT (3 values); @devdigest/ui's own
 // Severity adds a 4th (INFO) that findings can never carry, so the badge call
 // below casts rather than widening this component's props.
 import { SeverityBadge, type Severity as UiSeverity } from "@devdigest/ui";
 import type { Severity } from "@devdigest/shared";
-import { SEVERITY_KEYS } from "./helpers";
+import { SEVERITIES } from "@/lib/severity";
 import { s } from "./styles";
 
 export function SeverityPills({
@@ -23,11 +24,12 @@ export function SeverityPills({
   value: Severity | null;
   onChange: (next: Severity | null) => void;
 }) {
-  const present = SEVERITY_KEYS.filter((k) => counts[k] > 0);
+  const t = useTranslations("prReview");
+  const present = SEVERITIES.filter((k) => counts[k] > 0);
   if (present.length === 0) return null;
 
   return (
-    <div style={s.pillRow} role="group" aria-label="Filter this run's findings by severity">
+    <div style={s.row} role="group" aria-label={t("panel.severityFilter")}>
       {present.map((sev) => {
         const active = value === sev;
         return (
@@ -36,7 +38,7 @@ export function SeverityPills({
             type="button"
             onClick={() => onChange(active ? null : sev)}
             aria-pressed={active}
-            aria-label={`${counts[sev]} ${sev}`}
+            aria-label={t("panel.severityPill", { count: counts[sev], severity: sev })}
             style={s.pill(active, value != null)}
           >
             <SeverityBadge severity={sev as UiSeverity} count={counts[sev]} />
@@ -46,5 +48,3 @@ export function SeverityPills({
     </div>
   );
 }
-
-export default SeverityPills;

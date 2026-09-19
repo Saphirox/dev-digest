@@ -3,7 +3,7 @@
 Append-only log of non-obvious lessons from working in this module, written
 for the next agent. Agents append via the `engineering-insights` skill
 (`.claude/skills/engineering-insights/`); humans prune. A lesson that keeps
-coming back graduates into this module's CLAUDE.md as a standing rule.
+coming back graduates into this module's AGENTS.md as a standing rule.
 
 ## What Works
 
@@ -21,11 +21,17 @@ coming back graduates into this module's CLAUDE.md as a standing rule.
 - 2026-09-18 · When a count and the list it describes can diverge, derive them in the SAME component. The run card's severity pills must equal the finding cards below, but `FindingsPanel` owns the "hide low confidence" toggle — counting `review.findings` one level up in `ReviewRunAccordion` would have promised cards the toggle had hidden. Putting the pills inside the panel and counting the post-confidence, pre-severity list makes the equality structural instead of a convention two components must both honour. `client/src/app/repos/[repoId]/pulls/[number]/_components/FindingsPanel/FindingsPanel.tsx:33`.
 - 2026-09-18 · `@devdigest/ui` exports its own `Severity` with a fourth value (`INFO`) that the contract's `Severity` in `@devdigest/shared` does not have, so importing both in one file is a duplicate-identifier error and `Record<ContractSeverity, number>` will not satisfy a `Record<UiSeverity, number>` parameter. Type props from the CONTRACT and alias the UI one (`type Severity as UiSeverity`) at the `SeverityBadge` call. `client/src/vendor/ui/primitives/tokens.ts:3` vs `client/src/vendor/shared/contracts/findings.ts:11`.
 
+- 2026-09-19 · The Trace drawer shows findings from TWO independent sources, so the numbers can legitimately disagree: the `FINDINGS` stat tile reads `stats.findings` off the run's `RunTrace` document, while the `Findings` section below it renders the separately-passed `findings: FindingRecord[]` (the persisted rows). A run whose trace recorded 0 but whose review has 3 findings renders `FINDINGS 0` above a list of 3 — not a bug, and not something to "reconcile" without deciding which source is authoritative. `client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceBody/TraceBody.tsx:19` (`TraceBody`, props `trace` vs `findings`).
+- 2026-09-19 · SUPERSEDES the 2026-09-16 "three unlinked places" entry above: the PR list's columns now derive from one `COLUMNS` array (`pulls/constants.ts`) — `GRID`, the header row and the cell order all come from it, and `PRRow` builds `cells: Record<ColumnKey, ReactNode>`, so a column added without its cell is a `tsc` error (probed: TS2741 "Property 'probe' is missing"). The one link the type system can't see is the header label: `list.columns.<key>` in `prReview.json`, guarded by `pulls/constants.test.ts`. `client/src/app/repos/[repoId]/pulls/constants.ts:1` (`COLUMNS`).
+
 ## Tool & Library Notes
 
 - 2026-09-17 · There is no popover/tooltip/hovercard primitive anywhere in `client/src` (and no floating-ui/radix dep) — a hover card has to be hand-rolled. The pattern that works against the timeline's own `overflow`: `position: fixed` anchored to `e.currentTarget.getBoundingClientRect()` captured on `onMouseEnter`, clamped with `Math.min(rect.left, window.innerWidth - width)`. Keep the card a DOM child of the hovered element — `onMouseLeave` follows DOM containment, not visual position, so the pointer can travel into a fixed-positioned child without dismissing it. `client/src/components/findings-preview/styles.ts:8` (`card`).
 
 - 2026-09-17 · `ConfidenceNum` (`primitives/ConfidenceNum.tsx:8`) hardcodes `title="Model confidence"` and offers no prop to suppress it. Dropped onto a non-interactive surface such as a hover card, that lone `title` is enough for the browser to show a help/"?" cursor there — reported as a bug by the user, and confirmed by measuring: every element computed `cursor: default` and the repo contains no `cursor: help` at all, so the `title` was the only candidate. When a design needs the visual without the tooltip, duplicate its ~8 lines locally (`vendor/ui` is off-limits) and leave a comment saying why. Corollary: name chips with `aria-label`, never `title`. Guarded by "puts no title anywhere in the hover card" in `RunHistory.test.tsx`.
+
+- 2026-09-19 · When verifying or screenshotting the findings UI in a browser, move the pointer off the chips BEFORE clicking or scrolling elsewhere. The preview card only closes on `onMouseLeave`, so a programmatic click/`scrollIntoView` leaves it open, floating over whatever you navigate to and spoiling the next screenshot (it also swallowed an accordion click, which then toggled the wrong row). Hover a far corner first, then act. Complements the build-pattern entry above. `client/src/components/findings-preview/FindingsPreviewCard.tsx:1`.
+- 2026-09-19 · The client runs React **19.2** (`node -p "require('react/package.json').version"` → 19.2.7), so `React.useEffectEvent` is stable and typed here — use it for window/document listeners that read fresh state, instead of listing that state as effect deps (which re-subscribes the listener on every change, e.g. every j/k focus move). Pair it with "adjust state during render" (`if (prev !== x) { setPrev(x); reset(); }`) for resets keyed to a prop, rather than a `useEffect` that paints one stale frame first. Both used in `client/src/app/repos/[repoId]/pulls/[number]/_components/FindingsPanel/useFindingKeyboardNav.ts:1`, guarded by the keyboard tests in `FindingsPanel.test.tsx`.
 
 ## Recurring Errors & Fixes
 
@@ -35,5 +41,7 @@ coming back graduates into this module's CLAUDE.md as a standing rule.
 - 2026-09-17 · Run Cost UI + react-best-practices review pass — found and fixed the "0 tok" bug; +1 insight (Codebase Patterns)
 - 2026-09-17 · Per-severity chips + hover findings preview on the PR timeline (client-only, no model call) — +5 insights (Codebase Patterns ×3, Tool & Library Notes ×2)
 - 2026-09-18 · Rubric pass: run-card severity pills + filter, PR-list FINDINGS column, Reject label — +2 insights (Codebase Patterns)
+- 2026-09-19 · Captured PR screenshots across all three severity surfaces — +2 insights (Codebase Patterns, Tool & Library Notes)
+- 2026-09-19 · Frontend refactor phases 1–7 (severity module, hover hook, RunHistory split, FindingsCell, COLUMNS, FindingsPanel hooks, named exports) + copy fix + delete-button fix — +2 insights (Codebase Patterns: supersedes the column-trap entry; Tool & Library Notes: useEffectEvent)
 
 ## Open Questions

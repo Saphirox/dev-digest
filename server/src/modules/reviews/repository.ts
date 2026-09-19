@@ -148,25 +148,7 @@ export class ReviewRepository {
     return runRepo.createAgentRun(this.db, values);
   }
 
-  completeAgentRun(
-    runId: string,
-    values: {
-      status: 'done' | 'failed' | 'cancelled';
-      durationMs: number;
-      tokensIn: number;
-      tokensOut: number;
-      /** Run cost in USD; null when unknown (failed run, or unpriced model). */
-      costUsd?: number | null;
-      findingsCount: number;
-      grounding: string;
-      /** Review score (0-100); null on failed/cancelled runs. */
-      score?: number | null;
-      /** Findings that tripped the agent's gate; 0 on failed/cancelled runs. */
-      blockers?: number | null;
-      /** Failure reason (status='failed') / cancellation note. Null clears it. */
-      error?: string | null;
-    },
-  ): Promise<void> {
+  completeAgentRun(runId: string, values: runRepo.CompleteRunValues): Promise<void> {
     return runRepo.completeAgentRun(this.db, runId, values);
   }
 

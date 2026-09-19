@@ -3,6 +3,7 @@
 
 import React from "react";
 import { formatUsd } from "@/lib/format-usd";
+import { s } from "./styles";
 
 /**
  * Two variants, because cost appears in two structurally different places:
@@ -31,7 +32,7 @@ export function RunCostBadge({
 }) {
   if (variant === "inline") {
     return (
-      <span className="mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>
+      <span className="mono" style={s.inline}>
         {tokens != null && `${tokens.toLocaleString()} tok · `}
         {formatUsd(cost)}
       </span>
@@ -39,10 +40,8 @@ export function RunCostBadge({
   }
   // `tnum` keeps the figures tabular so the column's decimal points line up.
   return (
-    <span className="tnum" style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+    <span className="tnum" style={s.compact}>
       {formatUsd(cost)}
     </span>
   );
 }
-
-export default RunCostBadge;

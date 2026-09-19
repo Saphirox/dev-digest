@@ -6,42 +6,22 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Icon, Avatar, Badge, CircularScore } from "@devdigest/ui";
 import { RunCostBadge } from "@/components/run-cost-badge";
-import {
-  FindingsPreviewCard,
-  SeverityCountChips,
-  sortBySeverity,
-} from "@/components/findings-preview";
-import { usePrReviews } from "@/lib/hooks/reviews";
 import type { PrMeta } from "@/lib/types";
-import { SIZE_COLOR, STATUS_META } from "../../constants";
+import { COLUMNS, SIZE_COLOR, STATUS_META, type ColumnKey } from "../../constants";
 import { relativeTime, sizeOf } from "../../helpers";
 import { s } from "../../styles";
+import { FindingsCell } from "./_components/FindingsCell";
 
 export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   const t = useTranslations("prReview");
   const router = useRouter();
   const [h, setH] = React.useState(false);
-  // The list payload carries only the per-severity COUNTS. The preview card
-  // needs the findings themselves, so they are fetched the first time the cell
-  // is hovered and then cached by react-query — the list response stays small
-  // and no request is made for a PR nobody points at.
-  const [preview, setPreview] = React.useState<{ top: number; left: number } | null>(null);
-  const [wantFindings, setWantFindings] = React.useState(false);
-  const { data: reviews } = usePrReviews(wantFindings ? pr.id : null);
-  const previewFindings = React.useMemo(
-    () => sortBySeverity((reviews ?? []).flatMap((r) => r.findings).filter((f) => !f.dismissed_at)),
-    [reviews],
-  );
   const st = STATUS_META[pr.status] ?? STATUS_META.needs_review!;
   const { size, lines } = sizeOf(pr);
-  const reviewed = pr.score != null; // null score ⇒ PR has never been reviewed
-  return (
-    <div
-      onMouseEnter={() => setH(true)}
-      onMouseLeave={() => setH(false)}
-      onClick={() => router.push(`/repos/${repoId}/pulls/${pr.number}`)}
-      style={s.row(h)}
-    >
+  // One entry per column; keyed by ColumnKey so a column added to COLUMNS
+  // without its cell here fails the typecheck. Rendered in COLUMNS order.
+  const cells: Record<ColumnKey, React.ReactNode> = {
+    pullRequest: (
       <div style={s.rowTitleCell}>
         <Icon.GitPullRequest size={15} style={s.rowIcon(st.c)} />
         <div style={s.rowTitleWrap}>
@@ -51,57 +31,55 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
           </span>
         </div>
       </div>
+    ),
+    author: (
       <div style={s.authorCell}>
         <Avatar name={pr.author} size={18} />
         {pr.author}
       </div>
+    ),
+    size: (
       <div>
-        <Badge
-          color={SIZE_COLOR[size]}
-          bg="transparent"
-          style={s.sizeBadgeBorder(SIZE_COLOR[size]!)}
-        >
+        <Badge color={SIZE_COLOR[size]} bg="transparent" style={s.sizeBadgeBorder(SIZE_COLOR[size])}>
           {size} · {lines}
         </Badge>
       </div>
+    ),
+    score: (
       <div style={s.scoreCell}>
-        {reviewed ? (
-          <CircularScore score={pr.score!} size={34} stroke={3} />
+        {pr.score != null ? (
+          <CircularScore score={pr.score} size={34} stroke={3} />
         ) : (
+          // null score ⇒ PR has never been reviewed
           <span style={s.muted}>—</span>
         )}
       </div>
-      <div
-        style={s.findingsCell}
-        onMouseEnter={(e) => {
-          setWantFindings(true);
-          const rect = e.currentTarget.getBoundingClientRect();
-          setPreview({
-            top: rect.bottom + 6,
-            left: Math.max(8, Math.min(rect.left, window.innerWidth - 408)),
-          });
-        }}
-        onMouseLeave={() => setPreview(null)}
-      >
-        {pr.findings ? <SeverityCountChips counts={pr.findings} /> : null}
-        {preview && previewFindings.length > 0 && (
-          <FindingsPreviewCard
-            findings={previewFindings}
-            title={t("list.findingsInPr", { count: previewFindings.length })}
-            top={preview.top}
-            left={preview.left}
-          />
-        )}
-      </div>
+    ),
+    findings: <FindingsCell prId={pr.id} counts={pr.findings} />,
+    status: (
       <div>
         <Badge dot color={st.c} bg="transparent">
           {t(`list.status.${st.labelKey}`)}
         </Badge>
       </div>
+    ),
+    cost: (
       <div style={s.costCell}>
         <RunCostBadge cost={pr.cost_usd} />
       </div>
-      <div style={s.updatedCell}>{relativeTime(pr.updated_at)}</div>
+    ),
+    updated: <div style={s.updatedCell}>{relativeTime(pr.updated_at)}</div>,
+  };
+  return (
+    <div
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
+      onClick={() => router.push(`/repos/${repoId}/pulls/${pr.number}`)}
+      style={s.row(h)}
+    >
+      {COLUMNS.map((c) => (
+        <React.Fragment key={c.key}>{cells[c.key]}</React.Fragment>
+      ))}
     </div>
   );
 }

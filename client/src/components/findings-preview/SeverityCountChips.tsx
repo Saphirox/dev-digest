@@ -9,13 +9,13 @@
 import React from "react";
 import { Icon, SEV } from "@devdigest/ui";
 import type { Severity } from "@devdigest/shared";
-import { PREVIEW_SEVERITIES } from "./FindingsPreviewCard";
+import { SEVERITIES } from "@/lib/severity";
 import { s } from "./styles";
 
 export function SeverityCountChips({ counts }: { counts: Record<Severity, number> }) {
   return (
     <>
-      {PREVIEW_SEVERITIES.map((sev) => {
+      {SEVERITIES.map((sev) => {
         const count = counts[sev] ?? 0;
         if (count === 0) return null;
         const I = Icon[SEV[sev].icon];
@@ -31,5 +31,3 @@ export function SeverityCountChips({ counts }: { counts: Record<Severity, number
     </>
   );
 }
-
-export default SeverityCountChips;
