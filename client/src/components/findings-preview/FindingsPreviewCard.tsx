@@ -1,0 +1,94 @@
+/* FindingsPreviewCard — hover popover listing findings (severity, title,
+   category, file:line, confidence, truncated rationale). Lives here rather
+   than beside the timeline because the PR list's FINDINGS column is meant to
+   reuse it. */
+"use client";
+
+import React from "react";
+import { Icon, SeverityBadge, CategoryTag, type Severity as UiSeverity, type Category } from "@devdigest/ui";
+import type { FindingRecord, Severity } from "@devdigest/shared";
+import { s } from "./styles";
+
+/** Display order for severity chips and for sorting the preview list. */
+export const PREVIEW_SEVERITIES = ["CRITICAL", "WARNING", "SUGGESTION"] as const;
+
+/** Findings sorted CRITICAL → WARNING → SUGGESTION (unknown severities last). */
+export function sortBySeverity(findings: FindingRecord[]): FindingRecord[] {
+  const rank = (sev: string) => {
+    const i = PREVIEW_SEVERITIES.indexOf(sev as (typeof PREVIEW_SEVERITIES)[number]);
+    return i === -1 ? PREVIEW_SEVERITIES.length : i;
+  };
+  return [...findings].sort((a, b) => rank(a.severity) - rank(b.severity));
+}
+
+/**
+ * Confidence readout — a local copy of @devdigest/ui's ConfidenceNum, minus its
+ * hardcoded `title="Model confidence"`. That title is the only tooltip on this
+ * card and it makes the browser show a help/"?" cursor over a surface that is
+ * not a help affordance. The primitive exposes no way to suppress it and
+ * vendor/ui is not ours to edit, so the ~8 lines are duplicated on purpose —
+ * don't "simplify" this back to ConfidenceNum.
+ */
+function ConfidencePct({ value }: { value: number }) {
+  const pct = Math.round(value * 100);
+  const dot = pct >= 85 ? "var(--ok)" : pct >= 65 ? "var(--warn)" : "var(--text-muted)";
+  return (
+    <span className="mono tnum" style={s.conf}>
+      <span style={s.confDot(dot)} />
+      {pct}% conf
+    </span>
+  );
+}
+
+/** Count findings per severity. Callers pass the list that is actually being
+ *  represented, so a chip's number always matches what it stands for. */
+export function countBySeverity(findings: FindingRecord[]): Record<Severity, number> {
+  const counts = { CRITICAL: 0, WARNING: 0, SUGGESTION: 0 } as Record<Severity, number>;
+  for (const f of findings) {
+    if ((PREVIEW_SEVERITIES as readonly string[]).includes(f.severity)) counts[f.severity] += 1;
+  }
+  return counts;
+}
+
+export function FindingsPreviewCard({
+  findings,
+  title,
+  top,
+  left,
+}: {
+  findings: FindingRecord[];
+  /** Translated header, e.g. "2 findings in this run". */
+  title: string;
+  /** Viewport coordinates of the card's top-left corner. */
+  top: number;
+  left: number;
+}) {
+  return (
+    <div style={s.card(top, left)} onClick={(e) => e.stopPropagation()}>
+      <div style={s.title}>
+        <Icon.AlertOctagon size={12} />
+        {title}
+      </div>
+      {findings.map((f) => (
+        <div key={f.id} style={s.item}>
+          <div style={s.head}>
+            <SeverityBadge severity={f.severity as UiSeverity} compact />
+            <span style={s.itemTitle}>{f.title}</span>
+            <CategoryTag category={f.category as Category} />
+          </div>
+          <div style={s.meta}>
+            {/* plain span, not MonoLink: RunHistory has no repo/head sha to
+                build a GitHub href, and a link with no href is a dead button. */}
+            <span className="mono" style={s.file}>
+              {f.file}:{f.start_line}
+            </span>
+            <ConfidencePct value={f.confidence} />
+          </div>
+          <div style={s.rationale}>{f.rationale}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default FindingsPreviewCard;

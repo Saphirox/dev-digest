@@ -170,6 +170,25 @@ export const PrMeta = z.object({
   updated_at: z.string().nullish(),
   // Latest-review score (list endpoint only; null/absent until reviewed).
   score: z.number().int().nullish(),
+  /**
+   * Cost (USD) of the LATEST completed run on this PR — list endpoint only.
+   * `nullish` like `score`: PrMeta doubles as the GitHub adapter's shape
+   * (`listPullRequests`), which knows nothing about cost.
+   */
+  cost_usd: z.number().nullish(),
+  /**
+   * Per-severity finding counts for the list's FINDINGS column — list endpoint
+   * only, and `nullish` for the same reason as `score`/`cost_usd`: PrMeta also
+   * types the GitHub adapter's `listPullRequests`, which knows nothing about
+   * findings. Excludes dismissed findings.
+   */
+  findings: z
+    .object({
+      CRITICAL: z.number().int(),
+      WARNING: z.number().int(),
+      SUGGESTION: z.number().int(),
+    })
+    .nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 

@@ -22,6 +22,12 @@ export const s = {
   } satisfies CSSProperties,
   rowIcon: (color: string): CSSProperties => ({ color, flexShrink: 0 }),
   rowTitleWrap: { minWidth: 0 } satisfies CSSProperties,
+  findingsCell: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  } satisfies CSSProperties,
   rowTitle: (hover: boolean): CSSProperties => ({
     fontSize: 14,
     fontWeight: 550,
@@ -40,6 +46,8 @@ export const s = {
   } satisfies CSSProperties,
   sizeBadgeBorder: (color: string): CSSProperties => ({ border: `1px solid ${color}` }),
   scoreCell: { display: "flex", alignItems: "center" } satisfies CSSProperties,
+  // Alignment only — RunCostBadge owns the typography.
+  costCell: { display: "flex", alignItems: "center" } satisfies CSSProperties,
   updatedCell: {
     fontSize: 12,
     color: "var(--text-muted)",
