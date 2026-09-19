@@ -1,17 +1,16 @@
-/* FindingsPanel — hide-low-confidence + j/k navigation + FindingCard list,
-   wiring the accept/dismiss action hook (A2). */
+/* FindingsPanel — severity pills + hide-low-confidence + j/k navigation +
+   FindingCard list, wiring the accept/dismiss action hook (A2). */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Toggle, EmptyState } from "@devdigest/ui";
-import type { FindingRecord, Severity } from "@devdigest/shared";
+import type { FindingRecord } from "@devdigest/shared";
+import { useFindingAction } from "@/lib/hooks/reviews";
 import { FindingCard } from "../FindingCard";
-import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
-import { KEY_TO_ACTION } from "./constants";
-import { countBySeverity } from "@/lib/severity";
-import { visibleFindings } from "./helpers";
-import { SeverityPills } from "./SeverityPills";
+import { SeverityPills } from "./_components/SeverityPills";
+import { useFindingKeyboardNav } from "./useFindingKeyboardNav";
+import { useFindingsFilter } from "./useFindingsFilter";
 import { s } from "./styles";
 
 export function FindingsPanel({
@@ -27,44 +26,10 @@ export function FindingsPanel({
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
-  const [hideLow, setHideLow] = React.useState(false);
-  const [focusIdx, setFocusIdx] = React.useState(0);
-  const [severity, setSeverity] = React.useState<Severity | null>(null);
-
-  // Counted BEFORE the severity filter but AFTER "hide low confidence", so a
-  // pill's number always equals the cards rendered below it — including while
-  // the toggle is on. Counting raw `findings` would over-count there.
-  const afterConfidence = React.useMemo(
-    () => visibleFindings(findings, hideLow),
-    [findings, hideLow],
+  const { hideLow, setHideLow, severity, setSeverity, counts, shown } = useFindingsFilter(findings);
+  const focusIdx = useFindingKeyboardNav(shown, (f, act) =>
+    action.mutate({ findingId: f.id, action: act, prId }),
   );
-  const counts = React.useMemo(() => countBySeverity(afterConfidence), [afterConfidence]);
-  const shown = React.useMemo(
-    () => (severity ? afterConfidence.filter((f) => f.severity === severity) : afterConfidence),
-    [afterConfidence, severity],
-  );
-
-  // Toggling "hide low confidence" can shrink the list past the focused index,
-  // which would leave no card highlighted and make a/d silently no-op on an
-  // undefined finding — re-anchor at the top whenever the list changes.
-  React.useEffect(() => {
-    setFocusIdx(0);
-  }, [shown]);
-
-  // j/k navigation + a/d shortcuts on the focused finding (keyboard).
-  React.useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "j") setFocusIdx((i) => Math.min(i + 1, shown.length - 1));
-      else if (e.key === "k") setFocusIdx((i) => Math.max(i - 1, 0));
-      else if (KEY_TO_ACTION[e.key] && shown[focusIdx]) {
-        action.mutate({ findingId: shown[focusIdx]!.id, action: KEY_TO_ACTION[e.key]!, prId });
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [shown, focusIdx, action, prId]);
 
   return (
     <div>

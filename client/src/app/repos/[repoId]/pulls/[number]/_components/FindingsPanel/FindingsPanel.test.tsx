@@ -5,7 +5,7 @@ import type { FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 
 const mutate = vi.fn();
-vi.mock("../../../../../../../lib/hooks/reviews", () => ({
+vi.mock("@/lib/hooks/reviews", () => ({
   useFindingAction: () => ({ mutate, isPending: false }),
 }));
 
@@ -100,8 +100,8 @@ describe("FindingsPanel (smoke)", () => {
 describe("FindingsPanel — severity pills (rubric #16-18)", () => {
   it("shows one pill per severity actually present, with its count", () => {
     renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" />);
-    expect(screen.getByLabelText("2 CRITICAL")).toBeInTheDocument();
-    expect(screen.getByLabelText("1 WARNING")).toBeInTheDocument();
+    expect(screen.getByLabelText("2 Critical")).toBeInTheDocument();
+    expect(screen.getByLabelText("1 Warning")).toBeInTheDocument();
     // no SUGGESTION in the fixture → no pill at all (not a "0" pill)
     expect(screen.queryByLabelText(/SUGGESTION/)).not.toBeInTheDocument();
   });
@@ -109,12 +109,12 @@ describe("FindingsPanel — severity pills (rubric #16-18)", () => {
   it("pill counts equal the finding cards rendered below (#17)", () => {
     renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" />);
     expect(shownTitles()).toHaveLength(3); // 2 critical + 1 warning
-    expect(screen.getByLabelText("2 CRITICAL")).toBeInTheDocument();
+    expect(screen.getByLabelText("2 Critical")).toBeInTheDocument();
   });
 
   it("clicking a pill leaves only that severity, clicking again restores (#18)", () => {
     renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" />);
-    const crit = screen.getByLabelText("2 CRITICAL");
+    const crit = screen.getByLabelText("2 Critical");
 
     fireEvent.click(crit);
     expect(crit).toHaveAttribute("aria-pressed", "true");
@@ -129,8 +129,8 @@ describe("FindingsPanel — severity pills (rubric #16-18)", () => {
 
   it("switches straight from one severity to another", () => {
     renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" />);
-    fireEvent.click(screen.getByLabelText("2 CRITICAL"));
-    fireEvent.click(screen.getByLabelText("1 WARNING"));
+    fireEvent.click(screen.getByLabelText("2 Critical"));
+    fireEvent.click(screen.getByLabelText("1 Warning"));
     expect(screen.getByText("N+1 query")).toBeInTheDocument();
     expect(screen.queryByText("Hardcoded secret")).not.toBeInTheDocument();
   });
@@ -143,7 +143,7 @@ describe("FindingsPanel — severity pills (rubric #16-18)", () => {
     fireEvent.click(screen.getByRole("switch"));
     // re-query: the toggle collapses CRITICAL from 2 → 1
     expect(screen.queryByText("Low-confidence crash path")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("1 CRITICAL")).toBeInTheDocument();
+    expect(screen.getByLabelText("1 Critical")).toBeInTheDocument();
     expect(shownTitles()).toHaveLength(2);
   });
 });
