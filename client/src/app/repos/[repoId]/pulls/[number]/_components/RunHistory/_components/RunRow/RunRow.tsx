@@ -74,15 +74,15 @@ export function RunRow({
         <Icon.FileText size={13} />
       </button>
       {onDelete && run.status !== "running" && (
-        <span
-          role="button"
+        <button
+          type="button"
           aria-label={t("timeline.deleteRun")}
           title={t("timeline.deleteRun")}
           onClick={() => onDelete(run.run_id)}
           style={s.deleteBtn}
         >
           <Icon.Trash size={13} />
-        </span>
+        </button>
       )}
     </div>
   );

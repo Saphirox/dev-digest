@@ -4,7 +4,7 @@
  * a settled run is colored/labelled by its denormalized blocker/finding counts,
  * and shows the review score ring.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { RunSummary, ReviewRecord, FindingRecord } from "@devdigest/shared";
@@ -232,5 +232,29 @@ describe("RunHistory — per-run severity chips + hover preview", () => {
   it("falls back to the plain text when the matched review kept no findings", () => {
     renderRuns([run({ status: "done", findings_count: 0, blockers: 0 })], [review({ findings: [] })]);
     expect(screen.getByText(/0 finding\(s\)/)).toBeInTheDocument();
+  });
+});
+
+describe("RunHistory delete control", () => {
+  it("is a real, keyboard-reachable button that deletes that run", () => {
+    const onDelete = vi.fn();
+    render(
+      <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
+        <RunHistory runs={[run({ run_id: "run-9" })]} onOpenTrace={() => {}} onDelete={onDelete} />
+      </NextIntlClientProvider>,
+    );
+    const del = screen.getByRole("button", { name: "Delete run" });
+    expect(del.tagName).toBe("BUTTON");
+    fireEvent.click(del);
+    expect(onDelete).toHaveBeenCalledWith("run-9");
+  });
+
+  it("is not offered while the run is still running", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
+        <RunHistory runs={[run({ status: "running" })]} onOpenTrace={() => {}} onDelete={() => {}} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.queryByRole("button", { name: "Delete run" })).not.toBeInTheDocument();
   });
 });

@@ -57,8 +57,11 @@ export const s = {
     cursor: "pointer",
     flexShrink: 0,
   } satisfies CSSProperties,
+  // A real <button> (keyboard-reachable), reset to look like the bare icon.
   deleteBtn: {
     display: "inline-flex",
+    background: "none",
+    border: "none",
     padding: 3,
     borderRadius: 5,
     color: "var(--text-muted)",
