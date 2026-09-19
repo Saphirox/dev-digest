@@ -1,0 +1,68 @@
+import type { CSSProperties } from "react";
+
+/** Co-located styles for RunRow. */
+export const s = {
+  row: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "1px solid var(--border)",
+    background: "var(--bg-elevated)",
+    textAlign: "left",
+  } satisfies CSSProperties,
+  body: { display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 } satisfies CSSProperties,
+  heading: { fontSize: 13, fontWeight: 600, color: "var(--text-primary)" } satisfies CSSProperties,
+  // Looks like text; the dotted underline only appears when it can navigate.
+  agentLink: (clickable: boolean): CSSProperties => ({
+    background: "none",
+    border: "none",
+    padding: 0,
+    font: "inherit",
+    fontWeight: 600,
+    color: "var(--text-primary)",
+    cursor: clickable ? "pointer" : "default",
+    textDecoration: clickable ? "underline" : "none",
+    textDecorationStyle: "dotted",
+    textUnderlineOffset: 3,
+  }),
+  model: { fontSize: 12, fontWeight: 400, color: "var(--text-muted)" } satisfies CSSProperties,
+  error: {
+    fontSize: 12,
+    color: "var(--crit)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  } satisfies CSSProperties,
+  meta: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: 2,
+    fontSize: 11,
+    color: "var(--text-muted)",
+    flexShrink: 0,
+  } satisfies CSSProperties,
+  iconBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 4,
+    borderRadius: 5,
+    border: "1px solid var(--border)",
+    background: "var(--bg-surface)",
+    color: "var(--text-muted)",
+    cursor: "pointer",
+    flexShrink: 0,
+  } satisfies CSSProperties,
+  deleteBtn: {
+    display: "inline-flex",
+    padding: 3,
+    borderRadius: 5,
+    color: "var(--text-muted)",
+    flexShrink: 0,
+    cursor: "pointer",
+  } satisfies CSSProperties,
+} as const;
