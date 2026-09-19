@@ -31,5 +31,3 @@ export function SeverityCountChips({ counts }: { counts: Record<Severity, number
     </>
   );
 }
-
-export default SeverityCountChips;

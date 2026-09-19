@@ -68,5 +68,3 @@ export function FindingsPreviewCard({
     </div>
   );
 }
-
-export default FindingsPreviewCard;
