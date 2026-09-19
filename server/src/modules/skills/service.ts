@@ -57,8 +57,7 @@ export class SkillsService {
       ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
       ...(patch.description !== undefined ? { description: patch.description.trim() } : {}),
     };
-    const nextVersion = isSkillConfigChange(existing, clean) ? existing.version + 1 : undefined;
-    const row = await this.store.update(workspaceId, id, clean, nextVersion);
+    const row = await this.store.update(workspaceId, id, clean, isSkillConfigChange(existing, clean));
     if (!row) throw new NotFoundError('Skill not found');
     return toSkillDto(row);
   }
@@ -75,7 +74,7 @@ export class SkillsService {
 
   async versions(workspaceId: string, id: string): Promise<SkillVersion[]> {
     await this.get(workspaceId, id);
-    const rows = await this.store.listVersions(id);
+    const rows = await this.store.listVersions(workspaceId, id);
     return rows.map(toSkillVersionDto);
   }
 

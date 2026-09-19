@@ -55,14 +55,28 @@ d('SkillsRepository', () => {
 
   it('snapshots version 1 on insert and a new version on a bumped update', async () => {
     const s = await newSkill();
-    await repo.update(workspaceId, s.id, { body: 'v2 body' }, 2);
-    await repo.update(workspaceId, s.id, { enabled: false });
-    const versions = await repo.listVersions(s.id);
+    await repo.update(workspaceId, s.id, { body: 'v2 body' }, true);
+    await repo.update(workspaceId, s.id, { enabled: false }, false);
+    const versions = await repo.listVersions(workspaceId, s.id);
     expect(versions.map((v) => [v.version, v.body])).toEqual([
       [2, 'v2 body'],
       [1, 'v1 body'],
     ]);
     expect(await repo.get(workspaceId, s.id)).toMatchObject({ version: 2, enabled: false });
+    expect(await repo.listVersions(otherWorkspaceId, s.id)).toEqual([]);
+  });
+
+  it('gives concurrent text saves distinct versions, each with its snapshot', async () => {
+    const s = await newSkill();
+    await Promise.all([
+      repo.update(workspaceId, s.id, { body: 'edit A' }, true),
+      repo.update(workspaceId, s.id, { body: 'edit B' }, true),
+    ]);
+    const versions = await repo.listVersions(workspaceId, s.id);
+    expect(versions.map((v) => v.version)).toEqual([3, 2, 1]);
+    const live = await repo.get(workspaceId, s.id);
+    expect(live?.version).toBe(3);
+    expect(versions[0]!.body).toBe(live!.body);
   });
 
   it('scopes every lookup to the workspace', async () => {

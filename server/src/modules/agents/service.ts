@@ -158,8 +158,7 @@ export class AgentsService {
     const agent = await this.repo.getById(workspaceId, agentId);
     if (!agent) return undefined;
     await this.assertSkillsInWorkspace(workspaceId, links.map((l) => l.skillId));
-    await this.repo.setSkills(agentId, links);
-    await this.repo.bumpVersion(workspaceId, agentId);
+    await this.repo.setSkills(workspaceId, agentId, links);
     return this.skillLinks(agentId);
   }
 
@@ -173,10 +172,7 @@ export class AgentsService {
     const agent = await this.repo.getById(workspaceId, agentId);
     if (!agent) return undefined;
     await this.assertSkillsInWorkspace(workspaceId, [skillId]);
-    const existing = await this.repo.linkedSkills(agentId);
-    const resolvedOrder = order ?? existing.length;
-    await this.repo.linkSkill(agentId, skillId, resolvedOrder);
-    await this.repo.bumpVersion(workspaceId, agentId);
+    await this.repo.linkSkill(workspaceId, agentId, skillId, order);
     return this.skillLinks(agentId);
   }
 

@@ -78,7 +78,7 @@ const SetSkillsBody = z
       const ids = b.skills?.map((s) => s.skill_id) ?? b.skill_ids ?? [];
       return new Set(ids).size === ids.length;
     },
-    { message: 'A skill can be linked only once' },
+    (b) => ({ message: 'A skill can be linked only once', path: [b.skills ? 'skills' : 'skill_ids'] }),
   );
 
 export default async function agentsRoutes(appBase: FastifyInstance) {

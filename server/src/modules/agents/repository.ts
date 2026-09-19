@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
@@ -11,8 +11,8 @@ import { isConfigChange } from './helpers.js';
  * agent side: link/reorder/list for an agent). Workspace-scoped throughout.
  */
 
-import type { AgentRow, AgentVersionRow } from '../../db/rows.js';
-export type { AgentRow, AgentVersionRow };
+import type { AgentRow, AgentVersionRow, LinkedSkillRow } from '../../db/rows.js';
+export type { AgentRow, AgentVersionRow, LinkedSkillRow };
 
 export interface InsertAgent {
   workspaceId: string;
@@ -55,12 +55,8 @@ export interface PromptSkill {
 }
 
 /** A skill linked to an agent (with its order), joined from agent_skills. */
-export interface LinkedSkillRow {
-  skill: typeof t.skills.$inferSelect;
-  order: number;
-  /** Per-agent link switch (agent_skills.enabled). */
-  enabled: boolean;
-}
+/** The DB or an open transaction: link changes and their version bump share one. */
+type Executor = Db | Parameters<Parameters<Db['transaction']>[0]>[0];
 
 export class AgentsRepository {
   constructor(private db: Db) {}
@@ -169,13 +165,13 @@ export class AgentsRepository {
     return row;
   }
 
-  private async snapshotVersion(row: AgentRow, version: number): Promise<void> {
+  private async snapshotVersion(row: AgentRow, version: number, db: Executor = this.db): Promise<void> {
     // Only the skills that actually reach the prompt: a disabled link or a
     // globally disabled skill doesn't shape what this version reviews with.
-    const skills = (await this.linkedSkills(row.id))
+    const skills = (await this.linkedSkills(row.id, db))
       .filter((l) => l.enabled && l.skill.enabled)
       .map((l) => l.skill.id);
-    await this.db
+    await db
       .insert(t.agentVersions)
       .values({
         agentId: row.id,
@@ -217,8 +213,8 @@ export class AgentsRepository {
   // ---- agent_skills link table (A2 owns the agent side) -------------------
 
   /** Skills linked to an agent, in `order` ascending. */
-  async linkedSkills(agentId: string): Promise<LinkedSkillRow[]> {
-    const rows = await this.db
+  async linkedSkills(agentId: string, db: Executor = this.db): Promise<LinkedSkillRow[]> {
+    const rows = await db
       .select({ skill: t.skills, order: t.agentSkills.order, enabled: t.agentSkills.enabled })
       .from(t.agentSkills)
       .innerJoin(t.skills, eq(t.agentSkills.skillId, t.skills.id))
@@ -232,15 +228,22 @@ export class AgentsRepository {
     return links.map((l) => l.skill.id);
   }
 
-  /** Link a skill to an agent at a given order (idempotent: upserts order). */
-  async linkSkill(agentId: string, skillId: string, order: number): Promise<void> {
-    await this.db
-      .insert(t.agentSkills)
-      .values({ agentId, skillId, order })
-      .onConflictDoUpdate({
-        target: [t.agentSkills.agentId, t.agentSkills.skillId],
-        set: { order },
-      });
+  /**
+   * Link a skill to an agent (idempotent: upserts order; default = last) and
+   * bump the agent's version, in one transaction.
+   */
+  async linkSkill(workspaceId: string, agentId: string, skillId: string, order?: number): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const resolved = order ?? (await this.linkedSkills(agentId, tx)).length;
+      await tx
+        .insert(t.agentSkills)
+        .values({ agentId, skillId, order: resolved })
+        .onConflictDoUpdate({
+          target: [t.agentSkills.agentId, t.agentSkills.skillId],
+          set: { order: resolved },
+        });
+      await this.bumpVersion(workspaceId, agentId, tx);
+    });
   }
 
   async unlinkSkill(agentId: string, skillId: string): Promise<void> {
@@ -251,16 +254,19 @@ export class AgentsRepository {
 
   /**
    * Replace the agent's whole ordered skill set (order = index), keeping each
-   * link's enabled flag. Skills not in the list are unlinked. One transaction,
-   * so a failure can't leave the agent with an emptied list.
+   * link's enabled flag, and bump the version. Skills not in the list are
+   * unlinked. One transaction, so a failure can't leave the agent with an
+   * emptied list or with links that no version snapshot records.
    */
-  async setSkills(agentId: string, links: SkillLinkInput[]): Promise<void> {
+  async setSkills(workspaceId: string, agentId: string, links: SkillLinkInput[]): Promise<void> {
     await this.db.transaction(async (tx) => {
       await tx.delete(t.agentSkills).where(eq(t.agentSkills.agentId, agentId));
-      if (links.length === 0) return;
-      await tx
-        .insert(t.agentSkills)
-        .values(links.map((l, i) => ({ agentId, skillId: l.skillId, enabled: l.enabled, order: i })));
+      if (links.length > 0) {
+        await tx
+          .insert(t.agentSkills)
+          .values(links.map((l, i) => ({ agentId, skillId: l.skillId, enabled: l.enabled, order: i })));
+      }
+      await this.bumpVersion(workspaceId, agentId, tx);
     });
   }
 
@@ -304,15 +310,14 @@ export class AgentsRepository {
   /**
    * A skill-link change alters what the agent reviews with, so it is a config
    * change: bump the version and snapshot, like `update` does for its fields.
+   * The increment happens in SQL, so concurrent saves get distinct versions.
    */
-  async bumpVersion(workspaceId: string, agentId: string): Promise<void> {
-    const existing = await this.getById(workspaceId, agentId);
-    if (!existing) return;
-    const [row] = await this.db
+  private async bumpVersion(workspaceId: string, agentId: string, db: Executor): Promise<void> {
+    const [row] = await db
       .update(t.agents)
-      .set({ version: existing.version + 1 })
-      .where(eq(t.agents.id, agentId))
+      .set({ version: sql`${t.agents.version} + 1` })
+      .where(and(eq(t.agents.id, agentId), eq(t.agents.workspaceId, workspaceId)))
       .returning();
-    if (row) await this.snapshotVersion(row, row.version);
+    if (row) await this.snapshotVersion(row, row.version, db);
   }
 }

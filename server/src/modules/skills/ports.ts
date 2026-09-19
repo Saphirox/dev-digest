@@ -60,18 +60,15 @@ export interface SkillsStore {
   /** Insert a skill and snapshot its first version. */
   insert(workspaceId: string, skill: NewSkill): Promise<SkillRecord>;
   /**
-   * Apply a patch. With `nextVersion`, also bump `version` and snapshot the new
-   * body, atomically. Undefined when the skill isn't in the workspace.
+   * Apply a patch. With `bump`, also increment `version` (in SQL, so
+   * concurrent saves get distinct versions) and snapshot the new body,
+   * atomically. Undefined when the skill isn't in the workspace.
    */
-  update(
-    workspaceId: string,
-    id: string,
-    patch: SkillPatch,
-    nextVersion?: number,
-  ): Promise<SkillRecord | undefined>;
+  update(workspaceId: string, id: string, patch: SkillPatch, bump: boolean): Promise<SkillRecord | undefined>;
   /** Delete; agent links and versions cascade. False when not in the workspace. */
   delete(workspaceId: string, id: string): Promise<boolean>;
   /** Agents (in the workspace) with an ENABLED link to this skill. */
   usedBy(workspaceId: string, id: string): Promise<AgentRef[]>;
-  listVersions(skillId: string): Promise<SkillVersionRecord[]>;
+  /** Body history, newest first; empty when the skill isn't in the workspace. */
+  listVersions(workspaceId: string, skillId: string): Promise<SkillVersionRecord[]>;
 }

@@ -7,7 +7,7 @@ import type {
   ReviewStrategy,
 } from '@devdigest/shared';
 import { AgentVersionConfig } from '@devdigest/shared';
-import type { AgentRow, AgentVersionRow, LinkedSkillRow } from './repository.js';
+import type { AgentRow, AgentVersionRow, LinkedSkillRow } from '../../db/rows.js';
 
 /**
  * Pure helpers for the agents module — DB row ⇄ DTO mapping and the

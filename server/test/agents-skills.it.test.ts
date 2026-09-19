@@ -119,6 +119,23 @@ d('agent skill links', () => {
     await app.close();
   });
 
+  it('gives concurrent skill-set saves distinct agent versions, each snapshotted', async () => {
+    const { app, agentId, skill } = await setup();
+    const a = await skill('race-a');
+    const b = await skill('race-b');
+    const save = (ids: string[]) =>
+      app.inject({
+        method: 'POST',
+        url: `/agents/${agentId}/skills`,
+        payload: { skills: ids.map((id) => ({ skill_id: id, enabled: true })) },
+      });
+    const res = await Promise.all([save([a.id]), save([b.id])]);
+    expect(res.map((r) => r.statusCode)).toEqual([200, 200]);
+    const versions = (await app.inject({ method: 'GET', url: `/agents/${agentId}/versions` })).json();
+    expect(versions.map((v: { version: number }) => v.version)).toEqual([3, 2, 1]);
+    await app.close();
+  });
+
   it('counts enabled skill links on the agents list', async () => {
     const { app, agentId, skill } = await setup();
     const a = await skill('count-a');

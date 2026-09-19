@@ -1,4 +1,4 @@
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq, getTableColumns, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import { INITIAL_SKILL_VERSION } from './constants.js';
@@ -57,23 +57,15 @@ export class SkillsRepository implements SkillsStore {
     });
   }
 
-  async update(
-    workspaceId: string,
-    id: string,
-    patch: SkillPatch,
-    nextVersion?: number,
-  ): Promise<SkillRecord | undefined> {
+  async update(workspaceId: string, id: string, patch: SkillPatch, bump: boolean): Promise<SkillRecord | undefined> {
     return this.db.transaction(async (tx) => {
       const [row] = await tx
         .update(t.skills)
-        .set({ ...patch, ...(nextVersion !== undefined ? { version: nextVersion } : {}) })
+        .set({ ...patch, ...(bump ? { version: sql`${t.skills.version} + 1` } : {}) })
         .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.id, id)))
         .returning();
-      if (row && nextVersion !== undefined) {
-        await tx
-          .insert(t.skillVersions)
-          .values({ skillId: row.id, version: nextVersion, body: row.body })
-          .onConflictDoNothing();
+      if (row && bump) {
+        await tx.insert(t.skillVersions).values({ skillId: row.id, version: row.version, body: row.body });
       }
       return row;
     });
@@ -102,11 +94,12 @@ export class SkillsRepository implements SkillsStore {
       .orderBy(t.agents.name);
   }
 
-  async listVersions(skillId: string): Promise<SkillVersionRecord[]> {
+  async listVersions(workspaceId: string, skillId: string): Promise<SkillVersionRecord[]> {
     return this.db
-      .select()
+      .select(getTableColumns(t.skillVersions))
       .from(t.skillVersions)
-      .where(eq(t.skillVersions.skillId, skillId))
+      .innerJoin(t.skills, eq(t.skillVersions.skillId, t.skills.id))
+      .where(and(eq(t.skillVersions.skillId, skillId), eq(t.skills.workspaceId, workspaceId)))
       .orderBy(desc(t.skillVersions.version));
   }
 }

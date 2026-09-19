@@ -27,11 +27,11 @@ function fakeStore() {
       versions.push({ skillId: row.id, version: 1, body: row.body });
       return row;
     },
-    async update(ws, id, patch: SkillPatch, nextVersion) {
+    async update(ws, id, patch: SkillPatch, bump) {
       const r = rows.get(id);
       if (!r || r.ws !== ws) return undefined;
-      Object.assign(r, patch, nextVersion ? { version: nextVersion } : {});
-      if (nextVersion) versions.push({ skillId: id, version: nextVersion, body: r.body });
+      Object.assign(r, patch, bump ? { version: r.version + 1 } : {});
+      if (bump) versions.push({ skillId: id, version: r.version, body: r.body });
       return r;
     },
     async delete(ws, id) {
@@ -41,7 +41,8 @@ function fakeStore() {
     async usedBy() {
       return [];
     },
-    async listVersions(skillId) {
+    async listVersions(ws, skillId) {
+      if (rows.get(skillId)?.ws !== ws) return [];
       return versions
         .filter((v) => v.skillId === skillId)
         .map((v) => ({ ...v, createdAt: new Date(0) }))
