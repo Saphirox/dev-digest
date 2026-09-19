@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Icon, Avatar, Badge, CircularScore } from "@devdigest/ui";
 import { RunCostBadge } from "@/components/run-cost-badge";
-import { FindingsPreviewCard, SeverityCountChips } from "@/components/findings-preview";
+import { FindingsPreviewCard, SeverityCountChips, useHoverPreview } from "@/components/findings-preview";
 import { sortBySeverity } from "@/lib/severity";
 import { usePrReviews } from "@/lib/hooks/reviews";
 import type { PrMeta } from "@/lib/types";
@@ -22,7 +22,7 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   // needs the findings themselves, so they are fetched the first time the cell
   // is hovered and then cached by react-query — the list response stays small
   // and no request is made for a PR nobody points at.
-  const [preview, setPreview] = React.useState<{ top: number; left: number } | null>(null);
+  const preview = useHoverPreview();
   const [wantFindings, setWantFindings] = React.useState(false);
   const { data: reviews } = usePrReviews(wantFindings ? pr.id : null);
   const previewFindings = React.useMemo(
@@ -72,21 +72,17 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
         style={s.findingsCell}
         onMouseEnter={(e) => {
           setWantFindings(true);
-          const rect = e.currentTarget.getBoundingClientRect();
-          setPreview({
-            top: rect.bottom + 6,
-            left: Math.max(8, Math.min(rect.left, window.innerWidth - 408)),
-          });
+          preview.onMouseEnter(e);
         }}
-        onMouseLeave={() => setPreview(null)}
+        onMouseLeave={preview.onMouseLeave}
       >
         {pr.findings ? <SeverityCountChips counts={pr.findings} /> : null}
-        {preview && previewFindings.length > 0 && (
+        {preview.anchor && previewFindings.length > 0 && (
           <FindingsPreviewCard
             findings={previewFindings}
             title={t("list.findingsInPr", { count: previewFindings.length })}
-            top={preview.top}
-            left={preview.left}
+            top={preview.anchor.top}
+            left={preview.anchor.left}
           />
         )}
       </div>

@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { CARD_WIDTH } from "./constants";
 
 /** Co-located styles for FindingsPreviewCard. */
 export const s = {
@@ -38,7 +39,7 @@ export const s = {
     top,
     left,
     zIndex: 60,
-    width: 400,
+    width: CARD_WIDTH,
     maxHeight: 340,
     overflowY: "auto",
     padding: "12px 14px",
