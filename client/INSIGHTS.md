@@ -22,6 +22,7 @@ coming back graduates into this module's AGENTS.md as a standing rule.
 - 2026-09-18 · `@devdigest/ui` exports its own `Severity` with a fourth value (`INFO`) that the contract's `Severity` in `@devdigest/shared` does not have, so importing both in one file is a duplicate-identifier error and `Record<ContractSeverity, number>` will not satisfy a `Record<UiSeverity, number>` parameter. Type props from the CONTRACT and alias the UI one (`type Severity as UiSeverity`) at the `SeverityBadge` call. `client/src/vendor/ui/primitives/tokens.ts:3` vs `client/src/vendor/shared/contracts/findings.ts:11`.
 
 - 2026-09-19 · The Trace drawer shows findings from TWO independent sources, so the numbers can legitimately disagree: the `FINDINGS` stat tile reads `stats.findings` off the run's `RunTrace` document, while the `Findings` section below it renders the separately-passed `findings: FindingRecord[]` (the persisted rows). A run whose trace recorded 0 but whose review has 3 findings renders `FINDINGS 0` above a list of 3 — not a bug, and not something to "reconcile" without deciding which source is authoritative. `client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceBody/TraceBody.tsx:19` (`TraceBody`, props `trace` vs `findings`).
+- 2026-09-19 · SUPERSEDES the 2026-09-16 "three unlinked places" entry above: the PR list's columns now derive from one `COLUMNS` array (`pulls/constants.ts`) — `GRID`, the header row and the cell order all come from it, and `PRRow` builds `cells: Record<ColumnKey, ReactNode>`, so a column added without its cell is a `tsc` error (probed: TS2741 "Property 'probe' is missing"). The one link the type system can't see is the header label: `list.columns.<key>` in `prReview.json`, guarded by `pulls/constants.test.ts`. `client/src/app/repos/[repoId]/pulls/constants.ts:1` (`COLUMNS`).
 
 ## Tool & Library Notes
 
@@ -40,5 +41,6 @@ coming back graduates into this module's AGENTS.md as a standing rule.
 - 2026-09-17 · Per-severity chips + hover findings preview on the PR timeline (client-only, no model call) — +5 insights (Codebase Patterns ×3, Tool & Library Notes ×2)
 - 2026-09-18 · Rubric pass: run-card severity pills + filter, PR-list FINDINGS column, Reject label — +2 insights (Codebase Patterns)
 - 2026-09-19 · Captured PR screenshots across all three severity surfaces — +2 insights (Codebase Patterns, Tool & Library Notes)
+- 2026-09-19 · Frontend refactor phases 1–5 (severity module, hover hook, RunHistory split, FindingsCell, COLUMNS) + `list.findingsInPr` copy fix — +1 insight (Codebase Patterns, supersedes the column-trap entry)
 
 ## Open Questions

@@ -1,4 +1,4 @@
-import type { PrMeta } from "../../../../lib/types";
+import type { PrMeta } from "@/lib/types";
 
 /** Constants for the PR list page (/repos/:repoId/pulls). */
 
@@ -17,17 +17,36 @@ export const STATUS_META: Record<string, { c: string; labelKey: string }> = {
 };
 
 /** Size bucket → colour token. */
-export const SIZE_COLOR: Record<string, string> = {
+export const SIZE_COLOR: Record<PrSize, string> = {
   S: "var(--ok)",
   M: "var(--warn)",
   L: "var(--crit)",
 };
 
-/** Grid template for both the header row and PR rows. Keep the track count in
- *  sync with COLUMN_KEYS below AND with the cells rendered by PRRow — the
- *  three are only related through this template, so a column added to one
- *  without the others silently shifts every header off its cell. */
-export const GRID = "1fr 132px 92px 60px 120px 118px 76px 78px";
+export type Column = { key: string; width: string; align?: "right" };
+
+/**
+ * The PR list's columns, in display order — the ONE source for the grid
+ * template, the header row (i18n key under `list.columns`) and PRRow's cells.
+ * PRRow builds a `Record<ColumnKey, ReactNode>`, so adding a column here
+ * without its cell is a type error rather than every header silently shifting
+ * off its cell.
+ */
+export const COLUMNS = [
+  { key: "pullRequest", width: "1fr" },
+  { key: "author", width: "132px" },
+  { key: "size", width: "92px" },
+  { key: "score", width: "60px" },
+  { key: "findings", width: "120px" },
+  { key: "status", width: "118px" },
+  { key: "cost", width: "76px" },
+  { key: "updated", width: "78px", align: "right" },
+] as const satisfies readonly Column[];
+
+export type ColumnKey = (typeof COLUMNS)[number]["key"];
+
+/** Grid template shared by the header row and every PR row. */
+export const GRID = COLUMNS.map((c) => c.width).join(" ");
 
 /** Line-count thresholds for the S/M/L size bucket. */
 export const SIZE_SMALL_MAX = 100;
@@ -39,18 +58,6 @@ export const STATUS_FILTERS: { key: string; labelKey: string }[] = [
   { key: "needs_review", labelKey: "needs_review" },
   { key: "reviewed", labelKey: "reviewed" },
   { key: "stale", labelKey: "stale" },
-];
-
-/** Column header i18n keys (under `list.columns`), in display order. */
-export const COLUMN_KEYS: string[] = [
-  "pullRequest",
-  "author",
-  "size",
-  "score",
-  "findings",
-  "status",
-  "cost",
-  "updated",
 ];
 
 /** Number of skeleton rows shown while loading. */
