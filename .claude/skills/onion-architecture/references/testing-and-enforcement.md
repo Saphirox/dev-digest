@@ -66,7 +66,7 @@ cd server
 
 - Exit code is non-zero only for `error` violations. `warn` violations
   print but pass.
-- **Baseline 2026-09-19: 0 errors, 29 warnings** (list in
+- **Baseline 2026-09-19: 0 errors, 27 warnings** (list in
   `layers-and-dependency-rule.md` §4). Compare the warning count before and
   after your change. An increase means your change added debt.
 - To see one file's edges: add `--focus 'src/modules/foo'`. For a graph:

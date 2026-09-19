@@ -53,7 +53,7 @@ export default async function reposRoutes(appBase: FastifyInstance) {
 }
 ```
 
-Counter-example (known debt, `pulls/routes.ts:241`):
+Counter-example (the shape `pulls/routes.ts` had before its 2026-09-19 split; `polling`, `settings` and `workspace` routes still query like this):
 
 ```ts
 // ❌ presentation reaching into infrastructure

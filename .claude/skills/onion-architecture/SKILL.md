@@ -39,7 +39,7 @@ Sources for every rule: [references.md](references.md).
 1. Read `server/AGENTS.md` (and `reviewer-core/AGENTS.md` if you touch it).
 2. Copy the shape of a **clean** module: `repos`, `agents` or `reviews`
    (`routes.ts` → `service.ts` → `repository.ts`, plus `helpers.ts` and `constants.ts`).
-3. **Don't** copy `pulls`, `polling`, `workspace` or `settings`. Their routes
+3. **Don't** copy `polling`, `workspace` or `settings`. Their routes
    query Drizzle directly through `container.db`. That is known debt, not a
    pattern (see the debt list in `references/layers-and-dependency-rule.md`).
 
@@ -148,7 +148,7 @@ rules are known debt that new code must not add to.
 
 Run it: `cd server && ./node_modules/.bin/depcruise src ../reviewer-core/src --config .dependency-cruiser.cjs --output-type err`
 (or `pnpm arch:check`, where the pnpm wrapper works; see the `ERR_PNPM_IGNORED_BUILDS`
-entry in the root `INSIGHTS.md`). Baseline on 2026-09-19: **0 errors, 29 warnings**.
+entry in the root `INSIGHTS.md`). Baseline on 2026-09-19: **0 errors, 27 warnings** (29 before `pulls` got its service/repository split).
 A change that raises the warning count adds debt, so fix it or justify it in the PR.
 
 ## Anti-patterns → fix

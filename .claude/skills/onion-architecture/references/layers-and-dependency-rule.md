@@ -75,7 +75,7 @@ creates a second instance with its own state.
   engine (`review/`, `prompt.ts`, `grounding.ts`, `output/`) sees only the
   `LLMProvider` interface. `reviewer-core-engine-no-sdk` enforces that.
 
-## 4. Known debt (baseline 2026-09-19: 29 warnings)
+## 4. Known debt (baseline 2026-09-19: 27 warnings)
 
 Don't copy these. If your change touches one of these files, you may fix
 the debt in passing when it is cheap, and say so in the PR. Don't start a
@@ -83,7 +83,7 @@ refactor nobody asked for.
 
 | Rule | Where | Nature |
 |---|---|---|
-| `routes-no-persistence` ×8 | `pulls/routes.ts`, `polling/routes.ts`, `settings/routes.ts`, `workspace/routes.ts` (each → `drizzle-orm` + `db/schema`) | Whole modules without a service/repository split, e.g. `pulls/routes.ts:241` deletes and inserts `prFiles` inline |
+| `routes-no-persistence` ×6 | `polling/routes.ts`, `settings/routes.ts`, `workspace/routes.ts` (each → `drizzle-orm` + `db/schema`) | Whole modules without a service/repository split. `pulls` was paid down on 2026-09-19 (`routes` → `service` → `repository` + `ports.ts`); its `replaceDetail` multi-write still has no transaction |
 | `application-no-drizzle` ×5 | `reviews/run-executor.ts`, `reviews/diff-loader.ts`, `settings/feature-models.ts` (×2), `repos/helpers.ts` → `db/schema` | Row types or queries used above the repository |
 | `modules-no-concrete-adapters` ×8 | `repo-intel/service.ts`, `repo-intel/pipeline/{full,incremental,repo-map}.ts` → `adapters/{astgrep,codeindex,tokenizer}`; `reviews/diff-loader.ts` → `adapters/git/diff-parser.ts` | Parsers called directly. `parseUnifiedDiff` is pure, so the better fix is moving it inward, not wrapping it |
 | `adapters-not-inward-to-app` ×2 | `adapters/astgrep/index.ts`, `adapters/depgraph/index.ts` → `modules/repo-intel/constants.ts` | An adapter reading app constants. Pass them in as options or move them to the adapter |
