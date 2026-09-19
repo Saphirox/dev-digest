@@ -1,7 +1,7 @@
-import { AgentsListView } from "./_components/AgentsListView";
+import { AgentsIndexPane } from "./_components/AgentsIndexPane";
 
-/* Route: /agents (Agents list). Thin route entry — the view, its create modal,
-   styles, constants, helpers and i18n are colocated under _components/AgentsListView. */
+/* Route: /agents. Thin route entry — the right pane only (empty state or
+   "select an agent"); the rail lives in ./layout.tsx. */
 export default function AgentsPage() {
-  return <AgentsListView />;
+  return <AgentsIndexPane />;
 }

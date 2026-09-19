@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Agent } from "@devdigest/shared";
@@ -40,6 +40,20 @@ describe("AgentCard (smoke)", () => {
     expect(screen.getByText("Security Reviewer")).toBeInTheDocument();
     expect(screen.getByText("gpt-4.1")).toBeInTheDocument();
     expect(screen.getByText("3 skills")).toBeInTheDocument();
+  });
+
+  it("shortens a routed model id and keeps the full id in the tooltip", () => {
+    renderWithIntl(<AgentCard ag={{ ...AGENT, model: "deepseek/deepseek-v4-flash" }} />);
+    expect(screen.getByText("deepseek-v4-flash")).toHaveAttribute("title", "deepseek/deepseek-v4-flash");
+  });
+
+  it("asks to delete without opening the agent", () => {
+    const onClick = vi.fn();
+    const onDelete = vi.fn();
+    renderWithIntl(<AgentCard ag={AGENT} onClick={onClick} onDelete={onDelete} />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete Security Reviewer" }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onClick).not.toHaveBeenCalled();
   });
 
   it("falls back to a translated placeholder when description is empty", () => {
