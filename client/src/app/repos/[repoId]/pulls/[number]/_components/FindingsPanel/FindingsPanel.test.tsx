@@ -1,16 +1,18 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 
+const mutate = vi.fn();
 vi.mock("../../../../../../../lib/hooks/reviews", () => ({
-  useFindingAction: () => ({ mutate: vi.fn(), isPending: false }),
+  useFindingAction: () => ({ mutate, isPending: false }),
 }));
 
 import { FindingsPanel } from "./FindingsPanel";
 
 afterEach(cleanup);
+beforeEach(() => mutate.mockReset());
 
 const FINDINGS: FindingRecord[] = [
   {
@@ -143,5 +145,52 @@ describe("FindingsPanel — severity pills (rubric #16-18)", () => {
     expect(screen.queryByText("Low-confidence crash path")).not.toBeInTheDocument();
     expect(screen.getByLabelText("1 CRITICAL")).toBeInTheDocument();
     expect(shownTitles()).toHaveLength(2);
+  });
+});
+
+describe("FindingsPanel keyboard (j/k + a/d)", () => {
+  // Shown order is severity-sorted: f1 (CRITICAL), f3 (CRITICAL, low conf), f2 (WARNING).
+  const press = (key: string) => fireEvent.keyDown(window, { key });
+  const acted = () => mutate.mock.calls.map(([arg]) => `${arg.action}:${arg.findingId}`);
+
+  it("a/d act on the focused finding, starting at the top", () => {
+    renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" />);
+    press("a");
+    press("j");
+    press("d");
+    expect(acted()).toEqual(["accept:f1", "dismiss:f3"]);
+    expect(mutate.mock.calls[0]![0].prId).toBe("pr1");
+  });
+
+  it("j/k clamp at both ends of the list", () => {
+    renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" />);
+    press("k");
+    press("a");
+    press("j");
+    press("j");
+    press("j");
+    press("j");
+    press("a");
+    expect(acted()).toEqual(["accept:f1", "accept:f2"]);
+  });
+
+  it("re-anchors at the top when the shown list changes, so a/d never no-op", () => {
+    renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" />);
+    press("j");
+    press("j"); // focus on f2, index 2
+    fireEvent.click(screen.getByRole("switch")); // hides f3 → list shrinks to 2
+    press("a");
+    expect(acted()).toEqual(["accept:f1"]);
+  });
+
+  it("ignores shortcuts typed into a text field", () => {
+    renderWithIntl(
+      <>
+        <input aria-label="search" />
+        <FindingsPanel findings={FINDINGS} prId="pr1" />
+      </>,
+    );
+    fireEvent.keyDown(screen.getByLabelText("search"), { key: "a" });
+    expect(mutate).not.toHaveBeenCalled();
   });
 });
