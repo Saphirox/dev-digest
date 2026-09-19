@@ -22,3 +22,17 @@
     transform: translateY(0);
   }
 }
+
+/* Skill preview (Skills → Preview): the body rendered as the agent receives it,
+   with document typography. Scoped, because the global reset strips heading
+   sizes and list bullets from every other markdown surface on purpose. */
+.skill-md h1 { font-size: 20px; font-weight: 700; margin: 0 0 12px; }
+.skill-md h2 { font-size: 16px; font-weight: 700; margin: 20px 0 8px; }
+.skill-md h3 { font-size: 14px; font-weight: 700; margin: 16px 0 6px; }
+.skill-md p { margin: 0 0 10px; line-height: 1.7; color: var(--text-secondary); }
+.skill-md ul, .skill-md ol { margin: 0 0 10px; padding-left: 22px; color: var(--text-secondary); }
+.skill-md ul { list-style: disc; }
+.skill-md ol { list-style: decimal; }
+.skill-md li { margin: 4px 0; line-height: 1.6; }
+.skill-md strong { color: var(--text-primary); }
+.skill-md pre { margin: 0 0 12px; padding: 10px 12px; border-radius: 6px; background: var(--bg-surface); overflow: auto; }
