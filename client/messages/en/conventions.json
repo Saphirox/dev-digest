@@ -4,23 +4,62 @@
     "crumbConventions": "Conventions",
     "headingPrefix": "Conventions in ",
     "repoFallback": "repo",
-    "subtitle": "Scan the cloned repo to surface house-rules — each backed by evidence you can turn into a Skill.",
+    "meta": "Detected from {count, plural, one {# sample file} other {# sample files}} · last scan {when}",
+    "metaNever": "Not scanned yet",
     "scanning": "Scanning…",
     "rescan": "Re-scan",
-    "runExtraction": "Run extraction",
-    "extractionFailed": "Extraction failed",
+    "deselectAll": "Deselect all",
+    "acceptedCount": "{accepted} of {total} accepted",
+    "createSkill": "Create skill",
     "loadError": "Could not load conventions.",
+    "allCategories": "All",
+    "scanResult": "{proposed, plural, =0 {No new conventions} one {# new convention} other {# new conventions}} · {dropped} dropped without evidence",
     "empty": {
       "title": "No conventions extracted yet",
-      "body": "Scan the repo to surface house-rules — naming, error handling, structure — each backed by evidence you can turn into a Skill.",
-      "cta": "Run extraction"
+      "body": "Scan the repo to surface house rules (naming, error handling, structure), each backed by evidence you can turn into a Skill.",
+      "cta": "Run scan"
     },
-    "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files"
+    "runScan": "Run scan",
+    "emptyScanned": {
+      "title": "No conventions found",
+      "body": "The last scan found nothing backed by evidence. Re-scan after the repo changes, or try another model in Settings → Models."
+    }
   },
   "card": {
     "confidence": "Confidence",
     "accepted": "Accepted",
-    "accepting": "Accepting…",
-    "acceptAsSkill": "Accept as Skill"
+    "accept": "Accept",
+    "reject": "Reject",
+    "rejected": "Rejected",
+    "copy": "Copy snippet",
+    "copied": "Snippet copied",
+    "seenIn": "{count, plural, one {seen in # file} other {seen in # files}}",
+    "edit": "Edit rule",
+    "editHint": "Enter to save · Esc to cancel",
+    "category": {
+      "naming": "naming",
+      "structure": "structure",
+      "errors": "errors",
+      "testing": "testing",
+      "imports": "imports",
+      "typing": "typing",
+      "api": "api",
+      "general": "general"
+    },
+    "editButton": "Edit"
+  },
+  "modal": {
+    "title": "Create skill from conventions",
+    "banner": "Merged from <b>{count, plural, one {# accepted convention} other {# accepted conventions}}</b> in <accent>{repo}</accent>. Everything below is editable before you save.",
+    "enabled": "Enabled",
+    "enabledHint": "Whether this block is added to agents' prompts.",
+    "footer": "Saved as v1 · added to Skills Lab",
+    "cancel": "Cancel",
+    "create": "Create skill",
+    "created": "Created \"{name}\". Attach it to an agent in Agents → Skills.",
+    "agentLabel": "Attach to agent",
+    "agentNone": "Don't attach now",
+    "agentHint": "Linked and enabled for that agent, added at the end of its prompt. You can change it later in Agents → Skills.",
+    "createdLinked": "Created \"{name}\" and attached it to {agent}."
   }
 }
