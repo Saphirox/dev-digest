@@ -103,7 +103,7 @@ filler. For most small tasks this is the expected outcome.
 ## Quality bar — substantive means all four
 
 1. **Not obvious** — anyone reading the code wouldn't see it. Skip generic
-   programming knowledge and anything already in a CLAUDE.md or README.
+   programming knowledge and anything already in a AGENTS.md or README.
 2. **Actionable cold** — an agent reading only this line knows what to do or
    avoid, and it would have saved real time or prevented a mistake in this
    task. It is likely to come up again, and the code it describes is stable
@@ -150,7 +150,7 @@ One bullet = one insight, at most 3 lines:
 - **Never write secrets** — no tokens, keys, `.env` values, or personal data.
 - **Lesson → rule.** If the same insight comes up a second time, or you
   broke an entry you had already read, propose moving it into that module's
-  CLAUDE.md — or into a hook if it keeps being broken. Don't edit CLAUDE.md
+  AGENTS.md — or into a hook if it keeps being broken. Don't edit AGENTS.md
   unasked.
 - **Oversized file** (~100 entries): tell the user it needs a prune; don't
   prune it yourself.

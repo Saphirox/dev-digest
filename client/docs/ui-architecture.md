@@ -1,7 +1,7 @@
 # client — архітектура UI
 
 Практичний огляд `@devdigest/web`. Карта маршрутів → ендпоінтів у
-[../README.md](../README.md#ui-route-map); правила — у [../CLAUDE.md](../CLAUDE.md).
+[../README.md](../README.md#ui-route-map); правила — у [../AGENTS.md](../AGENTS.md).
 
 ## Розкладка
 
