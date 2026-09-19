@@ -171,7 +171,8 @@ export const PrMeta = z.object({
   // Latest-review score (list endpoint only; null/absent until reviewed).
   score: z.number().int().nullish(),
   /**
-   * Cost (USD) of the LATEST completed run on this PR — list endpoint only.
+   * Total cost (USD) of every COMPLETED run on this PR — list endpoint only.
+   * Null when unknown (no completed run carries a recorded cost), never 0.
    * `nullish` like `score`: PrMeta doubles as the GitHub adapter's shape
    * (`listPullRequests`), which knows nothing about cost.
    */
