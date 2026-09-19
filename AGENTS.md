@@ -84,17 +84,22 @@ not a separate package.
 Every module (`client`, `server`, `reviewer-core`, `repo-intel`, `e2e`) keeps
 an append-only `INSIGHTS.md`; cross-cutting lessons live in the root
 [INSIGHTS.md](INSIGHTS.md). None are auto-loaded — they're read on demand,
-lazily (section map first, then only what the task needs). Routing, reading
-strategy, format, and quality bar: the `engineering-insights` skill.
+lazily (section map first, then only what the task needs).
 
 1. **Start of every task** — after the user's prompt and before exploring,
    editing, or answering, read the `INSIGHTS.md` of every module the prompt
    concerns (questions and reviews included, not only code changes); add the
    root one when the task spans modules or touches `scripts/`, Docker, CI, or
    `.claude/`. Say in one line which entries apply, or that none do.
-2. **End of every task** — run the `engineering-insights` wrap-up: re-read
-   the target `INSIGHTS.md`, then append only substantive insights it doesn't
-   already contain. Nothing new → write nothing.
+2. **End of every task** — re-read the target `INSIGHTS.md`, then append
+   only substantive insights it doesn't already contain. Nothing new → write nothing.
+
+## Before a PR
+
+A `PreToolUse` hook (`.claude/settings.json`) denies `git push`,
+`gh pr create`, `gh pr merge` and `gh pr ready` until the *current* diff has
+a passing self-review; any unoverridden critical blocks. Only the user may
+override a critical as a false positive.
 
 ## Docs
 
