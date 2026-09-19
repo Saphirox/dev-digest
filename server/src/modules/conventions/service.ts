@@ -6,7 +6,7 @@ import type {
   ConventionSkillDraft,
 } from '@devdigest/shared';
 import { NotFoundError, ValidationError } from '../../platform/errors.js';
-import { CONFIG_FILES, MAX_PATTERN_LENGTH, SAMPLE_TOP_FILES } from './constants.js';
+import { CONFIG_FILES, SAMPLE_TOP_FILES } from './constants.js';
 import {
   adjustConfidence,
   buildSkillDraft,
@@ -14,6 +14,7 @@ import {
   normalizeRule,
   renderSample,
   resolveSampledPath,
+  safeSearchPattern,
   toConventionDto,
   type SampleFile,
 } from './helpers.js';
@@ -84,7 +85,7 @@ export class ConventionsService {
         continue;
       }
       seen.add(key);
-      const pattern = c.pattern?.trim() && c.pattern.length <= MAX_PATTERN_LENGTH ? c.pattern.trim() : null;
+      const pattern = safeSearchPattern(c.pattern);
       // 0 means the pattern misses even the evidence file: it's wrong, so the
       // frequency is unknown rather than "seen in 0 files".
       const count = pattern ? await source.countFiles(repo, pattern) : null;

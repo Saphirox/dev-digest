@@ -3,6 +3,7 @@ import {
   CONVENTIONS_SKILL_NAME,
   MAX_CHARS_PER_FILE,
   MAX_LINES_PER_FILE,
+  MAX_PATTERN_LENGTH,
   MAX_SNIPPET_LINES,
   MAX_TOTAL_CHARS,
   MIN_SNIPPET_CHARS,
@@ -152,4 +153,23 @@ export function buildSkillDraft(repoName: string, accepted: ConventionRecord[]):
     body,
     convention_count: n,
   };
+}
+
+/**
+ * A model-written search pattern we are willing to run. It is untrusted (the
+ * model read the scanned repo, so the repo can steer it): no leading `-` (would
+ * be an option to ripgrep), within the length cap, a valid regex, and no nested
+ * quantifier such as `(a+)+` or backreference, which can backtrack for ever in
+ * the Node fallback. Anything else → null (frequency unknown).
+ */
+export function safeSearchPattern(raw: string | null | undefined): string | null {
+  const pattern = raw?.trim();
+  if (!pattern || pattern.length > MAX_PATTERN_LENGTH || pattern.startsWith('-')) return null;
+  if (/\([^)]*[+*}][^)]*\)\s*[+*{]/.test(pattern) || /\\[1-9]/.test(pattern)) return null;
+  try {
+    new RegExp(pattern);
+  } catch {
+    return null;
+  }
+  return pattern;
 }

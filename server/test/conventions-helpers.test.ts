@@ -6,6 +6,7 @@ import {
   normalizeRule,
   renderSample,
   resolveSampledPath,
+  safeSearchPattern,
   slugify,
 } from '../src/modules/conventions/helpers.js';
 import type { ConventionRecord } from '../src/modules/conventions/ports.js';
@@ -121,5 +122,30 @@ describe('buildSkillDraft', () => {
     expect(draft.body).toContain('## always-use-async-await-instead-of-then-chains');
     expect(draft.body).toContain('Detected in `src/api/users.ts:23`:');
     expect(draft.body).toContain('const u = await x();');
+  });
+});
+
+describe('safeSearchPattern', () => {
+  it('keeps an ordinary regex, trimmed', () => {
+    expect(safeSearchPattern('  satisfies CSSProperties ')).toBe('satisfies CSSProperties');
+    expect(safeSearchPattern('\\buuid\\(')).toBe('\\buuid\\(');
+  });
+
+  it('rejects what ripgrep would read as an option', () => {
+    expect(safeSearchPattern('--pre=sh')).toBeNull();
+    expect(safeSearchPattern(' -e foo')).toBeNull();
+  });
+
+  it('rejects nested quantifiers and backreferences (catastrophic backtracking)', () => {
+    expect(safeSearchPattern('(a+)+$')).toBeNull();
+    expect(safeSearchPattern('(\\w*)*x')).toBeNull();
+    expect(safeSearchPattern('(a)\\1')).toBeNull();
+  });
+
+  it('rejects invalid, empty and oversized patterns', () => {
+    expect(safeSearchPattern('([')).toBeNull();
+    expect(safeSearchPattern('   ')).toBeNull();
+    expect(safeSearchPattern(null)).toBeNull();
+    expect(safeSearchPattern('x'.repeat(201))).toBeNull();
   });
 });
