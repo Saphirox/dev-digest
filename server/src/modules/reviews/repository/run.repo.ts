@@ -139,25 +139,32 @@ export async function createAgentRun(
   return row!.id;
 }
 
+/** Terminal values written onto an agent_run when it finishes. */
+export interface CompleteRunValues {
+  status: 'done' | 'failed' | 'cancelled';
+  durationMs: number;
+  tokensIn: number;
+  tokensOut: number;
+  /**
+   * Run cost in USD; null when unknown (failed run, or unpriced model).
+   * Required, not optional: every completion must decide cost explicitly so a
+   * new call site can't silently store NULL.
+   */
+  costUsd: number | null;
+  findingsCount: number;
+  grounding: string;
+  /** Review score (0-100); null on failed/cancelled runs. */
+  score?: number | null;
+  /** Findings that tripped the agent's gate; 0 on failed/cancelled runs. */
+  blockers?: number | null;
+  /** Failure reason (status='failed') / cancellation note. Null clears it. */
+  error?: string | null;
+}
+
 export async function completeAgentRun(
   db: Db,
   runId: string,
-  values: {
-    status: 'done' | 'failed' | 'cancelled';
-    durationMs: number;
-    tokensIn: number;
-    tokensOut: number;
-    /** Run cost in USD; null when unknown (failed run, or unpriced model). */
-    costUsd?: number | null;
-    findingsCount: number;
-    grounding: string;
-    /** Review score (0-100); null on failed/cancelled runs. */
-    score?: number | null;
-    /** Findings that tripped the agent's gate; 0 on failed/cancelled runs. */
-    blockers?: number | null;
-    /** Failure reason (status='failed') / cancellation note. Null clears it. */
-    error?: string | null;
-  },
+  values: CompleteRunValues,
 ): Promise<void> {
   await db
     .update(t.agentRuns)
@@ -166,7 +173,7 @@ export async function completeAgentRun(
       durationMs: values.durationMs,
       tokensIn: values.tokensIn,
       tokensOut: values.tokensOut,
-      costUsd: values.costUsd ?? null,
+      costUsd: values.costUsd,
       findingsCount: values.findingsCount,
       grounding: values.grounding,
       score: values.score ?? null,
