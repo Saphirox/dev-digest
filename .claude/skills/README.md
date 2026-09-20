@@ -21,13 +21,26 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [git-rebase-sync](git-rebase-sync/SKILL.md) | Workflow | Rebase onto fresh `origin/main` before commits (hook `.claude/hooks/rebase-before-commit.mjs`), conflict summaries, repo-specific resolution rules, recovery |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
 
-The `planner` and `implementer` agents (`.claude/agents/`) load skills lazily by area
-(frontend / backend / reviewer-core), never by preload; the planner reads them with
-`Read` and also uses `mermaid-diagram` for the optional diagrams in its plans; the
-implementer uses the Skill tool. The single skill-mapping table lives in
-`.claude/agents/planner.md` ("Lazy skill reading"); the implementer follows the plan's
-per-step `Skills:` and falls back to that table. When you add or rename a skill, update
-`pr-self-review/references/routing.json` **and** that table.
+All ten agents in `.claude/agents/` (`brainstorm`, `investigator`,
+`researcher`, `planner`, `implementer`, `test-writer`,
+`architecture-reviewer`, `plan-verifier`, `doc-writer`, `insight-curator`)
+load skills lazily by area, never by preload, and the mechanism splits by
+what the agent does: agents that write code — `implementer` and
+`test-writer` — have the `Skill` tool and load skills through it; agents
+that only read for rules — `planner`, `architecture-reviewer`,
+`plan-verifier` (which loads none), `doc-writer`, `brainstorm`,
+`investigator` (`mermaid-diagram`, for Mode B's optional diagram) and
+`insight-curator` (`engineering-insights`) — have no `Skill` tool and read a
+skill's `SKILL.md` (and, for `doc-writer`, `mermaid-diagram`'s
+`examples.md`) directly with `Read`. Since
+`tools:` is an allowlist, omitting `Skill` is what enforces the read-only
+mechanism. The single skill-mapping table lives in `.claude/agents/planner.md`
+("Lazy skill reading"), covering `planner`, `implementer` and `test-writer`;
+each agent follows its own plan/report input's named skills first and falls
+back to that table. When you add or rename a skill, update
+`pr-self-review/references/routing.json` **and** that table — adding an agent
+does **not** require a `routing.json` change, since that file routes files to
+skills for `pr-self-review`, not agents to skills.
 
 ## What Are Skills?
 

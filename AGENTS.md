@@ -53,6 +53,7 @@ not a separate package.
 | Adapter | `src/adapters/<port>/<impl>.ts`, port name singular | `adapters/llm/openrouter.ts`, `adapters/secrets/local.ts` |
 | DB schema | one file per domain in `src/db/schema/<domain>.ts`; shared columns in `_shared.ts` | `schema/runs.ts` |
 | Migration | `NNNN_<snake_case>.sql`, 4-digit sequential prefix, drizzle-generated name — never renumbered | `0011_petite_molecule_man.sql` |
+| Plan | `docs/plans/NNNN-<slug>.md`, 4-digit sequential prefix, never renumbered | `docs/plans/0001-helper-agent-set.md` |
 | Contract | zod schema and its inferred type share one name | `export const PrMeta = z.object({…})` + `export type PrMeta = z.infer<typeof PrMeta>` |
 | Client route | `src/app/**/page.tsx`; pages stay thin | `app/repos/[repoId]/pulls/[number]/page.tsx` |
 | Client feature component | colocated folder `_components/<Name>/` holding `<Name>.tsx` + optional `constants.ts`, `helpers.ts`, `styles.ts`, `index.ts`, `<Name>.test.tsx` | `_components/FindingCard/` |
@@ -113,5 +114,7 @@ Scripts under `.claude/` must locate siblings via `import.meta.url`, never
 
 ## Docs
 
-[TESTING.md](TESTING.md) · [docs/agent-prompts/](docs/agent-prompts/) — the
-built-in reviewer agent system prompts.
+[docs/README.md](docs/README.md) — routing index: which content type goes
+where under `docs/`. Also [TESTING.md](TESTING.md) ·
+[docs/agent-prompts/](docs/agent-prompts/) — the built-in reviewer agent
+system prompts.
