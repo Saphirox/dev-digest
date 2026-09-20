@@ -38,6 +38,12 @@ pnpm typecheck
 - `src/vendor/shared` is a manually-synced copy of `server/src/vendor/shared`,
   not an alias to it — it can lag behind server (missing later-lesson
   contracts). Diff before assuming parity.
+- **Import shared contracts as types only** — `import type { Finding } from
+  "@devdigest/shared"`. A runtime import (e.g. reading `SkillType.options`)
+  500s the page under `next dev` with `Module not found: Can't resolve
+  './contracts/findings.js'`: the vendored index uses `.js` specifiers webpack
+  can't resolve. `tsc` and `pnpm test` both pass — only a real page load
+  catches it. Derive runtime lists from a local `Record<Union, …>`.
 - Component/interaction tests mock `fetch`; they intentionally don't need the
   API running. Full client+API+DB journeys live in [`../e2e`](../e2e/README.md),
   not here.
@@ -47,6 +53,19 @@ pnpm typecheck
 - The UI route map (which route calls which API endpoint) is in
   [README.md](README.md#ui-route-map) — read it before wiring a new page to
   the API rather than guessing the endpoint shape.
+- **`React.useEffectEvent` is a trap here.** It type-checks and passes vitest
+  (`node_modules/react` is 19.2.7) but crashes in the browser with
+  `useEffectEvent is not a function` — Next 15.5's App Router runs its own
+  bundled React. Hold the latest values in a ref instead. Re-check when Next
+  vendors React ≥ 19.2.
+- **`@devdigest/ui` has two form traps.** `Button` sets no default `type`, so
+  any `Button` inside a `<form>` (e.g. Cancel) submits it — pass
+  `type="button"`. `Modal` gives its children no padding (`Drawer` does); wrap
+  a form in a `{ padding: 24 }` div.
+- **null ≠ 0 in run usage.** Unknown cost renders "—"; unknown tokens drop the
+  whole "N tok · " segment. Never `?? 0` a cost or token field — the server
+  enforces the same rule in SQL (`SUM` skips NULLs). It's a product contract,
+  not a formatting choice.
 
 ## Do not touch
 
