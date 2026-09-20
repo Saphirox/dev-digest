@@ -101,6 +101,16 @@ A `PreToolUse` hook (`.claude/settings.json`) denies `git push`,
 a passing self-review; any unoverridden critical blocks. Only the user may
 override a critical as a false positive.
 
+A second `PreToolUse` hook fetches `origin/main` and rebases the branch before
+every `git commit`; on conflicts it changes nothing and denies with the
+conflicting `file:line` ranges. It never commits, and a rebase makes earlier
+self-review verdicts stale.
+
+## Harness scripts
+
+Scripts under `.claude/` must locate siblings via `import.meta.url`, never
+`.claude/…` from cwd.
+
 ## Docs
 
 [TESTING.md](TESTING.md) · [docs/agent-prompts/](docs/agent-prompts/) — the

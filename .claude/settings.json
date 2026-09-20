@@ -11,6 +11,17 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/rebase-before-commit.mjs\"",
+            "timeout": 60,
+            "statusMessage": "Rebasing onto origin/main"
+          }
+        ]
       }
     ],
     "Stop": [
