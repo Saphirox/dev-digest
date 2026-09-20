@@ -21,6 +21,14 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [git-rebase-sync](git-rebase-sync/SKILL.md) | Workflow | Rebase onto fresh `origin/main` before commits (hook `.claude/hooks/rebase-before-commit.mjs`), conflict summaries, repo-specific resolution rules, recovery |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
 
+The `planner` and `implementer` agents (`.claude/agents/`) load skills lazily by area
+(frontend / backend / reviewer-core), never by preload; the planner reads them with
+`Read` and also uses `mermaid-diagram` for the optional diagrams in its plans; the
+implementer uses the Skill tool. The single skill-mapping table lives in
+`.claude/agents/planner.md` ("Lazy skill reading"); the implementer follows the plan's
+per-step `Skills:` and falls back to that table. When you add or rename a skill, update
+`pr-self-review/references/routing.json` **and** that table.
+
 ## What Are Skills?
 
 Skills are modular packages that extend the AI agent with specialized knowledge and workflows. Unlike rules (always applied) or agents (invoked for specific tasks), skills are loaded on-demand when the agent determines they're relevant.
