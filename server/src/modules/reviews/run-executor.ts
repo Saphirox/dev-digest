@@ -6,7 +6,7 @@ import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
 import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './repository.js';
 import { REVIEW_STRATEGY } from './constants.js';
-import { taskLine } from './helpers.js';
+import { taskLine, toSkillPromptBlock } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
@@ -186,6 +186,11 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // Linked skills whose link AND skill are enabled, in the agent's order.
+      // Omitted when there are none, so the prompt is byte-identical to a
+      // skill-less agent's.
+      const skills = await this.buildSkillBlocks(agent.id, runLog);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -203,6 +208,7 @@ export class ReviewRunExecutor {
         ...(callersDigest ? { callers: callersDigest } : {}),
         // T3 — repo skeleton, same omit-when-empty contract.
         ...(repoMap ? { repoMap } : {}),
+        ...(skills ? { skills: skills.blocks } : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
@@ -273,7 +279,7 @@ export class ReviewRunExecutor {
           findings: findingRows.length,
           grounding,
         },
-        prompt_assembly: outcome.assembly,
+        prompt_assembly: { ...outcome.assembly, skills_tokens: skills?.tokens ?? null },
         tool_calls: outcome.chunks.map((c) => ({
           tool: 'review_file',
           args: c.label,
@@ -368,6 +374,32 @@ export class ReviewRunExecutor {
    * slot. Returns `undefined` when repo-intel is off / the repo isn't indexed
    * (the facade degrades), so the prompt stays identical to the pre-T3 shape.
    */
+  /**
+   * The agent's enabled skills as prompt blocks, plus the tokens they add.
+   * Best-effort: a failure is logged and the review runs without skills.
+   */
+  private async buildSkillBlocks(
+    agentId: string,
+    runLog: RunLogger,
+  ): Promise<{ blocks: string[]; tokens: number } | undefined> {
+    try {
+      const skills = await this.agents.enabledSkillsForPrompt(agentId);
+      if (skills.length === 0) {
+        runLog.info('skills: none enabled for this agent');
+        return undefined;
+      }
+      const blocks = skills.map(toSkillPromptBlock);
+      const tokens = this.container.tokenizer.count(blocks.join('\n\n'));
+      runLog.info(
+        `skills: ${skills.length} attached (+~${tokens} tokens) — ${skills.map((s) => s.name).join(', ')}`,
+      );
+      return { blocks, tokens };
+    } catch (err) {
+      runLog.info(`skills: failed to load — ${(err as Error).message}`);
+      return undefined;
+    }
+  }
+
   private async buildRepoMapDigest(
     repoId: string,
     runLog: RunLogger,

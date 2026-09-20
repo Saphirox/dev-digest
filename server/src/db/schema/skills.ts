@@ -1,4 +1,5 @@
-import { pgTable, uuid, text, integer, boolean, jsonb, primaryKey } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { pgTable, uuid, text, integer, boolean, jsonb, primaryKey, index, check } from 'drizzle-orm/pg-core';
 import { now } from './_shared';
 import { workspaces } from './core';
 
@@ -18,7 +19,15 @@ export const skills = pgTable('skills', {
   version: integer('version').notNull().default(1),
   evidenceFiles: jsonb('evidence_files').$type<string[]>(),
   createdAt: now(),
-});
+}, (t) => ({
+  wsIdx: index('skills_workspace_idx').on(t.workspaceId),
+  // The `text({ enum })` above only narrows TypeScript; these make Postgres agree.
+  typeCk: check('skills_type_ck', sql`${t.type} in ('rubric', 'convention', 'security', 'custom')`),
+  sourceCk: check(
+    'skills_source_ck',
+    sql`${t.source} in ('manual', 'imported_url', 'extracted', 'community')`,
+  ),
+}));
 
 export const skillVersions = pgTable(
   'skill_versions',

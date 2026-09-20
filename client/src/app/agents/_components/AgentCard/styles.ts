@@ -41,6 +41,10 @@ export const s = {
   } satisfies CSSProperties,
   metaRow: { display: "flex", alignItems: "center", gap: 8 } satisfies CSSProperties,
   modelChip: (color: string): CSSProperties => ({
+    maxWidth: 170,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
     fontSize: 12,
     fontWeight: 600,
     color,
@@ -48,4 +52,5 @@ export const s = {
     padding: "1px 8px",
     borderRadius: 4,
   }),
+  delete: { marginLeft: "auto" } satisfies CSSProperties,
 } as const;

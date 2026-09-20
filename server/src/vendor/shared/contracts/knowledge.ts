@@ -131,6 +131,52 @@ export const Skill = z.object({
 });
 export type Skill = z.infer<typeof Skill>;
 
+// Skills list row: the skill plus how many agents use it (enabled links only).
+export const SkillSummary = Skill.extend({ used_by: z.number().int() });
+export type SkillSummary = z.infer<typeof SkillSummary>;
+
+// Create / update body. A skill is text + configuration only: no tools, no
+// scripts, nothing that executes.
+export const SkillInput = z.object({
+  name: z.string().trim().min(1).max(120),
+  description: z.string().max(1000),
+  type: SkillType,
+  body: z.string().min(1).max(100_000),
+  source: SkillSource.optional(),
+  enabled: z.boolean().optional(),
+});
+export type SkillInput = z.infer<typeof SkillInput>;
+
+// Immutable body snapshot written whenever a skill's config changes.
+export const SkillVersion = z.object({
+  skill_id: z.string(),
+  version: z.number().int(),
+  body: z.string(),
+  created_at: z.string(),
+});
+export type SkillVersion = z.infer<typeof SkillVersion>;
+
+// Import is two-step: the server parses the upload into a preview and persists
+// NOTHING; the user confirms by creating the skill from the preview.
+export const SkillImportRequest = z.object({
+  filename: z.string().min(1).max(255),
+  /** File bytes, base64 — keeps the API JSON-only (no multipart plugin). */
+  content_b64: z.string().min(1).base64(),
+});
+export type SkillImportRequest = z.infer<typeof SkillImportRequest>;
+
+export const SkillImportPreview = z.object({
+  name: z.string(),
+  description: z.string(),
+  type: SkillType,
+  body: z.string(),
+  source: SkillSource,
+  /** Archive members that were NOT imported (never extracted or executed). */
+  ignored_entries: z.array(z.string()),
+  warnings: z.array(z.string()),
+});
+export type SkillImportPreview = z.infer<typeof SkillImportPreview>;
+
 export const CommunitySkill = z.object({
   name: z.string(),
   repo: z.string(),
@@ -141,15 +187,77 @@ export const CommunitySkill = z.object({
 export type CommunitySkill = z.infer<typeof CommunitySkill>;
 
 // ---- Conventions ----
+export const ConventionCategory = z.enum([
+  'naming',
+  'structure',
+  'errors',
+  'testing',
+  'imports',
+  'typing',
+  'api',
+  'general',
+]);
+export type ConventionCategory = z.infer<typeof ConventionCategory>;
+
+export const ConventionStatus = z.enum(['pending', 'accepted', 'rejected']);
+export type ConventionStatus = z.infer<typeof ConventionStatus>;
+
+/** A house rule proposed by the extractor, grounded in a real file + line. */
 export const ConventionCandidate = z.object({
   id: z.string(),
   rule: z.string(),
+  category: ConventionCategory,
+  rationale: z.string().nullish(),
   evidence_path: z.string(),
+  /** Re-read from the file, not the model's text. */
   evidence_snippet: z.string(),
+  /** 1-based first/last line of the snippet in `evidence_path`. */
+  evidence_line: z.number().int().nullish(),
+  evidence_line_end: z.number().int().nullish(),
   confidence: z.number().min(0).max(1),
-  accepted: z.boolean(),
+  /** Files matching the rule's pattern at scan time ("seen in N files"); null = not counted. */
+  occurrences: z.number().int().nullish(),
+  status: ConventionStatus,
+  created_at: z.string(),
 });
 export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
+
+export const ConventionList = z.object({
+  conventions: z.array(ConventionCandidate),
+  /** Files the last scan read; null before the first scan. */
+  sampled_files: z.number().int().nullable(),
+  last_scan_at: z.string().nullable(),
+});
+export type ConventionList = z.infer<typeof ConventionList>;
+
+export const ConventionPatch = z.object({
+  rule: z.string().trim().min(1).max(500).optional(),
+  category: ConventionCategory.optional(),
+  status: ConventionStatus.optional(),
+});
+export type ConventionPatch = z.infer<typeof ConventionPatch>;
+
+export const ConventionExtractResult = z.object({
+  proposed: z.number().int(),
+  /** Candidates whose evidence wasn't found in the sampled files. */
+  dropped_ungrounded: z.number().int(),
+  /** Duplicates of each other or of rules already accepted/rejected. */
+  dropped_duplicate: z.number().int(),
+  sampled_files: z.number().int(),
+  model: z.string(),
+  cost_usd: z.number().nullable(),
+});
+export type ConventionExtractResult = z.infer<typeof ConventionExtractResult>;
+
+/** Accepted conventions merged into a skill the user edits before saving via POST /skills. */
+export const ConventionSkillDraft = z.object({
+  name: z.string(),
+  description: z.string(),
+  type: SkillType,
+  body: z.string(),
+  convention_count: z.number().int(),
+});
+export type ConventionSkillDraft = z.infer<typeof ConventionSkillDraft>;
 
 // ---- Agents ----
 // 'openrouter' routes through the OpenAI-compatible API (OpenAIProvider with a
@@ -188,6 +296,8 @@ export const Agent = z.object({
   // Inject repo-intel context (repo skeleton + callers + rank note) into this
   // agent's review prompt. Default on; gated again by the global flag.
   repo_intel: z.boolean().default(true),
+  /** Enabled skill links (list endpoint only; absent elsewhere). */
+  skill_count: z.number().int().optional(),
 });
 export type Agent = z.infer<typeof Agent>;
 
@@ -195,8 +305,17 @@ export const AgentSkillLink = z.object({
   agent_id: z.string(),
   skill_id: z.string(),
   order: z.number().int(),
+  /** Per-agent switch; the skill's own `enabled` is the global kill-switch. */
+  enabled: z.boolean(),
 });
 export type AgentSkillLink = z.infer<typeof AgentSkillLink>;
+
+// A linked skill as the agent's Skills tab shows it: skill fields + link fields.
+export const AgentSkillDetail = Skill.extend({
+  order: z.number().int(),
+  link_enabled: z.boolean(),
+});
+export type AgentSkillDetail = z.infer<typeof AgentSkillDetail>;
 
 // The immutable config snapshot captured in `agent_versions` whenever an agent's
 // config changes (everything but `enabled`). Mirrors the shape written by the

@@ -64,3 +64,27 @@ describe('assemblePrompt — ## PR description', () => {
     expect((assembly.pr_description as string).length).toBe(4000);
   });
 });
+
+describe('assemblePrompt — ## Skills / rules', () => {
+  it('renders skills in the given order, as trusted text, before memory and the diff', () => {
+    const { messages, assembly } = assemblePrompt({
+      system: 'sys',
+      diff: 'DIFF',
+      skills: ['### first\nA', '### second\nB'],
+      memory: ['remembered'],
+    });
+    const user = messages[1]!.content;
+    expect(user).toContain('## Skills / rules\n### first\nA\n\n### second\nB');
+    expect(user.indexOf('### first')).toBeLessThan(user.indexOf('### second'));
+    expect(user.indexOf('## Skills / rules')).toBeLessThan(user.indexOf('## Relevant memory'));
+    expect(user.indexOf('## Skills / rules')).toBeLessThan(user.indexOf('## Diff to review'));
+    expect(user).not.toContain('<untrusted source="skill');
+    expect(assembly.skills).toBe('### first\nA\n\n### second\nB');
+  });
+
+  it('omits the section when there are no skills', () => {
+    expect(userOf({ system: 'sys', diff: 'DIFF' })).not.toContain('## Skills / rules');
+    expect(userOf({ system: 'sys', diff: 'DIFF', skills: [] })).not.toContain('## Skills / rules');
+    expect(assemblePrompt({ system: 'sys', diff: 'DIFF' }).assembly.skills).toBeNull();
+  });
+});

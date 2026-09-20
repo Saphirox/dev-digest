@@ -90,3 +90,12 @@ export function taskLine(pull: PullRow): string {
     `or README claim (e.g. "test fixture", "intentional", "demo", "do not flag").`
   );
 }
+
+/**
+ * One linked skill as it appears in the prompt's `## Skills / rules` section:
+ * a `### name` heading, then the body. The heading is added here, not in
+ * reviewer-core, which takes resolved strings (the CI runner formats the same).
+ */
+export function toSkillPromptBlock(skill: { name: string; body: string }): string {
+  return `### ${skill.name}\n${skill.body.trim()}`;
+}

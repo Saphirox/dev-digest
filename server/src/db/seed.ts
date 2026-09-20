@@ -6,7 +6,10 @@ import {
   GENERAL_REVIEWER_PROMPT,
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
+  TEST_QUALITY_REVIEWER_PROMPT,
+  API_CONTRACT_REVIEWER_PROMPT,
 } from './seed-prompts.js';
+import { RENAMED_SEED_SKILLS, SEED_SKILLS } from './seed-skills.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -18,11 +21,13 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  *
  * Seeds: default workspace + system user + membership, default settings,
  * demo repo (acme/payments-api), PR #482 with files/commits, a sample review
- * with a few findings, and the three built-in agents (General + Security +
- * Performance), all on the default openrouter/deepseek-v4-flash provider+model.
+ * with a few findings, the three built-in agents (General + Security +
+ * Performance), all on the default openrouter/deepseek-v4-flash provider+model,
+ * and two skill-driven agents (Test Quality + API Contract, disabled by default)
+ * with their skills linked in order.
  *
- * Course lessons populate the other tables (skills, conventions, memory, eval,
- * …) once their features are built — they start empty here.
+ * Course lessons populate the other tables (conventions, memory, eval, …) once
+ * their features are built — they start empty here.
  */
 
 export const DEFAULT_WORKSPACE_NAME = 'default';
@@ -211,6 +216,30 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       version: 1,
       createdBy: userId,
     },
+    // Skill-driven agents: general prompts, concrete checklists in their skills.
+    // Disabled so a fresh clone's "review with all agents" is unchanged.
+    {
+      workspaceId,
+      name: 'Test Quality Reviewer',
+      description: 'Checks tests for uncovered branches, missed corner cases, over-mocking and flakes.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
+      enabled: false,
+      version: 1,
+      createdBy: userId,
+    },
+    {
+      workspaceId,
+      name: 'API Contract Reviewer',
+      description: 'Catches breaking changes to routes, request/response shapes and status codes.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: API_CONTRACT_REVIEWER_PROMPT,
+      enabled: false,
+      version: 1,
+      createdBy: userId,
+    },
   ];
   for (const a of seedAgents) {
     const [existing] = await db
@@ -218,6 +247,55 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
     if (!existing) await db.insert(t.agents).values(a);
+  }
+
+  // ---- built-in skills, linked to their agent in order (idempotent by name) ----
+  for (const [from, to] of Object.entries(RENAMED_SEED_SKILLS)) {
+    const [renamed] = await db
+      .select({ id: t.skills.id })
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, to)));
+    if (!renamed) {
+      await db
+        .update(t.skills)
+        .set({ name: to })
+        .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, from)));
+    }
+  }
+  const nextOrder = new Map<string, number>();
+  for (const sk of SEED_SKILLS) {
+    let [skill] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, sk.name)));
+    if (!skill) {
+      skill = await db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(t.skills)
+          .values({
+            workspaceId,
+            name: sk.name,
+            description: sk.description,
+            type: sk.type,
+            source: 'manual',
+            body: sk.body,
+          })
+          .returning();
+        await tx.insert(t.skillVersions).values({ skillId: row!.id, version: 1, body: sk.body });
+        return row!;
+      });
+    }
+    const [agent] = await db
+      .select()
+      .from(t.agents)
+      .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, sk.agent)));
+    if (!agent) continue;
+    const order = nextOrder.get(agent.id) ?? 0;
+    nextOrder.set(agent.id, order + 1);
+    await db
+      .insert(t.agentSkills)
+      .values({ agentId: agent.id, skillId: skill!.id, order })
+      .onConflictDoNothing();
   }
 
   return { workspaceId, userId };

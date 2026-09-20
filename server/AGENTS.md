@@ -38,7 +38,19 @@ pnpm arch:check      # onion layering rules (dependency-cruiser); must stay 0 er
 
 - **Onion layering.** Imports point inward only: `routes.ts` → `service.ts` →
   ports ← `repository.ts`/`adapters/*`. No Drizzle in routes or services.
-  Checked by `pnpm arch:check`.
+  Checked by `pnpm arch:check`. A repository method may wrap its own writes in
+  `db.transaction`; reach for a `UnitOfWork` port only when a **service** must
+  span repositories.
+- **New migrations must be idempotent.** The `devdigest_pgdata` volume is
+  shared by every worktree, so a new migration can meet objects that already
+  exist — a raw drizzle-kit file then breaks everyone else's `db:migrate`.
+  Generate, then hand-edit to `ADD COLUMN IF NOT EXISTS` / `CREATE INDEX IF
+  NOT EXISTS`, and guard `ADD CONSTRAINT` with a `DO $$ … pg_constraint`
+  block. Check with `\d <table>` first. The migrator applies by journal
+  **timestamp**, not hash, so old migrations can replay.
+- **Never drop and add columns on the same table in one migration** —
+  `drizzle-kit generate` opens an interactive rename prompt and hangs a
+  non-TTY run forever. Split it into two migrations; run with `</dev/null`.
 - No keys required to boot — `loadConfig` marks every secret optional; set
   keys via Settings UI or `server/.env` at runtime.
 - Secrets never touch `AppConfig`/DB — only `LocalSecretsProvider`
@@ -62,7 +74,10 @@ pnpm arch:check      # onion layering rules (dependency-cruiser); must stay 0 er
   (`groundFindings`) or it's dropped; the score is recomputed from surviving
   findings, never trusted from the model.
 - DB-backed tests **must** be named `*.it.test.ts` (testcontainers Postgres,
-  self-skip without Docker) or the unit/integration split breaks.
+  self-skip without Docker) or the unit/integration split breaks. **A green
+  exit code isn't green:** `dockerAvailable()` intermittently returns false
+  and those files self-skip (`Test Files 30 passed | 2 skipped`). Check the
+  skipped count, not the exit code, and re-run.
 
 ## Do not touch
 

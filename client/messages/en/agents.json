@@ -1,20 +1,26 @@
 {
   "card": {
     "noDescription": "No description",
-    "skillCount": "{count} skills"
+    "skillCount": "{count} skills",
+    "delete": "Delete {name}"
   },
   "list": {
     "breadcrumbLab": "Skills Lab",
     "breadcrumb": "Agents",
     "title": "Agents",
-    "subtitle": "User-created reviewers. Each = provider + model + system prompt + linked skills.",
     "searchPlaceholder": "Search agents…",
     "addAgent": "Add Agent",
     "createFromScratch": "Create from scratch",
     "loadError": "Could not load agents.",
     "emptyTitle": "No agents yet",
     "emptyBody": "An agent is a configured reviewer — a model, a prompt, and the skills it uses. Create one to start reviewing.",
-    "emptyCta": "Create your first agent"
+    "emptyCta": "Create your first agent",
+    "noMatch": "No agents match your search.",
+    "startFromTemplate": "Start from template",
+    "selectPrompt": {
+      "title": "Select an agent",
+      "body": "Pick an agent on the left to edit its config and skills."
+    }
   },
   "create": {
     "title": "Create agent",
@@ -32,24 +38,20 @@
       "provider": "Provider",
       "model": "Model",
       "systemPrompt": "System prompt"
-    }
+    },
+    "templateName": "{template} Reviewer"
   },
   "editor": {
-    "loadErrorTitle": "Couldn’t load this agent",
     "loadErrorBody": "The agent could not be loaded.",
-    "agentFallback": "Agent",
-    "listTitle": "Agents",
-    "add": "Add",
-    "createFromScratch": "Create from scratch",
-    "disabled": "disabled",
-    "runOnPr": "Run on a PR…",
     "tabs": {
       "config": "Config",
       "skills": "Skills",
       "evals": "Evals",
       "stats": "Stats",
       "ci": "CI"
-    }
+    },
+    "runReview": "Run Review",
+    "runReviewNoPrs": "No open PRs in the active repo — open the PR list"
   },
   "config": {
     "title": "Configuration",
@@ -85,15 +87,29 @@
     "save": "Save agent",
     "saving": "Saving…",
     "saved": "Saved (v{version})",
-    "savedToast": "Agent saved (v{version})"
+    "savedToast": "Agent saved (v{version})",
+    "promptTokens": "{count, number} / {budget, number} tokens",
+    "cancel": "Cancel",
+    "delete": "Delete agent",
+    "deleteConfirm": "Delete agent \"{name}\"? Its versions and skill links go with it. Past runs keep their history."
   },
   "skills": {
     "title": "Skills",
     "enabledCount": "{linked} of {total} enabled",
     "filterPlaceholder": "Filter skills…",
-    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Toggle to attach."
+    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Only enabled skills can be dragged; ticking a skill adds it at the end.",
+    "noMatch": "No attached skill matches the filter.",
+    "dragHandle": "Drag to reorder",
+    "globallyOff": "disabled globally",
+    "empty": "No skills in this workspace yet.",
+    "moveHint": "{name}: drag, or press ↑ / ↓ to reorder",
+    "dragDisabled": "Enable the skill to reorder it"
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."
+  },
+  "delete": {
+    "title": "Delete agent?",
+    "done": "Deleted \"{name}\"."
   }
 }

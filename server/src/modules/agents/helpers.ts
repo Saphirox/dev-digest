@@ -1,6 +1,13 @@
-import type { Agent, AgentVersion, CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
+import type {
+  Agent,
+  AgentSkillDetail,
+  AgentVersion,
+  CiFailOn,
+  Provider,
+  ReviewStrategy,
+} from '@devdigest/shared';
 import { AgentVersionConfig } from '@devdigest/shared';
-import type { AgentRow, AgentVersionRow } from './repository.js';
+import type { AgentRecord, AgentVersionRecord, LinkedSkillRecord } from './ports.js';
 
 /**
  * Pure helpers for the agents module — DB row ⇄ DTO mapping and the
@@ -9,7 +16,7 @@ import type { AgentRow, AgentVersionRow } from './repository.js';
  */
 
 /** Map a persisted agent row to the public `Agent` DTO. */
-export function toAgentDto(row: AgentRow): Agent {
+export function toAgentDto(row: AgentRecord): Agent {
   return {
     id: row.id,
     name: row.name,
@@ -26,13 +33,31 @@ export function toAgentDto(row: AgentRow): Agent {
   };
 }
 
+/** A linked skill as the agent's Skills tab shows it: skill fields + link fields. */
+export function toAgentSkillDetail(link: LinkedSkillRecord): AgentSkillDetail {
+  const { skill } = link;
+  return {
+    id: skill.id,
+    name: skill.name,
+    description: skill.description,
+    type: skill.type,
+    source: skill.source,
+    body: skill.body,
+    enabled: skill.enabled,
+    version: skill.version,
+    evidence_files: skill.evidenceFiles ?? null,
+    order: link.order,
+    link_enabled: link.enabled,
+  };
+}
+
 /**
  * Map a persisted `agent_versions` row to the public `AgentVersion` DTO. The
  * stored `config_json` is untyped jsonb (a snapshot from an older config shape
  * could drift), so it is parsed through `AgentVersionConfig` — a malformed
  * snapshot throws here rather than leaking an unvalidated blob to the client.
  */
-export function toAgentVersionDto(row: AgentVersionRow): AgentVersion {
+export function toAgentVersionDto(row: AgentVersionRecord): AgentVersion {
   return {
     agent_id: row.agentId,
     version: row.version,
@@ -60,7 +85,7 @@ export interface ConfigChangePatch {
  */
 export function isConfigChange(
   existing: Pick<
-    AgentRow,
+    AgentRecord,
     | 'name'
     | 'description'
     | 'provider'

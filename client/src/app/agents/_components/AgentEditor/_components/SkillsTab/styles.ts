@@ -1,0 +1,65 @@
+import type { CSSProperties } from "react";
+
+/** Co-located styles for SkillsTab (matches the agent editor mock). */
+export const s = {
+  header: { display: "flex", alignItems: "center", gap: 12, marginBottom: 8 } satisfies CSSProperties,
+  title: { fontSize: 18, fontWeight: 700 } satisfies CSSProperties,
+  filter: {
+    marginLeft: "auto",
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "7px 12px",
+    borderRadius: 7,
+    border: "1px solid var(--border)",
+    background: "var(--bg-surface)",
+    width: 240,
+  } satisfies CSSProperties,
+  filterInput: {
+    flex: 1,
+    fontSize: 13,
+    background: "transparent",
+    border: "none",
+    outline: "none",
+    color: "var(--text-primary)",
+  } satisfies CSSProperties,
+  hint: { fontSize: 13, color: "var(--text-muted)", marginBottom: 16 } satisfies CSSProperties,
+  filterIcon: { color: "var(--text-muted)" } satisfies CSSProperties,
+  list: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    maxWidth: 1000,
+    listStyle: "none",
+    padding: 0,
+    margin: 0,
+  } satisfies CSSProperties,
+  row: (dragOver: boolean, checked: boolean): CSSProperties => ({
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "1px solid " + (dragOver ? "var(--accent)" : "var(--border)"),
+    // Ticked rows stand out, as in the mock; unticked ones sit back.
+    background: checked ? "var(--bg-hover)" : "var(--bg-elevated)",
+  }),
+  handle: (enabled: boolean): CSSProperties => ({
+    color: "var(--text-muted)",
+    cursor: enabled ? "grab" : "not-allowed",
+    opacity: enabled ? 1 : 0.35,
+    display: "inline-flex",
+    background: "none",
+    border: "none",
+    padding: 0,
+  }),
+  name: (globallyOff: boolean): CSSProperties => ({
+    fontSize: 14,
+    fontWeight: 500,
+    textDecoration: globallyOff ? "line-through" : undefined,
+    color: globallyOff ? "var(--text-muted)" : "var(--text-primary)",
+  }),
+  offHint: { fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
+  spacer: { flex: 1 } satisfies CSSProperties,
+  empty: { fontSize: 13, color: "var(--text-muted)", padding: "12px 0" } satisfies CSSProperties,
+} as const;

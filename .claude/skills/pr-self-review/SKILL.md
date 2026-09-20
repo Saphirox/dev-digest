@@ -1,8 +1,11 @@
 ---
 name: pr-self-review
 description: "Local pre-PR self-review for DevDigest: collects every open change (branch commits vs origin/main plus staged, unstaged and untracked files), runs the repo's hard-rule checks and arch:check, routes each changed file to the matching project skills (UI skills for client files, onion/fastify/drizzle/postgres for backend files, security and zod where relevant), reviews the diff against each skill in parallel, verifies every critical, and gives a PASS/BLOCK verdict. Any unoverridden critical blocks the change: a hook denies `gh pr create`, `gh pr merge` and `git push` until the current diff has a PASS. Use before opening a pull request, before pushing a branch for review, when a push or `gh pr create` is denied by the pr-self-review gate, or when the user says self-review, pre-PR check, review my changes, is this ready for a PR, or /pr-self-review. Not for reviewing someone else's GitHub PR by number: that is /code-review."
+# Manual only: the user runs /pr-self-review. The model can't invoke it on its own;
+# when the push/PR gate blocks, it tells the user to run it.
+disable-model-invocation: true
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   updated: "2026-09-19"
 ---
 

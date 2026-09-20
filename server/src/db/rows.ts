@@ -14,3 +14,12 @@ export type AgentVersionRow = typeof t.agentVersions.$inferSelect;
 export type FindingRow = typeof t.findings.$inferSelect;
 export type PullRow = typeof t.pullRequests.$inferSelect;
 export type AgentRunRow = typeof t.agentRuns.$inferSelect;
+export type SkillRow = typeof t.skills.$inferSelect;
+
+/** One of an agent's skill links, with the skill row it points to. */
+export interface LinkedSkillRow {
+  skill: SkillRow;
+  order: number;
+  /** Per-agent link switch (agent_skills.enabled). */
+  enabled: boolean;
+}
