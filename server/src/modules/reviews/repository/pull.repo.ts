@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
-import type { Intent } from '@devdigest/shared';
+import type { IntentSource, PrIntentRecord } from '@devdigest/shared';
 import type { PullRow } from '../../../db/rows.js';
 
 // ---- PR lookup (workspace-scoped) -----------------------------------------
@@ -44,25 +44,59 @@ export async function markReviewed(db: Db, prId: string, sha: string): Promise<v
     .where(eq(t.pullRequests.id, prId));
 }
 
-// ---- intent ---------------------------------------------------------------
+// ---- intent -----------------------------------------------------------------
 
-export async function upsertIntent(db: Db, prId: string, intent: Intent): Promise<void> {
-  await db
-    .insert(t.prIntent)
-    .values({
-      prId,
-      intent: intent.intent,
-      inScope: intent.in_scope,
-      outOfScope: intent.out_of_scope,
-    })
-    .onConflictDoUpdate({
-      target: t.prIntent.prId,
-      set: { intent: intent.intent, inScope: intent.in_scope, outOfScope: intent.out_of_scope },
-    });
+/** Fields the intent service derives; `pr_id` and `stale` are not stored (`stale`
+ *  is always recomputed against the PR's current head_sha by the service). */
+export interface IntentUpsertInput {
+  intent: string;
+  inScope: string[];
+  outOfScope: string[];
+  confidence: number | null;
+  derivedForSha: string;
+  sources: IntentSource[];
+  missingContext: string[];
+  provider: string;
+  model: string;
 }
 
-export async function getIntent(db: Db, prId: string): Promise<Intent | undefined> {
+export async function upsertIntent(db: Db, prId: string, record: IntentUpsertInput): Promise<void> {
+  const values = {
+    prId,
+    intent: record.intent,
+    inScope: record.inScope,
+    outOfScope: record.outOfScope,
+    confidence: record.confidence,
+    derivedForSha: record.derivedForSha,
+    sources: record.sources,
+    missingContext: record.missingContext,
+    provider: record.provider,
+    model: record.model,
+    derivedAt: new Date(),
+  };
+  await db
+    .insert(t.prIntent)
+    .values(values)
+    .onConflictDoUpdate({ target: t.prIntent.prId, set: values });
+}
+
+/** `stale` is always `false` here — the repository has no `head_sha` to compare
+ *  against; `IntentService.get`/`ensureFresh` recomputes it before returning. */
+export async function getIntent(db: Db, prId: string): Promise<PrIntentRecord | undefined> {
   const [row] = await db.select().from(t.prIntent).where(eq(t.prIntent.prId, prId));
   if (!row) return undefined;
-  return { intent: row.intent, in_scope: row.inScope, out_of_scope: row.outOfScope };
+  return {
+    pr_id: row.prId,
+    intent: row.intent,
+    in_scope: row.inScope,
+    out_of_scope: row.outOfScope,
+    confidence: row.confidence,
+    derived_for_sha: row.derivedForSha,
+    derived_at: row.derivedAt?.toISOString() ?? null,
+    stale: false,
+    sources: row.sources,
+    missing_context: row.missingContext,
+    provider: row.provider,
+    model: row.model,
+  };
 }

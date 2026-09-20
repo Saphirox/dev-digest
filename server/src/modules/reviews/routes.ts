@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { RunRequest } from '@devdigest/shared';
-import type { RunEvent } from '@devdigest/shared';
+import type { IntentDeriveResult, PrIntentRecord, PrRisks, RunEvent } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { NotFoundError } from '../../platform/errors.js';
@@ -14,6 +14,9 @@ import { ReviewService } from './service.js';
  *   GET    /runs/:id/trace                             → the single-document RunTrace
  *   GET    /pulls/:id/reviews                          → persisted reviews + findings for a PR
  *   POST   /findings/:id/(accept|dismiss)              → finding actions
+ *   GET    /pulls/:id/intent                            → stored intent (or null); `stale` vs head_sha
+ *   POST   /pulls/:id/intent/derive                     → always re-derive intent (spends money)
+ *   GET    /pulls/:id/risks                              → deterministic diff-grounded risk scan (no model call)
  */
 const FINDING_ACTIONS = ['accept', 'dismiss'] as const;
 export default async function reviewsRoutes(appBase: FastifyInstance) {
@@ -147,4 +150,36 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
       return result;
     });
   }
+
+  // ---- Intent Layer ---------------------------------------------------------
+  app.get(
+    '/pulls/:id/intent',
+    { schema: { params: IdParams } },
+    async (req): Promise<PrIntentRecord | null> => {
+      const { workspaceId } = await getContext(container, req);
+      return service.getIntent(workspaceId, req.params.id);
+    },
+  );
+
+  // Spends money (one classifier call) — same rate-limit guard as POST /review.
+  app.post(
+    '/pulls/:id/intent/derive',
+    { schema: { params: IdParams }, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (req): Promise<IntentDeriveResult> => {
+      const { workspaceId } = await getContext(container, req);
+      return service.deriveIntent(workspaceId, req.params.id, req.log);
+    },
+  );
+
+  // ---- Risk Areas -------------------------------------------------------
+  // Deterministic, recomputed on every read — no model call, so no rate limit
+  // (unlike /intent/derive, this endpoint spends no money).
+  app.get(
+    '/pulls/:id/risks',
+    { schema: { params: IdParams } },
+    async (req): Promise<PrRisks> => {
+      const { workspaceId } = await getContext(container, req);
+      return service.getRisks(workspaceId, req.params.id, req.log);
+    },
+  );
 }

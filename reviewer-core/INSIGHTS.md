@@ -16,6 +16,8 @@ coming back graduates into this module's AGENTS.md as a standing rule.
 
 ## Tool & Library Notes
 
+- 2026-09-20 · `reviewer-core/tsconfig.json` has `include: ["src/**/*.ts"]`, so `pnpm typecheck` (`tsc --noEmit -p tsconfig.json`) never type-checks `test/**`. A wrong prop passed to e.g. `assemblePrompt` in a test surfaces only when vitest runs it, not in typecheck — "tsc passes clean" says nothing about test files. `reviewer-core/tsconfig.json:29`.
+
 ## Recurring Errors & Fixes
 
 ## Session Notes

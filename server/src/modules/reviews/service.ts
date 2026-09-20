@@ -1,5 +1,12 @@
 import type { Container } from '../../platform/container.js';
-import type { FindingActionKind, RunEventKind, RunTrace } from '@devdigest/shared';
+import type {
+  FindingActionKind,
+  IntentDeriveResult,
+  PrIntentRecord,
+  PrRisks,
+  RunEventKind,
+  RunTrace,
+} from '@devdigest/shared';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import type { AgentRow } from '../../db/rows.js';
 import { ReviewRepository } from './repository.js';
@@ -7,6 +14,13 @@ import { type ReviewDto, type ReviewDtoFinding } from './helpers.js';
 import { ReviewRunExecutor, type Logger } from './run-executor.js';
 import { actOnFinding as actOnFindingImpl } from './findings.js';
 import { reviewToDto } from './helpers.js';
+import { IntentService } from './intent/service.js';
+import { INTENT_SCHEMA_NAME, IntentSchema } from './intent/prompt.js';
+import type { IntentModel, IntentSources, IntentStore } from './intent/ports.js';
+import { resolveFeatureModel } from '../settings/feature-models.js';
+import { RunLogger } from '../../platform/run-logger.js';
+import { loadDiff } from './diff-loader.js';
+import { deriveRisks } from './risks/index.js';
 
 // Re-export DTO types + converters for backward-compatible imports from
 // './service.js' (these previously lived here; logic now in ./helpers.ts).
@@ -28,12 +42,52 @@ export type { ReviewDto, ReviewDtoFinding } from './helpers.js';
 export class ReviewService {
   private repo: ReviewRepository;
   private agents: Container['agentsRepo'];
+  private intent: IntentService;
   private executor: ReviewRunExecutor;
 
   constructor(private container: Container) {
     this.repo = new ReviewRepository(container.db);
     this.agents = container.agentsRepo;
-    this.executor = new ReviewRunExecutor(container, this.repo, this.agents);
+    this.intent = new IntentService(this.buildIntentDeps(container));
+    this.executor = new ReviewRunExecutor(container, this.repo, this.agents, this.intent);
+  }
+
+  /**
+   * Wire the Intent Layer's four ports to the container — this module's own
+   * composition point (mirrors `conventions/routes.ts`'s `ExtractorModel`
+   * wiring): the store is the existing (previously dead) `pr_intent`
+   * repository methods, sources are GitHub + git, and the model resolves the
+   * `review_intent` feature model like any other system LLM feature.
+   */
+  private buildIntentDeps(container: Container): {
+    store: IntentStore;
+    sources: IntentSources;
+    model: IntentModel;
+    tokens: { count(text: string): number };
+  } {
+    const store: IntentStore = {
+      get: (prId) => this.repo.getIntent(prId),
+      upsert: (prId, record) => this.repo.upsertIntent(prId, record),
+    };
+    const sources: IntentSources = {
+      getIssue: async (repo, n) => (await container.github()).getIssue(repo, n),
+      readFile: (repo, path) => container.git.readFile(repo, path),
+    };
+    const model: IntentModel = {
+      classify: async (workspaceId, messages) => {
+        const choice = await resolveFeatureModel(container, workspaceId, 'review_intent');
+        const llm = await container.llm(choice.provider);
+        const res = await llm.completeStructured({
+          model: choice.model,
+          schema: IntentSchema,
+          schemaName: INTENT_SCHEMA_NAME,
+          messages,
+          temperature: 0.1,
+        });
+        return { data: res.data, model: res.model, provider: choice.provider, costUsd: res.costUsd };
+      },
+    };
+    return { store, sources, model, tokens: container.tokenizer };
   }
 
   // ===========================================================================
@@ -175,5 +229,76 @@ export class ReviewService {
 
   async getRunTrace(runId: string): Promise<RunTrace | undefined> {
     return this.repo.getRunTrace(runId);
+  }
+
+  // ===========================================================================
+  // Intent Layer
+  // ===========================================================================
+
+  /** Stored intent for a PR (`stale: true` when the PR's head moved since it
+   *  was derived). `null` when nothing has been derived yet. */
+  async getIntent(workspaceId: string, prId: string): Promise<PrIntentRecord | null> {
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError('Pull request not found');
+    return this.intent.get(prId, pull.headSha);
+  }
+
+  /** Always re-derives (that is what the re-derive button means) — spends
+   *  money, so the route applies a tight rate limit. */
+  async deriveIntent(workspaceId: string, prId: string, logger?: Logger): Promise<IntentDeriveResult> {
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError('Pull request not found');
+    const repoRow = await this.repo.getRepo(pull.repoId);
+    if (!repoRow) throw new NotFoundError('Repo not found');
+    const diff = await loadDiff(this.container, this.repo, workspaceId, pull, repoRow);
+    // No associated agent run — an empty runIds fan-out (no SSE target), the
+    // logger still mirrors composition/result lines to stdout.
+    const runLog = new RunLogger(this.container.runBus, [], logger);
+    return this.intent.derive(
+      workspaceId,
+      { id: pull.id, number: pull.number, title: pull.title, body: pull.body, headSha: pull.headSha },
+      { owner: repoRow.owner, name: repoRow.name },
+      diff,
+      runLog,
+    );
+  }
+
+  // ===========================================================================
+  // Risk Areas
+  // ===========================================================================
+
+  /** Deterministic diff-grounded risk scan — no model call, recomputed on
+   *  every read (see the risk-source ADR in
+   *  `docs/plans/0003-intent-card-risk-areas.md`). */
+  async getRisks(workspaceId: string, prId: string, logger?: Logger): Promise<PrRisks> {
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError('Pull request not found');
+    const repoRow = await this.repo.getRepo(pull.repoId);
+    if (!repoRow) throw new NotFoundError('Repo not found');
+    const diff = await loadDiff(this.container, this.repo, workspaceId, pull, repoRow);
+
+    const risks = deriveRisks(diff);
+    const addedLinesCount = diff.files.reduce((n, f) => n + f.additions, 0);
+
+    // Counts, file counts and detector names only — never a matched line's
+    // text, never a secret, never a token.
+    const byKind = risks.reduce<Record<string, number>>((acc, r) => {
+      acc[r.kind] = (acc[r.kind] ?? 0) + 1;
+      return acc;
+    }, {});
+    const kindsDesc = Object.entries(byKind)
+      .map(([kind, n]) => `${kind}×${n}`)
+      .join(', ');
+    logger?.info(
+      { prId, files: diff.files.length, addedLines: addedLinesCount, risks: risks.length, byKind },
+      `risks: scanned ${diff.files.length} files / ${addedLinesCount} added lines → ${risks.length} risk(s)${kindsDesc ? ` [${kindsDesc}]` : ''}`,
+    );
+
+    return {
+      pr_id: pull.id,
+      derived_for_sha: pull.headSha,
+      risks,
+      scanned: { files: diff.files.length, added_lines: addedLinesCount },
+    };
   }
 }

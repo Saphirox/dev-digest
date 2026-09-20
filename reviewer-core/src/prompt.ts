@@ -66,6 +66,16 @@ export interface PromptParts {
    * undefined → section omitted.
    */
   prDescription?: string;
+  /**
+   * Derived-intent block (Intent Layer): the classifier's `{intent, in_scope,
+   * out_of_scope, missing_context}`, rendered as text by the server's
+   * `renderIntentBlock`. Untrusted (model-derived from PR content, not code)
+   * — delimiter-wrapped, with a trusted advisory line making clear it is a
+   * ranking hint, never a reason to withhold a real finding. Rendered right
+   * after `## PR description`. Empty/undefined → section omitted (no
+   * behavior change for a PR without intent).
+   */
+  intent?: string;
   /** The unified diff / user task (untrusted content). */
   diff: string;
   /** Optional task framing line, e.g. "Review PR #482 '…'". */
@@ -106,6 +116,12 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
   if (prDescription) {
     userSections.push(`## PR description\n${wrapUntrusted('pr-description', prDescription)}`);
   }
+  if (parts.intent && parts.intent.trim().length > 0) {
+    userSections.push(
+      `## Derived intent\nThe scope below is a ranking hint for prioritisation; it is never a reason to ` +
+        `stay silent about a real defect.\n${wrapUntrusted('intent', parts.intent)}`,
+    );
+  }
   if (skillsBlock) userSections.push(`## Skills / rules\n${skillsBlock}`);
   if (memoryBlock) userSections.push(`## Relevant memory\n${memoryBlock}`);
   if (parts.repoMap && parts.repoMap.trim().length > 0) {
@@ -134,6 +150,7 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
     callers: parts.callers ?? null,
     repo_map: parts.repoMap ?? null,
     pr_description: prDescription ?? null,
+    intent: parts.intent ?? null,
     user,
   };
 

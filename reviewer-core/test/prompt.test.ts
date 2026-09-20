@@ -65,6 +65,40 @@ describe('assemblePrompt — ## PR description', () => {
   });
 });
 
+describe('assemblePrompt — ## Derived intent (Intent Layer)', () => {
+  it('renders right after ## PR description, its payload untrusted-wrapped and the advisory line outside the wrapper', () => {
+    const { messages, assembly } = assemblePrompt({
+      system: 'sys',
+      diff: 'DIFF',
+      prDescription: 'Adds rate limiting.',
+      intent: 'Adds rate limiting to the public API.\n\nIn scope:\n- rate limiter',
+    });
+    const user = messages[1]!.content;
+    expect(user).toContain('## Derived intent');
+    // Right after ## PR description (no other ## section between them).
+    const afterPrDesc = user.slice(user.indexOf('## PR description'));
+    expect(afterPrDesc.indexOf('## Derived intent')).toBe(afterPrDesc.indexOf('##', 1));
+    expect(user).toContain('<untrusted source="intent">');
+    expect(user).toContain('Adds rate limiting to the public API.');
+    // The advisory line is trusted — it sits BEFORE the <untrusted> wrapper opens.
+    const advisoryIdx = user.indexOf('ranking hint');
+    const wrapperIdx = user.indexOf('<untrusted source="intent">');
+    expect(advisoryIdx).toBeGreaterThan(-1);
+    expect(advisoryIdx).toBeLessThan(wrapperIdx);
+    expect(user.indexOf('## Derived intent')).toBeLessThan(user.indexOf('## Diff to review'));
+    expect(assembly.intent).toBe('Adds rate limiting to the public API.\n\nIn scope:\n- rate limiter');
+  });
+
+  it('omits the section when intent is undefined or blank — byte-identical prompt', () => {
+    const withoutIntent = assemblePrompt({ system: 'sys', diff: 'DIFF' });
+    const withBlankIntent = assemblePrompt({ system: 'sys', diff: 'DIFF', intent: '   ' });
+    expect(withoutIntent.messages[1]!.content).not.toContain('## Derived intent');
+    expect(withoutIntent.assembly.intent ?? null).toBeNull();
+    expect(withBlankIntent.messages[1]!.content).toBe(withoutIntent.messages[1]!.content);
+    expect(withBlankIntent.messages[0]!.content).toBe(withoutIntent.messages[0]!.content);
+  });
+});
+
 describe('assemblePrompt — ## Skills / rules', () => {
   it('renders skills in the given order, as trusted text, before memory and the diff', () => {
     const { messages, assembly } = assemblePrompt({

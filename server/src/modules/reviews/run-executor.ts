@@ -1,6 +1,6 @@
 import type { Container } from '../../platform/container.js';
-import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
-import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
+import type { PrIntentRecord, Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
+import { reviewPullRequest, countBlockers, scoreFromFindings } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
@@ -8,6 +8,9 @@ import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './reposit
 import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine, toSkillPromptBlock } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
+import type { IntentService } from './intent/service.js';
+import { renderIntentBlock } from './intent/helpers.js';
+import { filterOutOfScope } from './scope-filter.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -45,6 +48,7 @@ export class ReviewRunExecutor {
     private container: Container,
     private repo: ReviewRepository,
     private agents: Container['agentsRepo'],
+    private intent: IntentService,
   ) {}
 
   /**
@@ -107,6 +111,16 @@ export class ReviewRunExecutor {
     }
     runLog.info(`Diff ready — ${diff.files.length} changed file(s); starting ${jobs.length} agent run(s)`);
 
+    // Intent Layer — shared pre-work like the diff above, so every queued
+    // run's Live Log and persisted trace show it. Best-effort in the style of
+    // `buildSkillBlocks`: `ensureFresh` itself never throws (it catches and
+    // logs internally), so a classifier failure can NEVER fail the review.
+    const intent: PrIntentRecord | undefined = await runLog.step(
+      'Deriving PR intent',
+      () => this.intent.ensureFresh(workspaceId, pull, { owner: repo.owner, name: repo.name }, diff, runLog),
+      { kind: 'tool' },
+    );
+
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
       logger?.info(
@@ -114,7 +128,7 @@ export class ReviewRunExecutor {
         `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
       );
       try {
-        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog);
+        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog, intent);
         logger?.info(
           {
             runId,
@@ -146,6 +160,7 @@ export class ReviewRunExecutor {
     agent: AgentRow,
     runId: string,
     parentLog: RunLogger,
+    intent: PrIntentRecord | undefined,
   ): Promise<RunOutcome> {
     const start = Date.now();
     // Narrow the fanned-out pre-work logger to THIS run; the shared diff/intent
@@ -191,6 +206,13 @@ export class ReviewRunExecutor {
       // skill-less agent's.
       const skills = await this.buildSkillBlocks(agent.id, runLog);
 
+      // Intent Layer — rendered text for the `## Derived intent` prompt slot,
+      // plus its token cost for the trace. `undefined` when no intent was
+      // available (never derived, or derivation failed) — assemblePrompt
+      // omits the section, so the prompt is byte-identical to the pre-intent
+      // shape for that run.
+      const intentBlock = intent ? renderIntentBlock(intent) : undefined;
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -212,6 +234,8 @@ export class ReviewRunExecutor {
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
+        // Intent Layer — advisory scope hint; omitted when unavailable.
+        ...(intentBlock ? { intent: intentBlock } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
@@ -221,7 +245,23 @@ export class ReviewRunExecutor {
       });
       const { tokensIn, tokensOut, grounding, costUsd } = outcome;
 
-      const keptFindings = outcome.review.findings;
+      // Scope filter: out-of-scope findings collapse onto one carrier.
+      // CRITICAL findings are never dropped (enforced inside the filter);
+      // identity when there's no intent or no out_of_scope.
+      const { kept: keptFindings, dropped: droppedFindings, carrier } = filterOutOfScope(
+        outcome.review.findings,
+        intent,
+      );
+      if (droppedFindings.length > 0 && carrier) {
+        runLog.result(
+          `scope filter: dropped ${droppedFindings.length} out-of-scope finding(s), kept 1 carrier "${carrier.title}"`,
+        );
+      }
+
+      // Score is recomputed from the POST-FILTER findings — never the model's
+      // self-reported (pre-filter) score — so `reviews.score`/`agent_runs.score`
+      // always agree with the persisted findings.
+      const score = scoreFromFindings(keptFindings);
 
       // ---- Persist review + findings ----------------------------------------
       const review = await this.repo.insertReview({
@@ -232,7 +272,7 @@ export class ReviewRunExecutor {
         kind: 'review',
         verdict: outcome.review.verdict,
         summary: outcome.review.summary,
-        score: outcome.review.score,
+        score,
         model: agent.model,
       });
       const findingRows = await this.repo.insertFindings(review.id, keptFindings);
@@ -245,7 +285,8 @@ export class ReviewRunExecutor {
       const durationMs = Date.now() - start;
 
       // Deterministic blocker count (severity ≥ the agent's gate) — the signal
-      // the timeline colors on, NOT the model's self-reported verdict.
+      // the timeline colors on, NOT the model's self-reported verdict. Computed
+      // on the POST-FILTER findings, same as the score.
       const blockers = countBlockers(keptFindings, agent.ciFailOn);
 
       // ---- Observability: agent_runs + ONE run_traces document --------------
@@ -257,7 +298,7 @@ export class ReviewRunExecutor {
         costUsd,
         findingsCount: findingRows.length,
         grounding,
-        score: outcome.review.score,
+        score,
         blockers,
         error: null,
       });
@@ -279,7 +320,12 @@ export class ReviewRunExecutor {
           findings: findingRows.length,
           grounding,
         },
-        prompt_assembly: { ...outcome.assembly, skills_tokens: skills?.tokens ?? null },
+        prompt_assembly: {
+          ...outcome.assembly,
+          skills_tokens: skills?.tokens ?? null,
+          intent: intentBlock ?? null,
+          intent_tokens: intentBlock ? this.container.tokenizer.count(intentBlock) : null,
+        },
         tool_calls: outcome.chunks.map((c) => ({
           tool: 'review_file',
           args: c.label,
