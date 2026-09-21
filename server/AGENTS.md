@@ -78,6 +78,10 @@ pnpm arch:check      # onion layering rules (dependency-cruiser); must stay 0 er
   exit code isn't green:** `dockerAvailable()` intermittently returns false
   and those files self-skip (`Test Files 30 passed | 2 skipped`). Check the
   skipped count, not the exit code, and re-run.
+- **Bisect before calling a failure "pre-existing".** Revert your own diff
+  and re-run; a suite that passed earlier in the same session is the
+  baseline. A config VALUE change (a `FEATURE_MODELS` default model) is not
+  "purely additive" just because no function body moved.
 
 ## Do not touch
 

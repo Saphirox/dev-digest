@@ -43,6 +43,14 @@ not a separate package.
   unused ones just sit empty until that lesson's code fills them — don't
   "clean up" what looks unused.
 - Migrations are **not** applied on boot — `cd server && pnpm db:migrate`.
+- **Shared state moves under you.** Other sessions edit this worktree and
+  re-run reviews against the shared dev DB mid-task. Re-read a file and
+  re-query `reviews`/`findings` rows immediately before a plan, a review
+  finding or a verification step relies on them, and run
+  `git rev-parse --abbrev-ref HEAD` before committing.
+- **Design precedence:** grading rubric > design screenshot or reverted
+  feature commit > written brief. Before building UI, ask for the screenshot
+  — a text-only description has been misread more than once.
 
 ## Naming conventions
 

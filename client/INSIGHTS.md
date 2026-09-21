@@ -5,8 +5,9 @@ for the next agent. Agents append via the `engineering-insights` skill
 (`.claude/skills/engineering-insights/`); humans prune. A lesson that keeps
 coming back graduates into this module's AGENTS.md as a standing rule.
 
-_Compacted 2026-09-20: supersede chains collapsed into their current truth,
-wording tightened. Dates are the date the lesson was learned._
+_Compacted 2026-09-21: supersede chains collapsed into their current truth,
+stale entries dropped, Session Notes removed (history lives in git log).
+Dates are the date the lesson was learned._
 
 ## What Works
 
@@ -25,8 +26,7 @@ wording tightened. Dates are the date the lesson was learned._
 - 2026-09-19 · UI state that must survive moving between `/x` and `/x/:id` (e.g. the agents rail's "sorted once per page load" order) has to live in a Next `layout.tsx`, not a component each page renders — separate pages remount it on every navigation. `client/src/app/agents/layout.tsx:1` mounts `AgentsLayout` once; pages render only the right pane, and the create-modal trigger reaches them via `AgentsShellContext`.
 
 - 2026-09-20 · `MonoLink` (`client/src/vendor/ui/primitives/MonoLink.tsx:25`) renders an `<a>` ONLY when `href` is set and otherwise falls through to a `<button className="mono">` — so a call site that passes `href={undefined}` to mean "no link" ships a focusable, `cursor:pointer` control with no handler, and an RTL `queryByRole('link')` absence check passes VACUOUSLY (a `<button>` can never match it). Seen in `RiskRow`/`RiskAreas.test.tsx`: the test named "renders as plain text with no link role" certified the opposite of the truth; the honest assertion is `queryByRole('button', { name: <ref text> })`, which FAILS today. Third member of the same family after `Badge` silently dropping `aria-label` and `ConfidenceNum` hardcoding `title`: **a vendored primitive does something other than its prop name implies — assert the absence of the role it actually renders, not the one you intended.**
-- 2026-09-21 · The Smart Diff findings indicator (`SmartDiffViewer.tsx`, `FileCard`'s `pathAdornment` slot) is a bare dot `<button style={s.findingDot} aria-label={...} />` with NO visible text child — the count ("3 findings") lives ONLY in `aria-label`. `toHaveTextContent("3 findings")` fails with an empty string even though `getByRole("button", { name: /findings/ })` finds the element fine (accessible-name matching reads `aria-label`, `textContent` doesn't). Use `toHaveAccessibleName("3 findings")` instead. Fourth member of the `MonoLink`/`Badge`/`ConfidenceNum` family above, opposite direction: here the accessible name is real but detached from any rendered text node. `client/src/components/diff-viewer/FileCard/FileCard.tsx:47` (`pathAdornment`).
-- 2026-09-21 · Supersedes 2026-09-21 "The Smart Diff findings indicator ... is a bare dot": it is now one `<button>` per PRESENT severity (`FindingSeverityDots`), worst-first by `SEVERITIES`, each with a VISIBLE count child and an accessible name like `"1 Critical finding"`; a click jumps to the FIRST finding of THAT severity (no round-robin). Assert via `getAllByRole("button", { name: /finding/ })` + `toHaveAccessibleName`. The summary chip / "What this does" row and `FileCard`'s `headerExtras`/`bodyLead` slots are gone; only `pathAdornment` remains. `SmartDiffViewer/_components/FindingSeverityDots/`
+- 2026-09-21 · Smart Diff findings are one `<button>` per PRESENT severity (`FindingSeverityDots`, worst-first by `SEVERITIES`), each with a VISIBLE count and an accessible name like "1 Critical finding"; a click jumps to the first finding of that severity. Assert with `getAllByRole("button", { name: /finding/ })` + `toHaveAccessibleName` — `toHaveTextContent` misses a name that lives only in `aria-label`. `FileCard` keeps only the `pathAdornment` slot. `client/src/app/repos/[repoId]/pulls/[number]/_components/SmartDiffViewer/_components/FindingSeverityDots/FindingSeverityDots.tsx:18`
 
 ## Tool & Library Notes
 
@@ -45,13 +45,5 @@ wording tightened. Dates are the date the lesson was learned._
 - 2026-09-19 · `Module not found: Can't resolve './contracts/findings.js'` (page 500s under `next dev` while `tsc` and vitest pass) → keep client imports from `@devdigest/shared` as `import type`; derive runtime lists from a local `Record<Union, …>` (the compiler keeps it complete). Root cause: a RUNTIME import (e.g. `SkillType.options`) pulls in the vendored index, whose `.js` specifiers Next's webpack can't resolve; every other client file imports types only, so only a real page load catches it. `client/src/app/skills/_components/SkillsView/_components/SkillForm/constants.ts:1`. → now a rule in client/AGENTS.md.
 
 ## Session Notes
-
-- 2026-09-16 → 09-18 · Run Cost feature (spec, UI, review pass), per-severity chips + hover findings preview, rubric pass (run-card pills + filter, PR-list FINDINGS column, Reject label) — +9 insights
-- 2026-09-19 · PR screenshots across all severity surfaces; frontend refactor phases 1–7 (severity module, hover hook, RunHistory split, FindingsCell, COLUMNS, FindingsPanel hooks, named exports); skills client side (nav group, /skills grid + drawer + import, agent Skills tab, trace token label) — +6 insights
-- 2026-09-20 · `useEffectEvent` crash traced to Next's bundled React; compacted this file (supersede chains collapsed, no facts dropped); promoted 4 entries to client/AGENTS.md — +1 insight
-- 2026-09-20 · Intent card redesign (chip, colour-coded scope columns, Risk Areas section) — +2 insights
-- 2026-09-20 · Implemented Smart Diff client side (`SmartDiffViewer`, severity join, `FileCard`/`CodeLine` prop threading, DiffTab wiring) — +1 insight (Tool & Library Notes)
-- 2026-09-21 · Wrote greenfield tests for Smart Diff (`SmartDiffViewer`/`helpers`/`CodeLine`/`FileCard` — 17 new tests, 0 skipped); the UI-fidelity pass moved the findings badge to an aria-label-only dot mid-session — +1 insight (Codebase Patterns)
-- 2026-09-21 · Smart Diff: per-severity dots, summary UI + two dead `FileCard` slots removed — client 182/182; +1 insight (Codebase Patterns, supersedes)
 
 ## Open Questions

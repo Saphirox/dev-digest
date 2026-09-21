@@ -22,7 +22,4 @@ coming back graduates into this module's AGENTS.md as a standing rule.
 
 ## Session Notes
 
-- 2026-09-16 · Traced the cost path for the Run Cost spec — engine needs no changes; +1 insight (Codebase Patterns)
-- 2026-09-19 · Onboarding Q&A on pgvector/embeddings (no code changes) — +1 insight (Codebase Patterns)
-
 ## Open Questions

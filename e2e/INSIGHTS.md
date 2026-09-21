@@ -20,6 +20,4 @@ coming back graduates into this module's AGENTS.md as a standing rule.
 
 ## Session Notes
 
-- 2026-09-17 · Timeline severity chips + hover preview — no flow added (hover unsupported); +2 insights (Codebase Patterns)
-
 ## Open Questions
