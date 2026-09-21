@@ -57,6 +57,16 @@ export function* walkDiff(raw: string): Generator<DiffEvent> {
   let inHunk = false;
 
   for (const line of raw.split('\n')) {
+    // A new file section starts: everything up to its `+++`/`@@` lines is
+    // header (`new file mode`, `index …`, `similarity …`), never content of the
+    // PREVIOUS file's last hunk. Without this reset those lines were read as
+    // context lines of the previous file and widened the grounding index past
+    // the file's real end (test/diff-lines.test.ts).
+    if (line.startsWith('diff --git')) {
+      path = '';
+      inHunk = false;
+      continue;
+    }
     if (line.startsWith('+++ ')) {
       const p = line.slice(4).replace(/^b\//, '').trim();
       path = p === '/dev/null' ? '' : p;
