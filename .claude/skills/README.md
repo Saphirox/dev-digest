@@ -18,16 +18,19 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [typescript-expert](typescript-expert/SKILL.md) | Full-stack | Type-level programming, performance, tooling, migrations |
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [pr-self-review](pr-self-review/SKILL.md) | Workflow | **Manual only** (`/pr-self-review`; `disable-model-invocation`). Pre-PR review of all local changes: routes changed files to the skills above, runs repo-rule checks + `arch:check`, blocks `gh pr create`/`git push` on any critical. Add every new skill to its `references/routing.json` |
+| [staged-changes-review](staged-changes-review/SKILL.md) | Workflow | **Manual only** (`/staged-changes-review`). pr-self-review scoped to the git index vs HEAD, for use before a commit. Reuses its scripts (`--staged`), rubric, routing, cache and overrides. Never satisfies the push/PR gate |
 | [git-rebase-sync](git-rebase-sync/SKILL.md) | Workflow | Rebase onto fresh `origin/main` before commits (hook `.claude/hooks/rebase-before-commit.mjs`), conflict summaries, repo-specific resolution rules, recovery |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
 
-All ten agents in `.claude/agents/` (`brainstorm`, `investigator`,
+All eleven agents in `.claude/agents/` (`brainstorm`, `investigator`,
 `researcher`, `planner`, `implementer`, `test-writer`,
-`architecture-reviewer`, `plan-verifier`, `doc-writer`, `insight-curator`)
+`architecture-reviewer`, `security-reviewer`, `plan-verifier`, `doc-writer`,
+`insight-curator`)
 load skills lazily by area, never by preload, and the mechanism splits by
 what the agent does: agents that write code — `implementer` and
 `test-writer` — have the `Skill` tool and load skills through it; agents
 that only read for rules — `planner`, `architecture-reviewer`,
+`security-reviewer` (`security/SKILL.md` + `checklists.md`),
 `plan-verifier` (which loads none), `doc-writer`, `brainstorm`,
 `investigator` (`mermaid-diagram`, for Mode B's optional diagram) and
 `insight-curator` (`engineering-insights`) — have no `Skill` tool and read a

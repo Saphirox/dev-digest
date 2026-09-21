@@ -29,6 +29,7 @@ export function ReviewRunAccordion({
   defaultOpen = false,
   repoFullName,
   headSha,
+  focusFindingId = null,
   targetRunId = null,
   targetNonce = 0,
 }: {
@@ -37,6 +38,8 @@ export function ReviewRunAccordion({
   defaultOpen?: boolean;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Deep-linked finding id, forwarded to this run's `FindingsPanel`. */
+  focusFindingId?: string | null;
   /** When this matches review.run_id, the accordion opens and scrolls into view
    *  (driven from the Timeline: clicking an agent name navigates here). */
   targetRunId?: string | null;
@@ -152,6 +155,7 @@ export function ReviewRunAccordion({
             prId={prId}
             repoFullName={repoFullName}
             headSha={headSha}
+            focusFindingId={focusFindingId}
           />
         </div>
       )}

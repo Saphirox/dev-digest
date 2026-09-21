@@ -60,19 +60,33 @@ export default function PRDetailPage() {
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
-  const setParam = (key: string, val: string | null) => {
+  // Builds ONE URLSearchParams and ONE router.replace from a patch of keys —
+  // two sequential single-key `setParam` calls would both read the same
+  // stale `search` and silently drop one of the keys.
+  const setParams = (patch: Record<string, string | null>) => {
     const sp = new URLSearchParams(search.toString());
-    if (val == null) sp.delete(key);
-    else sp.set(key, val);
+    for (const [key, val] of Object.entries(patch)) {
+      if (val == null) sp.delete(key);
+      else sp.set(key, val);
+    }
     router.replace(`/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`);
   };
-  const setTab = (t: string) => setParam("tab", t);
+  const setParam = (key: string, val: string | null) => setParams({ [key]: val });
+  // Switching tabs clears a stale finding highlight.
+  const setTab = (t: string) => setParams({ tab: t, finding: null });
+  const focusFindingId = search.get("finding");
 
   // Reviews come newest-first; each is its own run (grouped into accordions).
   const runs = reviews ?? [];
   const allFindings: FindingRecord[] = React.useMemo(
     () => runs.flatMap((r) => r.findings),
     [reviews],
+  );
+  // Derived, not stored: resolves which run OWNS the deep-linked finding so
+  // FindingsTab can open the right accordion. Recomputes once `runs` arrives.
+  const focusRunId = React.useMemo(
+    () => runs.find((r) => r.findings.some((f) => f.id === focusFindingId))?.run_id ?? null,
+    [runs, focusFindingId],
   );
   const lethalTrifecta = allFindings.filter((f) => f.kind === "lethal_trifecta");
   const findingsCount = allFindings.length;
@@ -153,6 +167,8 @@ export default function PRDetailPage() {
             prCommits={pr.commits}
             repoFullName={repoFullName}
             headSha={pr.head_sha}
+            focusFindingId={focusFindingId}
+            focusRunId={focusRunId}
             cancelMutation={cancel}
             onOpenTrace={(id) => setParam("trace", id)}
             onDelete={(id) => {
@@ -173,6 +189,7 @@ export default function PRDetailPage() {
             filesCount={pr.files_count}
             files={pr.files}
             canComment={pr.status === "open"}
+            onOpenFinding={(id) => setParams({ tab: "findings", finding: id })}
           />
         )}
       </div>

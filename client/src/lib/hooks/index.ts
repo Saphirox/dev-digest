@@ -10,3 +10,4 @@ export * from "./skills";
 export * from "./conventions";
 export * from "./intent";
 export * from "./risks";
+export * from "./smart-diff";

@@ -65,6 +65,13 @@ export class ReviewRepository {
     return reviewRepo.reviewsForPull(this.db, prId);
   }
 
+  /** Findings from the latest review PER AGENT on a PR (Smart Diff's
+   *  `finding_lines`) — see `review.repo.ts` for why `selectDistinctOn` is
+   *  keyed on `(prId, agentId)`. */
+  latestFindingRangesForPull(prId: string): Promise<reviewRepo.FindingRangeRow[]> {
+    return reviewRepo.latestFindingRangesForPull(this.db, prId);
+  }
+
   getReview(reviewId: string): Promise<ReviewRow | undefined> {
     return reviewRepo.getReview(this.db, reviewId);
   }

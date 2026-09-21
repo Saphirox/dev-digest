@@ -78,6 +78,41 @@ export async function getReview(db: Db, reviewId: string): Promise<ReviewRow | u
   return row;
 }
 
+/** One finding range, the shape Smart Diff needs to build `finding_lines`. */
+export interface FindingRangeRow {
+  file: string;
+  startLine: number;
+  endLine: number;
+}
+
+/**
+ * The findings from the LATEST review per agent on a PR (`kind='review'`
+ * only — `'summary'` rows carry no findings worth flagging). Modelled on
+ * `PullsRepository.latestScores` (`modules/pulls/repository.ts:79-86`):
+ * `selectDistinctOn` needs its distinct columns to lead `orderBy`.
+ *
+ * `reviews.agentId` is nullable, so every NULL-agent review (the seeded demo
+ * data has no agent) collapses into ONE distinct-on group and contributes at
+ * most one review's findings — accepted; a real multi-agent PR has an
+ * `agentId` on every review.
+ */
+export async function latestFindingRangesForPull(db: Db, prId: string): Promise<FindingRangeRow[]> {
+  const latest = await db
+    .selectDistinctOn([t.reviews.prId, t.reviews.agentId], { id: t.reviews.id })
+    .from(t.reviews)
+    .where(and(eq(t.reviews.prId, prId), eq(t.reviews.kind, 'review')))
+    .orderBy(t.reviews.prId, t.reviews.agentId, desc(t.reviews.createdAt));
+
+  const ids = latest.map((r) => r.id);
+  if (ids.length === 0) return [];
+
+  const rows = await db
+    .select({ file: t.findings.file, startLine: t.findings.startLine, endLine: t.findings.endLine })
+    .from(t.findings)
+    .where(inArray(t.findings.reviewId, ids));
+  return rows;
+}
+
 /** Delete a whole review (one agent's run) + its findings (cascade), scoped
  *  to the workspace. Returns false if not found in the workspace. */
 export async function deleteReview(

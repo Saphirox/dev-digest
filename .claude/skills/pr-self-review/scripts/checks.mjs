@@ -4,9 +4,9 @@
 // THIS diff introduced; pre-existing state is at most a warning.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
-import { git, repoRoot } from './lib.mjs';
+import { git, readTarget, repoRoot } from './lib.mjs';
 
 const LARGE_DIFF_LINES = 1500;
 
@@ -47,15 +47,12 @@ function contentAt(sha, path) {
   }
 }
 
-function readWorking(path) {
-  try {
-    return readFileSync(join(repoRoot(), path), 'utf8');
-  } catch {
-    return null;
-  }
-}
+// Working tree normally; the index in staged mode (lib.readTarget).
+const readWorking = (path, base) => readTarget(path, base)?.toString('utf8') ?? null;
 
 function migrations(files, base) {
+  // "Merged" means present in main — in staged mode HEAD may hold unmerged ones.
+  base = base.mergeBase ?? base;
   return files
     .filter(
       (f) =>
@@ -126,7 +123,7 @@ function sharedContracts(files, base) {
     seen.add(m[2]);
     const server = `server/src/vendor/shared/${m[2]}`;
     const client = `client/src/vendor/shared/${m[2]}`;
-    if (readWorking(server) === readWorking(client)) continue;
+    if (readWorking(server, base) === readWorking(client, base)) continue;
     const driftedBefore = contentAt(base.sha, server) !== contentAt(base.sha, client);
     out.push(
       d(
@@ -198,14 +195,14 @@ function secrets(files) {
   return out;
 }
 
-function dbTestNaming(files) {
+function dbTestNaming(files, base) {
   return files
     .filter(
       (f) =>
         ['A', 'R'].includes(f.status) &&
         /^server\/test\/.+\.test\.ts$/.test(f.path) &&
         !f.path.endsWith('.it.test.ts') &&
-        /helpers\/pg|testcontainers/.test(readWorking(f.path) ?? ''),
+        /helpers\/pg|testcontainers/.test(readWorking(f.path, base) ?? ''),
     )
     .map((f) =>
       d(
@@ -309,7 +306,7 @@ export function runChecks(files, base) {
       ...lockfiles(files),
       ...sharedContracts(files, base),
       ...secrets(files),
-      ...dbTestNaming(files),
+      ...dbTestNaming(files, base),
       ...arch.findings,
       ...e2eSpecs(files),
       ...diffSize(files),

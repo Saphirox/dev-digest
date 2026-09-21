@@ -21,6 +21,12 @@ interface FindingsTabProps {
   /** owner/repo + head sha — used to deep-link a finding's file:line to GitHub. */
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Deep-linked finding id (from `?finding=`) — highlighted + expanded in
+   *  whichever run's `FindingsPanel` contains it. */
+  focusFindingId?: string | null;
+  /** The `run_id` that owns `focusFindingId`, resolved by the page — opens
+   *  and scrolls to that run's accordion. */
+  focusRunId?: string | null;
   onOpenTrace: (id: string) => void;
   onDelete: (id: string) => void;
   onRunDone: () => void;
@@ -37,6 +43,8 @@ export function FindingsTab({
   cancelMutation,
   repoFullName,
   headSha,
+  focusFindingId,
+  focusRunId,
   onOpenTrace,
   onDelete,
   onRunDone,
@@ -70,6 +78,22 @@ export function FindingsTab({
   const handleGoToReview = useCallback((runId: string) => {
     setTarget((p) => ({ runId, n: (p?.n ?? 0) + 1 }));
   }, []);
+
+  // Seed the SAME `target` mechanism from a deep-linked finding's resolved
+  // run, so a cold load / URL navigation opens+scrolls the right accordion
+  // exactly like clicking the timeline does. Adjusted during render (not an
+  // effect) so it fires both on mount and when `focusRunId` resolves later
+  // (once `runs` arrives), and exactly once per new value.
+  const [prevFocusRunId, setPrevFocusRunId] = React.useState<string | null>(null);
+  // A deep link is live only when the page resolved it to a run. A stale or
+  // deleted id resolves to no run, and must NOT be forwarded: every panel
+  // would then consider itself "not the owner" and go keyboard-inactive.
+  const liveFocusFindingId = focusRunId ? (focusFindingId ?? null) : null;
+
+  if ((focusRunId ?? null) !== prevFocusRunId) {
+    setPrevFocusRunId(focusRunId ?? null);
+    if (focusRunId) setTarget((p) => ({ runId: focusRunId, n: (p?.n ?? 0) + 1 }));
+  }
 
   return (
     <section>
@@ -163,6 +187,7 @@ export function FindingsTab({
             defaultOpen={i === 0}
             repoFullName={repoFullName}
             headSha={headSha}
+            focusFindingId={liveFocusFindingId}
             targetRunId={target?.runId ?? null}
             targetNonce={target?.n ?? 0}
           />

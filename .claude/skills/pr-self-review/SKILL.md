@@ -135,6 +135,14 @@ check in branch protection for `main`. Say so the first time.
   `h="$(git rev-parse --git-common-dir)/hooks/pre-push"; printf '#!/bin/sh\nexec node "$(git rev-parse --show-toplevel)/.claude/skills/pr-self-review/scripts/gate.mjs" --pre-push\n' > "$h" && chmod +x "$h"`.
   In worktrees, `hooks/` lives in the common git dir.
 
+## Staged mode
+
+`prepare.mjs --staged` / `verdict.mjs --staged` review only the index vs
+HEAD. It is the engine of `/staged-changes-review`
+(`../staged-changes-review/SKILL.md`), so script changes here affect both
+skills. A staged verdict never satisfies the gate, because its diff hash has
+its own prefix. It shares the cache and `overrides.json`.
+
 ## Adding or changing a skill
 
 Add the new skill to `references/routing.json` under `skills`, or under

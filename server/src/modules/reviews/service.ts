@@ -6,6 +6,7 @@ import type {
   PrRisks,
   RunEventKind,
   RunTrace,
+  SmartDiff,
 } from '@devdigest/shared';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import type { AgentRow } from '../../db/rows.js';
@@ -21,6 +22,7 @@ import { resolveFeatureModel } from '../settings/feature-models.js';
 import { RunLogger } from '../../platform/run-logger.js';
 import { loadDiff } from './diff-loader.js';
 import { deriveRisks } from './risks/index.js';
+import { buildSmartDiff } from './smart-diff/index.js';
 
 // Re-export DTO types + converters for backward-compatible imports from
 // './service.js' (these previously lived here; logic now in ./helpers.ts).
@@ -300,5 +302,50 @@ export class ReviewService {
       risks,
       scanned: { files: diff.files.length, added_lines: addedLinesCount },
     };
+  }
+
+  // ===========================================================================
+  // Smart Diff
+  // ===========================================================================
+
+  /** Reviewer-ordered diff (`core`/`wiring`/`boilerplate`) — deterministic,
+   *  recomputed on every read, zero network I/O: only `pr_files` (already
+   *  persisted) and the latest-per-agent finding ranges are read. No
+   *  `loadDiff`, no `PullsService.getDetail`, no adapter call. */
+  async getSmartDiff(workspaceId: string, prId: string, logger?: Logger): Promise<SmartDiff> {
+    const pull = await this.repo.getPull(workspaceId, prId);
+    if (!pull) throw new NotFoundError('Pull request not found');
+
+    const [files, findingRows] = await Promise.all([
+      this.repo.getPrFiles(pull.id),
+      this.repo.latestFindingRangesForPull(pull.id),
+    ]);
+
+    const smartDiff = buildSmartDiff(
+      files.map((f) => ({ path: f.path, additions: f.additions, deletions: f.deletions, patch: f.patch })),
+      findingRows,
+    );
+
+    const byRole = Object.fromEntries(smartDiff.groups.map((g) => [g.role, g.files.length]));
+    const findingLines = smartDiff.groups.reduce(
+      (n, g) => n + g.files.reduce((m, f) => m + f.finding_lines.length, 0),
+      0,
+    );
+    // Counts only — never a matched line's text, never a provider/model/cost
+    // field: this route makes no model call.
+    logger?.info(
+      {
+        prId,
+        files: files.length,
+        core: byRole.core ?? 0,
+        wiring: byRole.wiring ?? 0,
+        boilerplate: byRole.boilerplate ?? 0,
+        totalLines: smartDiff.split_suggestion.total_lines,
+        findingLines,
+      },
+      `smart-diff: ${files.length} files → core×${byRole.core ?? 0}, wiring×${byRole.wiring ?? 0}, boilerplate×${byRole.boilerplate ?? 0}`,
+    );
+
+    return smartDiff;
   }
 }

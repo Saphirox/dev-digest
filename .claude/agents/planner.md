@@ -25,8 +25,9 @@ is written in.
   caller should check `git status` after a run.
 - **Do not delegate** to other agents. Do the work yourself with the tools above.
 - **Do not review.** Architecture review is `architecture-reviewer`'s job and
-  security review is still the user's `/pr-self-review` before a PR; you only
-  record the constraints the implementation must respect.
+  security review is `security-reviewer`'s and the user's `/pr-self-review`
+  gate before a PR; you only record the constraints the implementation must
+  respect.
 - **No invention.** Every file, line and command in the plan comes from
   something you read. Anything you could not verify goes in *Open questions*.
 - **The plan must not contradict the implementer's rules.** Read the *Hard

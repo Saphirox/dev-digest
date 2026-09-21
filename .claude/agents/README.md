@@ -15,13 +15,15 @@ the rules come from. Skills live in [../skills/README.md](../skills/README.md).
 | [`implementer`](implementer.md) | Executes a plan in `client/`, `server/`, `reviewer-core/` and verifies its own changes | `sonnet` | `Read, Glob, Grep, Edit, Write, Bash, Skill` | yes (code, tests, INSIGHTS) |
 | [`test-writer`](test-writer.md) | Writes or updates tests for existing behaviour, or reproduces a bug with a failing test | `sonnet` | `Read, Glob, Grep, Edit, Write, Bash, Skill` | yes (tests only) |
 | [`architecture-reviewer`](architecture-reviewer.md) | Read-only architecture review of a diff: boundaries the mechanical checks can't see | `opus` | `Read, Glob, Grep, Bash` | no |
+| [`security-reviewer`](security-reviewer.md) | Read-only security review of a diff: source→sink data-flow tracing, OWASP-shaped, repo-aware | `opus` | `Read, Glob, Grep, Bash` | no |
 | [`plan-verifier`](plan-verifier.md) | Adversarial per-item check of finished code against a Development Plan | `opus` | `Read, Glob, Grep, Bash` | no |
 | [`doc-writer`](doc-writer.md) | Documents an already-implemented feature into `docs/`, grounded in the diff | `sonnet` | `Read, Glob, Grep, Edit, Write, Bash` | yes (docs only) |
 | [`insight-curator`](insight-curator.md) | Scans `INSIGHTS.md` for duplicate/stale entries and lesson→rule promotions; proposes, never writes | `opus` | `Read, Glob, Grep, Bash` | no |
 
-None of the ten has `Agent`, so none can spawn subagents. None commits or
-pushes. Architecture review is now an agent (`architecture-reviewer`);
-security review is still not — `/pr-self-review` remains the gate.
+None of the eleven has `Agent`, so none can spawn subagents. None commits or
+pushes. Architecture review is an agent (`architecture-reviewer`) and so is
+security review (`security-reviewer`); `/pr-self-review` remains the gate
+either way — an agent's findings are advisory, the gate is what blocks a push.
 
 ## Flow
 
@@ -36,6 +38,7 @@ task ──► planner ──► Development Plan ──► saved to docs/plans/
                         ├─► implementer ──► change report
                         │                     ├─► plan-verifier ──► compliance matrix
                         │                     ├─► architecture-reviewer ──► findings/observations
+                        │                     ├─► security-reviewer ──► findings/verified-safe
                         │                     └─► doc-writer ──► docs/
                         └─► test-writer ──► tests added (a plan step, or standalone)
 
@@ -64,9 +67,9 @@ caller (not `planner` — it has no `Write`) saves the plan to
 (`docs/README.md` "Plans — the rule"). `planner` and
 `implementer` are a pair: the plan is the contract between them.
 `test-writer`, `plan-verifier`,
-`architecture-reviewer` and `doc-writer` all consume either a plan or an
-implementer's report (or both) and never edit production code (`test-writer`
-edits only test files; `doc-writer` edits only `docs/`). `insight-curator`
+`architecture-reviewer`, `security-reviewer` and `doc-writer` all consume
+either a plan or an implementer's report (or both) and never edit production
+code (`test-writer` edits only test files; `doc-writer` edits only `docs/`). `insight-curator`
 sits on the wrap-up lane: it reads the `INSIGHTS.md` files and proposes
 duplicate/stale/promotion bullets in the `engineering-insights` skill's exact
 format — that skill, not the curator, performs the write.
@@ -245,6 +248,35 @@ format — that skill, not the curator, performs the write.
   Observations, Deterministic results reused, Could not establish.
 - **Not for:** security review, correctness/bug hunting, performance, test
   quality, writing fixes, planning.
+
+## security-reviewer
+
+- **Responsibility:** read-only security review of a diff — source→sink
+  data-flow tracing per changed hunk ("can an attacker control this value?"),
+  OWASP-shaped findings, translated onto this repo's actual Fastify +
+  Drizzle/Postgres + Next 15 stack rather than the `security` skill's
+  Express/MongoDB/JWT wording. It is not the PR gate.
+- **Permissions:** `Read, Glob, Grep, Bash`, no `Write`/`Edit`/`Skill` (reads
+  `security/SKILL.md` and `checklists.md` with `Read`, like
+  `architecture-reviewer` reads its skill). **Read-only for `Bash` is
+  prompt-enforced only** — no hook guards it; the agent carries an explicit
+  allowed/denied command list, which specifically denies any read of
+  `~/.devdigest/**` or a non-example `.env`.
+- **Must NOT re-derive:** the `security` skill's confidence table or
+  "Do NOT flag" list — it carries them, never restates the whole skill; and
+  never restates `architecture-reviewer`'s ring-placement job — this agent
+  follows data, not boundaries.
+- **Input:** a diff range or "the uncommitted changes" (defaults to `git diff
+  origin/main...HEAD` plus working-tree changes), plus the module boundary.
+  Scoped by `pr-self-review/references/routing.json`'s `security` entry
+  (`include`/`triggers`).
+- **Output:** Verdict line ("no findings" is valid), Findings (max 5, HIGH
+  confidence only, each with `location`/`category`/`source`/`sink`/
+  `exploit`/`fix`/`confidence`), Verified safe, Needs manual verification
+  (the MEDIUM bucket), Could not establish.
+- **Not for:** architecture/boundary review, correctness/bug hunting,
+  performance, test quality, writing fixes, planning, replacing
+  `/pr-self-review`.
 
 ## plan-verifier
 
@@ -497,9 +529,10 @@ shared-worktree and stash hazards, and the `db:migrate` shared-volume trap
   agent set relies on the `tools:` allowlist and on skills, not on custom
   hook scripts. `tools:` is real enforcement — an agent without `Write`/
   `Edit` cannot edit a file, and `researcher` without `Bash` cannot run a
-  command at all. But `Bash` itself is not scoped by anything, so for the six
-  agents that keep it (`architecture-reviewer`, `plan-verifier`, `brainstorm`,
-  `investigator`, `insight-curator`, `planner`) read-only is a prompt rule.
+  command at all. But `Bash` itself is not scoped by anything, so for the seven
+  agents that keep it (`architecture-reviewer`, `security-reviewer`,
+  `plan-verifier`, `brainstorm`, `investigator`, `insight-curator`,
+  `planner`) read-only is a prompt rule.
   Each of those files carries an explicit allowed/denied command list rather
   than a vague "be read-only": when the prompt is the only line, it has to be
   specific.
