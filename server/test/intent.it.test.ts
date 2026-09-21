@@ -25,7 +25,6 @@ const INTENT_FIXTURE = {
   summary: 'Adds rate limiting to protect the public API from abuse.',
   in_scope: ['rate limiting middleware'],
   out_of_scope: ['authentication flow'],
-  confidence: 0.83,
   missing_context: [],
 };
 
@@ -71,7 +70,7 @@ d('Intent Layer — schema + API (Testcontainers pg)', () => {
     await pg?.stop();
   });
 
-  it('migration 0016 applies on a clean DB — pr_intent has the 7 new columns', async () => {
+  it('migrations 0016+0017 apply on a clean DB — pr_intent has its columns and NO confidence column', async () => {
     const rows = await pg.handle.db.execute(sql`
       select column_name from information_schema.columns
       where table_name = 'pr_intent'
@@ -79,7 +78,6 @@ d('Intent Layer — schema + API (Testcontainers pg)', () => {
     const columns = new Set((rows as unknown as { column_name: string }[]).map((r) => r.column_name));
     for (const col of [
       'derived_for_sha',
-      'confidence',
       'sources',
       'missing_context',
       'provider',
@@ -88,6 +86,7 @@ d('Intent Layer — schema + API (Testcontainers pg)', () => {
     ]) {
       expect(columns.has(col)).toBe(true);
     }
+    expect(columns.has('confidence')).toBe(false);
   });
 
   it('upsertIntent / getIntent round-trip every column', async () => {
@@ -100,7 +99,6 @@ d('Intent Layer — schema + API (Testcontainers pg)', () => {
       intent: 'Adds rate limiting.',
       inScope: ['rate limiter'],
       outOfScope: ['auth'],
-      confidence: 0.75,
       derivedForSha: pr.headSha,
       sources: [{ kind: 'pr_title_body', ref: `PR #${pr.number}`, ok: true, note: null }],
       missingContext: ['docs/plans/0002-intent-layer.md'],
@@ -114,7 +112,6 @@ d('Intent Layer — schema + API (Testcontainers pg)', () => {
       intent: 'Adds rate limiting.',
       in_scope: ['rate limiter'],
       out_of_scope: ['auth'],
-      confidence: 0.75,
       derived_for_sha: pr.headSha,
       sources: [{ kind: 'pr_title_body', ref: `PR #${pr.number}`, ok: true, note: null }],
       missing_context: ['docs/plans/0002-intent-layer.md'],
@@ -128,7 +125,6 @@ d('Intent Layer — schema + API (Testcontainers pg)', () => {
       intent: 'Updated intent.',
       inScope: [],
       outOfScope: [],
-      confidence: null,
       derivedForSha: 'newsha',
       sources: [],
       missingContext: [],

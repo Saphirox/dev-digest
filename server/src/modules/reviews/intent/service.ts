@@ -1,7 +1,7 @@
 import type { IntentDeriveResult, IntentSource, PrIntentRecord, RepoRef, UnifiedDiff } from '@devdigest/shared';
 import type { RunLogger } from '../../../platform/run-logger.js';
 import { MAX_BODY_CHARS, MAX_DOC_CHARS, MAX_FILES } from './constants.js';
-import { clampConfidence, extractDocLinks, extractIssueRef, hunkHeaders } from './helpers.js';
+import { extractDocLinks, extractIssueRef, hunkHeaders } from './helpers.js';
 import { buildMessages, type BuildMessagesDoc, type BuildMessagesFile, type BuildMessagesIssue } from './prompt.js';
 import type { IntentModel, IntentSources, IntentStore, IntentUpsertInput, Tokens } from './ports.js';
 
@@ -58,7 +58,6 @@ export class IntentService {
       { kind: 'pr_title_body', ref: `PR #${pull.number}`, ok: true, note: null },
     ];
     const missingRefs: string[] = [];
-    let anyUnreachable = false;
 
     const noteMissing = (ref: string) => {
       missingRefs.push(ref);
@@ -75,7 +74,6 @@ export class IntentService {
         sources.push({ kind: 'linked_issue', ref, ok: true, note: null });
         issueForPrompt = { number: issueNum, title: issue.title, body: issue.body ?? null };
       } catch {
-        anyUnreachable = true;
         sources.push({ kind: 'linked_issue', ref, ok: false, note: 'not reachable' });
         noteMissing(ref);
       }
@@ -85,7 +83,6 @@ export class IntentService {
     const docsForPrompt: BuildMessagesDoc[] = [];
     for (const link of extractDocLinks(pull.body)) {
       if (link.kind === 'external_link') {
-        anyUnreachable = true;
         sources.push({ kind: 'external_link', ref: link.ref, ok: false, note: 'external link not fetched' });
         noteMissing(link.ref);
         continue;
@@ -99,7 +96,6 @@ export class IntentService {
         // Never surface the raw error message here: for an ENOENT it embeds
         // the absolute host filesystem path (`open '/Users/<user>/…'`),
         // disclosed to the client via GET /pulls/:id/intent.
-        anyUnreachable = true;
         sources.push({ kind: 'repo_file', ref: link.ref, ok: false, note: 'not reachable' });
         noteMissing(link.ref);
       }
@@ -142,18 +138,12 @@ export class IntentService {
       `intent prompt: sections=[${sectionsDesc}]; diff bodies excluded; ~${tokens} tokens; model=${result.provider}/${result.model}`,
     );
 
-    const hasBody = !!bodyForPrompt && bodyForPrompt.trim().length > 0;
-    const hasIssueOrDoc = issueForPrompt != null || docsForPrompt.length > 0;
-    const clamped = clampConfidence(result.data.confidence, { hasBody, anyUnreachable, hasIssueOrDoc });
-    const clampNote = clamped < result.data.confidence ? ` (model ${result.data.confidence}, clamped)` : '';
-
     const missingContext = Array.from(new Set([...missingRefs, ...result.data.missing_context]));
 
     const upsertInput: IntentUpsertInput = {
       intent: result.data.summary,
       inScope: result.data.in_scope,
       outOfScope: result.data.out_of_scope,
-      confidence: clamped,
       derivedForSha: pull.headSha,
       sources,
       missingContext,
@@ -163,7 +153,7 @@ export class IntentService {
     await this.deps.store.upsert(pull.id, upsertInput);
 
     log.result(
-      `intent: in_scope=${result.data.in_scope.length}, out_of_scope=${result.data.out_of_scope.length}, confidence=${clamped}${clampNote}`,
+      `intent: in_scope=${result.data.in_scope.length}, out_of_scope=${result.data.out_of_scope.length}`,
     );
 
     const record: PrIntentRecord = {
@@ -171,7 +161,6 @@ export class IntentService {
       intent: result.data.summary,
       in_scope: result.data.in_scope,
       out_of_scope: result.data.out_of_scope,
-      confidence: clamped,
       derived_for_sha: pull.headSha,
       derived_at: new Date().toISOString(),
       stale: false,

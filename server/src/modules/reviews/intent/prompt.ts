@@ -14,11 +14,6 @@ export const IntentSchema = z.object({
   summary: z.string().describe("One or two sentences: what this PR does and why."),
   in_scope: z.array(z.string()).describe('Areas/behaviors this PR is expected to touch.'),
   out_of_scope: z.array(z.string()).describe('Areas/behaviors this PR explicitly does NOT touch.'),
-  confidence: z
-    .number()
-    .min(0)
-    .max(1)
-    .describe('How confident you are in this classification, given the evidence you were given.'),
   missing_context: z
     .array(z.string())
     .describe(
@@ -31,7 +26,7 @@ export const INTENT_SCHEMA_NAME = 'PrIntent';
 
 const SYSTEM = `You classify a pull request's INTENT and SCOPE from limited evidence: its title/description, a linked issue if any, linked repo documents if readable, and its changed-file list with \`@@ … @@\` hunk headers ONLY — diff bodies are deliberately excluded from what you are given. Never claim to have read the code; reason only from file names, hunk locations, and the text provided.
 
-Write a short summary of what the PR does and why, a list of areas/behaviors it is IN scope for, and a list it is explicitly OUT of scope for (aim for a few short, concrete phrases in each list, not prose). If a reference is listed under "## Missing context" below, you could not read it — echo it under \`missing_context\` in your answer and lower \`confidence\` accordingly. Never invent the contents of something you could not read.`;
+Write a short summary of what the PR does and why, a list of areas/behaviors it is IN scope for, and a list it is explicitly OUT of scope for (aim for a few short, concrete phrases in each list, not prose). If a reference is listed under "## Missing context" below, you could not read it — echo it under \`missing_context\` in your answer. Never invent the contents of something you could not read.`;
 
 export interface BuildMessagesIssue {
   number: number;

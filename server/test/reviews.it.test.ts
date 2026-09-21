@@ -124,7 +124,6 @@ const INTENT_FIXTURE = {
   summary: 'Adds a rate limiter to the public API.',
   in_scope: ['rate limiting'],
   out_of_scope: ['authentication'],
-  confidence: 0.8,
   missing_context: [],
 };
 

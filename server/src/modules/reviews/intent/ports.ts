@@ -13,7 +13,6 @@ export interface IntentUpsertInput {
   intent: string;
   inScope: string[];
   outOfScope: string[];
-  confidence: number | null;
   derivedForSha: string;
   sources: PrIntentRecord['sources'];
   missingContext: string[];

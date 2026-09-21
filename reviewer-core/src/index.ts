@@ -34,10 +34,8 @@ export {
   type ParseResult,
 } from './llm/structured.js';
 
-// Map-reduce helpers (reduce partials, slice a file's diff). scoreFromFindings
-// is also exported directly: the server recomputes the score post scope-filter
-// (Intent Layer), not just post-grounding.
-export { reduceReviews, sliceDiff, scoreFromFindings } from './review/reduce.js';
+// Map-reduce helpers (reduce partials, slice a file's diff).
+export { reduceReviews, sliceDiff } from './review/reduce.js';
 
 // The engine entry point: given (diff + resolved agent inputs + LLM) → grounded Review.
 export {

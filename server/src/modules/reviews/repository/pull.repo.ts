@@ -52,7 +52,6 @@ export interface IntentUpsertInput {
   intent: string;
   inScope: string[];
   outOfScope: string[];
-  confidence: number | null;
   derivedForSha: string;
   sources: IntentSource[];
   missingContext: string[];
@@ -66,7 +65,6 @@ export async function upsertIntent(db: Db, prId: string, record: IntentUpsertInp
     intent: record.intent,
     inScope: record.inScope,
     outOfScope: record.outOfScope,
-    confidence: record.confidence,
     derivedForSha: record.derivedForSha,
     sources: record.sources,
     missingContext: record.missingContext,
@@ -90,7 +88,6 @@ export async function getIntent(db: Db, prId: string): Promise<PrIntentRecord | 
     intent: row.intent,
     in_scope: row.inScope,
     out_of_scope: row.outOfScope,
-    confidence: row.confidence,
     derived_for_sha: row.derivedForSha,
     derived_at: row.derivedAt?.toISOString() ?? null,
     stale: false,

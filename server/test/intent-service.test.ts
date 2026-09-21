@@ -39,7 +39,6 @@ function makeStore(initial?: PrIntentRecord): IntentStore & { current(): PrInten
         intent: record.intent,
         in_scope: record.inScope,
         out_of_scope: record.outOfScope,
-        confidence: record.confidence,
         derived_for_sha: record.derivedForSha,
         derived_at: new Date().toISOString(),
         stale: false,
@@ -60,14 +59,13 @@ function classification(o: Partial<IntentClassification> = {}): IntentClassifica
     summary: 'The fake model summary.',
     in_scope: ['rate limiter'],
     out_of_scope: [],
-    confidence: 0.9,
     missing_context: [],
     ...o,
   };
 }
 
 describe('IntentService.derive — unreachable doc link', () => {
-  it('records missing_context + an { ok: false } source, clamps confidence, and persists the summary VERBATIM (no invented text)', async () => {
+  it('records missing_context + an { ok: false } source, and persists the summary VERBATIM (no invented text)', async () => {
     const store = makeStore();
     const sources: IntentSources = {
       getIssue: async () => {
@@ -91,9 +89,6 @@ describe('IntentService.derive — unreachable doc link', () => {
     expect(result.intent.missing_context).toContain('docs/plans/0002-intent-layer.md');
     const docSource = result.intent.sources.find((s: IntentSource) => s.kind === 'repo_file');
     expect(docSource).toMatchObject({ ref: 'docs/plans/0002-intent-layer.md', ok: false });
-    // Unreachable source clamps confidence to <= 0.6, strictly below the model's raw 0.9.
-    expect(result.intent.confidence).not.toBeNull();
-    expect(result.intent.confidence!).toBeLessThanOrEqual(0.6);
     // The persisted intent text is the fake model's summary VERBATIM.
     expect(result.intent.intent).toBe('The fake model summary.');
     expect(store.current()?.intent).toBe('The fake model summary.');
@@ -128,7 +123,6 @@ describe('IntentService.ensureFresh — never throws', () => {
       intent: 'Already derived.',
       in_scope: [],
       out_of_scope: [],
-      confidence: 0.7,
       derived_for_sha: PULL.headSha, // matches — fresh
       derived_at: '2026-09-20T00:00:00.000Z',
       stale: false,

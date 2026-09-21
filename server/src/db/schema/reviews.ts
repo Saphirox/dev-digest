@@ -56,7 +56,6 @@ export const prIntent = pgTable('pr_intent', {
   /** Head SHA the intent was derived for; a mismatch with the PR's current head
       makes the service report `stale: true`. */
   derivedForSha: text('derived_for_sha'),
-  confidence: doublePrecision('confidence'),
   sources: jsonb('sources').$type<IntentSource[]>().notNull().default(sql`'[]'::jsonb`),
   missingContext: jsonb('missing_context').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   provider: text('provider'),

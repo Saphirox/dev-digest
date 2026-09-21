@@ -25,8 +25,6 @@ interface IntentCardProps {
  * `{intent, in_scope, out_of_scope}`, the Risk Areas section, missing-context
  * refs when any, and a re-derive action — a hybrid of "auto-derive when a
  * review runs" (server-side, run-executor) and this explicit button.
- * `confidence` is not rendered on the card (still in the contract/DB/log/API
- * payload) — it is exposed to assistive tech only via the chip's `aria-label`.
  */
 export function IntentCard({ prId, headSha, repoFullName }: IntentCardProps) {
   const t = useTranslations("intent");
@@ -53,15 +51,11 @@ export function IntentCard({ prId, headSha, repoFullName }: IntentCardProps) {
   }
 
   const stale = intent.stale || intent.derived_for_sha !== headSha;
-  const chipAria =
-    intent.confidence == null
-      ? t("chipAriaUnknown")
-      : t("chipAria", { pct: Math.round(intent.confidence * 100) });
 
   return (
     <section>
       <div style={s.header}>
-        <span role="img" aria-label={chipAria} style={s.chipWrap}>
+        <span role="img" aria-label={t("chipLabel")} style={s.chipWrap}>
           <Icon.Target size={14} style={s.chipIcon} aria-hidden="true" />
           <span style={s.chip} aria-hidden="true">
             {t("chip")}

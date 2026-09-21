@@ -30,7 +30,6 @@ export type IntentSource = z.infer<typeof IntentSource>;
 /** Persisted per-PR intent record (`pr_intent` table), with freshness + provenance. */
 export const PrIntentRecord = Intent.extend({
   pr_id: z.string(),
-  confidence: z.number().min(0).max(1).nullable(),
   derived_for_sha: z.string().nullable(),
   derived_at: z.string().nullable(),
   stale: z.boolean(),

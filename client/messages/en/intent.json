@@ -1,8 +1,7 @@
 {
   "title": "Derived intent",
   "chip": "Intent",
-  "chipAria": "Intent — {pct}% confidence",
-  "chipAriaUnknown": "Intent — confidence unknown",
+  "chipLabel": "Derived intent",
   "inScope": "In scope",
   "outOfScope": "Out of scope",
   "none": "—",

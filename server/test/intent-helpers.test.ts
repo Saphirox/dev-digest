@@ -6,7 +6,6 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  clampConfidence,
   extractDocLinks,
   extractIssueRef,
   hunkHeaders,
@@ -114,33 +113,12 @@ describe('extractDocLinks', () => {
   });
 });
 
-describe('clampConfidence', () => {
-  it('caps at 0.5 for an empty body', () => {
-    expect(clampConfidence(0.9, { hasBody: false })).toBeLessThanOrEqual(0.5);
-  });
-
-  it('caps at 0.6 when any evidence source is unreachable', () => {
-    expect(clampConfidence(0.9, { hasBody: true, anyUnreachable: true, hasIssueOrDoc: true })).toBeLessThanOrEqual(0.6);
-  });
-
-  it('caps at 0.75 when there is no issue and no doc', () => {
-    expect(clampConfidence(0.9, { hasBody: true, anyUnreachable: false, hasIssueOrDoc: false })).toBeLessThanOrEqual(0.75);
-  });
-
-  it('never raises the model’s own number, and clamps into [0,1]', () => {
-    expect(clampConfidence(0.3, {})).toBe(0.3);
-    expect(clampConfidence(1.4, {})).toBeLessThanOrEqual(1);
-    expect(clampConfidence(-0.4, {})).toBeGreaterThanOrEqual(0);
-  });
-});
-
 describe('renderIntentBlock', () => {
   const base: PrIntentRecord = {
     pr_id: 'pr-1',
     intent: 'Adds a cheap PR-intent classifier.',
     in_scope: ['intent classifier'],
     out_of_scope: ['unrelated refactors'],
-    confidence: 0.8,
     derived_for_sha: 'abc123',
     derived_at: '2026-09-20T00:00:00.000Z',
     stale: false,

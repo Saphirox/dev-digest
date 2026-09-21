@@ -47,7 +47,6 @@ const INTENT_FIXTURE = {
   summary: 'Adds rate limiting to protect the public API from abuse.',
   in_scope: ['rate limiting middleware'],
   out_of_scope: [],
-  confidence: 0.83,
   missing_context: [],
 };
 
@@ -193,6 +192,125 @@ d('Review run derives + persists intent (Testcontainers pg)', () => {
     const trace = (await app.inject({ method: 'GET', url: `/runs/${runId}/trace` })).json();
     expect(trace.prompt_assembly.intent ?? null).toBeNull();
     expect(trace.prompt_assembly.intent_tokens ?? null).toBeNull();
+
+    await app.close();
+  });
+
+  it('off-topic findings are saved, not filtered — no code-side scope filter', async () => {
+    // Under the old code filter, `out_of_scope: ['Changes to config handling']`
+    // matched the `config` path segment and collapsed both findings into one
+    // carrier. There is no code-side filter anymore: the reviewer leaves out
+    // off-topic SUGGESTIONs itself (or not); grounded findings are saved as-is.
+    const offTopicReview: Review = {
+      verdict: 'request_changes',
+      summary: 'Webhook signature check missing; minor naming nit.',
+      score: 60,
+      findings: [
+        {
+          id: 'f-warning',
+          severity: 'WARNING',
+          category: 'security',
+          title: 'Webhook signature not verified',
+          file: 'src/config.ts',
+          start_line: 11,
+          end_line: 11,
+          rationale: 'The webhook handler trusts the payload without checking its signature.',
+          suggestion: 'Verify the signature before processing.',
+          confidence: 0.9,
+          kind: 'finding',
+        },
+        {
+          id: 'f-suggestion',
+          severity: 'SUGGESTION',
+          category: 'style',
+          title: 'Rename variable',
+          file: 'src/config.ts',
+          start_line: 11,
+          end_line: 11,
+          rationale: '`x` is not a descriptive name.',
+          suggestion: 'Rename `x` to `redisUrlEnv`.',
+          confidence: 0.6,
+          kind: 'finding',
+        },
+      ],
+    };
+    const offTopicIntent = {
+      summary: 'Adds rate limiting to protect the public API from abuse.',
+      in_scope: ['rate limiting middleware'],
+      out_of_scope: ['Changes to config handling'],
+      missing_context: [],
+    };
+
+    const app = await buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: {
+        git: new MockGitClient({ diff: DIFF }),
+        github: new MockGitHubClient(),
+        llm: {
+          openai: new MockLLMProvider('openai', { structured: offTopicReview }),
+          openrouter: new MockLLMProvider('openai', { structuredBySchema: { PrIntent: offTopicIntent } }),
+        },
+      },
+    });
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Sec3', provider: 'openai', model: 'gpt-4.1', system_prompt: 'sec' },
+      })
+    ).json();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/pulls/${pr.id}/review`,
+      payload: { agentId: agent.id },
+    });
+    expect(res.statusCode).toBe(200);
+    const runId = res.json().runs[0].run_id;
+
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+    await waitForRunTrace(pg.handle.db, runId);
+
+    const reviews = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/reviews` })).json();
+    expect(reviews).toHaveLength(1);
+    expect(reviews[0].findings).toHaveLength(2);
+    const titles = reviews[0].findings.map((f: { title: string }) => f.title).sort();
+    expect(titles).toEqual(['Rename variable', 'Webhook signature not verified']);
+    expect(reviews[0].findings.some((f: { title: string }) => f.title.includes('more out-of-scope'))).toBe(
+      false,
+    );
+    expect(reviews[0].score).toBe(85);
+
+    const [run] = await pg.handle.db.select().from(t.agentRuns).where(eq(t.agentRuns.id, runId));
+    expect(run?.score).toBe(85);
+
+    const trace = (await app.inject({ method: 'GET', url: `/runs/${runId}/trace` })).json();
+    expect(trace.stats.findings).toBe(2);
+    expect(
+      trace.log.some((e: { kind: string; msg: string }) => e.msg.startsWith('scope filter:')),
+    ).toBe(false);
+    expect(
+      trace.log.some(
+        (e: { kind: string; msg: string }) =>
+          e.kind === 'tool' && e.msg.startsWith('Deriving PR intent'),
+      ),
+    ).toBe(true);
+    expect(
+      trace.log.some(
+        (e: { kind: string; msg: string }) => e.kind === 'tool' && e.msg === 'Reviewing all files in one pass',
+      ),
+    ).toBe(true);
+    expect(
+      trace.log.some((e: { msg: string }) =>
+        e.msg.startsWith('intent: injected into reviewer prompt (in_scope=1, out_of_scope=1)'),
+      ),
+    ).toBe(true);
+    expect(trace.prompt_assembly.user).toContain('SUGGESTION-level remarks');
+    expect(trace.prompt_assembly.user.indexOf('SUGGESTION-level remarks')).toBeLessThan(
+      trace.prompt_assembly.user.indexOf('<untrusted source="intent">'),
+    );
 
     await app.close();
   });

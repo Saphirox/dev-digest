@@ -1,6 +1,6 @@
 import type { Container } from '../../platform/container.js';
 import type { PrIntentRecord, Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
-import { reviewPullRequest, countBlockers, scoreFromFindings } from '@devdigest/reviewer-core';
+import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
@@ -10,7 +10,6 @@ import { taskLine, toSkillPromptBlock } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 import type { IntentService } from './intent/service.js';
 import { renderIntentBlock } from './intent/helpers.js';
-import { filterOutOfScope } from './scope-filter.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -213,6 +212,16 @@ export class ReviewRunExecutor {
       // shape for that run.
       const intentBlock = intent ? renderIntentBlock(intent) : undefined;
 
+      // Observability: the only Live Log sign that intent reached the prompt
+      // — counts only, never body text. There is no code-side scope filter;
+      // the reviewer itself may leave out off-topic SUGGESTIONs (see the
+      // `## Derived intent` rule in reviewer-core's assemblePrompt).
+      if (intent) {
+        runLog.info(
+          `intent: injected into reviewer prompt (in_scope=${intent.in_scope.length}, out_of_scope=${intent.out_of_scope.length}); no code-side scope filter`,
+        );
+      }
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -245,23 +254,11 @@ export class ReviewRunExecutor {
       });
       const { tokensIn, tokensOut, grounding, costUsd } = outcome;
 
-      // Scope filter: out-of-scope findings collapse onto one carrier.
-      // CRITICAL findings are never dropped (enforced inside the filter);
-      // identity when there's no intent or no out_of_scope.
-      const { kept: keptFindings, dropped: droppedFindings, carrier } = filterOutOfScope(
-        outcome.review.findings,
-        intent,
-      );
-      if (droppedFindings.length > 0 && carrier) {
-        runLog.result(
-          `scope filter: dropped ${droppedFindings.length} out-of-scope finding(s), kept 1 carrier "${carrier.title}"`,
-        );
-      }
-
-      // Score is recomputed from the POST-FILTER findings — never the model's
-      // self-reported (pre-filter) score — so `reviews.score`/`agent_runs.score`
-      // always agree with the persisted findings.
-      const score = scoreFromFindings(keptFindings);
+      // Grounded findings are saved as they come back — off-topic handling is
+      // the reviewer's own job now (see the `## Derived intent` rule in
+      // reviewer-core), not a code-side filter here.
+      const keptFindings = outcome.review.findings;
+      const score = outcome.review.score;
 
       // ---- Persist review + findings ----------------------------------------
       const review = await this.repo.insertReview({
@@ -285,8 +282,7 @@ export class ReviewRunExecutor {
       const durationMs = Date.now() - start;
 
       // Deterministic blocker count (severity ≥ the agent's gate) — the signal
-      // the timeline colors on, NOT the model's self-reported verdict. Computed
-      // on the POST-FILTER findings, same as the score.
+      // the timeline colors on, NOT the model's self-reported verdict.
       const blockers = countBlockers(keptFindings, agent.ciFailOn);
 
       // ---- Observability: agent_runs + ONE run_traces document --------------

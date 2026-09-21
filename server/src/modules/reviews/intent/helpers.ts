@@ -130,38 +130,9 @@ export function extractDocLinks(body: string | null, opts: { max?: number } = {}
 }
 
 // ---------------------------------------------------------------------------
-// clampConfidence — mirrors `adjustConfidence` in `conventions/helpers.ts`:
-// the model's self-reported number is a ceiling, never trusted outright when
-// evidence is thin.
-// ---------------------------------------------------------------------------
-
-export interface ConfidenceAvailability {
-  /** The PR has a non-empty body. Default true (assume present). */
-  hasBody?: boolean;
-  /** At least one evidence source (issue, doc, external link) was unreachable. */
-  anyUnreachable?: boolean;
-  /** A linked issue OR a readable doc was found. Default true (assume present). */
-  hasIssueOrDoc?: boolean;
-}
-
-export function clampConfidence(self: number, avail: ConfidenceAvailability): number {
-  const hasBody = avail.hasBody ?? true;
-  const anyUnreachable = avail.anyUnreachable ?? false;
-  const hasIssueOrDoc = avail.hasIssueOrDoc ?? true;
-
-  let cap = 1;
-  if (!hasBody) cap = Math.min(cap, 0.5);
-  if (anyUnreachable) cap = Math.min(cap, 0.6);
-  if (!hasIssueOrDoc) cap = Math.min(cap, 0.75);
-
-  const clamped = Math.min(Math.max(0, self), cap);
-  return Math.round(clamped * 100) / 100;
-}
-
-// ---------------------------------------------------------------------------
 // renderIntentBlock — the `intent` prompt slot's payload (reviewer-core wraps
-// it in `<untrusted source="intent">` and adds the advisory line; see
-// `reviewer-core/src/prompt.ts`).
+// it in `<untrusted source="intent">` and puts the trusted `INTENT_SCOPE_RULE`
+// before it; see `reviewer-core/src/prompt.ts`).
 // ---------------------------------------------------------------------------
 
 export function renderIntentBlock(record: PrIntentRecord): string {

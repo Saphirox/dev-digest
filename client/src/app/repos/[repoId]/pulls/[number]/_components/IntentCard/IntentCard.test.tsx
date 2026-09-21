@@ -41,7 +41,6 @@ function record(o: Partial<PrIntentRecord> = {}): PrIntentRecord {
     intent: "Adds a cheap PR-intent classifier ahead of the full review.",
     in_scope: ["intent classifier", "scope filter"],
     out_of_scope: ["unrelated refactors"],
-    confidence: 0.82,
     derived_for_sha: "abc1234",
     derived_at: "2026-09-20T00:00:00.000Z",
     stale: false,
