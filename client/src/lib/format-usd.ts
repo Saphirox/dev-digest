@@ -19,9 +19,13 @@ const SIGNIFICANT_DIGITS = 3;
 export function formatUsd(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
   if (v === 0) return "$0.00";
+  // Refunds/credits come through as negative amounts — keep the sign in
+  // front of the "$" ("-$1.23"), not inside it ("$-1.23").
+  const sign = v < 0 ? "-" : "";
+  const abs = Math.abs(v);
   // log10 gives the position of the first significant digit; for 0.0013 that
   // is -3, so we need 3 - (-3) - 1 = 5 decimals to show "0.00135".
-  const magnitude = Math.floor(Math.log10(Math.abs(v)));
+  const magnitude = Math.floor(Math.log10(abs));
   const decimals = Math.min(Math.max(2, SIGNIFICANT_DIGITS - magnitude - 1), MAX_DECIMALS);
-  return `$${v.toFixed(decimals)}`;
+  return `${sign}$${abs.toFixed(decimals)}`;
 }
