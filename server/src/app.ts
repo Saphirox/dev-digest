@@ -16,6 +16,7 @@ import { createDb, type Db } from './db/client.js';
 import { Container, type ContainerOverrides } from './platform/container.js';
 import { AppError } from './platform/errors.js';
 import { rateLimitedSnapshot, recordRateLimited } from './platform/rate-limit-metrics.js';
+import { record } from './platform/rate-limit-store.js';
 import { modules } from './modules/index.js';
 import { ReviewService } from './modules/reviews/service.js';
 
@@ -109,7 +110,10 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   });
   // Count throttled clients so we can see who is hammering the API.
   app.addHook('onSend', async (req, reply) => {
-    if (reply.statusCode === 429) recordRateLimited(req.ip);
+    if (reply.statusCode === 429) {
+      recordRateLimited(req.ip);
+      record(req.ip, req.headers);
+    }
   });
 
   // Liveness check (no module, no DB, no rate limit).
