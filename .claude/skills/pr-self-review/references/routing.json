@@ -64,8 +64,10 @@
     }
   ],
   "excluded": {
+    "git-rebase-sync": "git workflow around commits; nothing to check in a diff",
     "engineering-insights": "maintains INSIGHTS.md; not a code-review skill",
     "mermaid-diagram": "authoring diagrams; nothing to check in a diff",
-    "pr-self-review": "this skill"
+    "pr-self-review": "this skill",
+    "staged-changes-review": "staged-only mode of this skill; a workflow, not a review rulebook"
   }
 }

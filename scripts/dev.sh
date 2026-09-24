@@ -30,6 +30,12 @@ for arg in "$@"; do
   esac
 done
 
+# pnpm runs a dep-status check before every `pnpm <script>` and fails it with
+# ERR_PNPM_IGNORED_BUILDS (esbuild, ssh2, …) even though deps are fine. Turn the
+# strictness off instead of `pnpm approve-builds`, which is interactive and
+# writes a pnpm-workspace.yaml this repo doesn't use.
+export pnpm_config_strict_dep_builds=false
+
 log()  { printf '\033[1;36m▸ %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m! %s\033[0m\n' "$*"; }
 

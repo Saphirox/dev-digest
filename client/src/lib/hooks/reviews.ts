@@ -66,6 +66,9 @@ export function useDeleteRun(prId: string | null | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["pr-runs", prId] });
       qc.invalidateQueries({ queryKey: ["reviews", prId] });
+      // Smart Diff joins these findings with its own query; invalidating only
+      // one half leaves coloured markers with no badge until a reload.
+      qc.invalidateQueries({ queryKey: ["pr-smart-diff", prId] });
     },
   });
 }
@@ -82,7 +85,10 @@ export function useDeleteReview(prId: string | null | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (reviewId: string) => api.del<{ ok: boolean }>(`/reviews/${reviewId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["reviews", prId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reviews", prId] });
+      qc.invalidateQueries({ queryKey: ["pr-smart-diff", prId] });
+    },
   });
 }
 
@@ -131,6 +137,9 @@ export function useRunReview() {
       }),
     onSuccess: (_d, { prId }) => {
       qc.invalidateQueries({ queryKey: ["reviews", prId] });
+      // Smart Diff joins these findings with its own query; invalidating only
+      // one half leaves coloured markers with no badge until a reload.
+      qc.invalidateQueries({ queryKey: ["pr-smart-diff", prId] });
     },
   });
 }
@@ -155,7 +164,12 @@ export function useFindingAction() {
         reply ? { reply } : undefined,
       ),
     onSuccess: (_d, { prId }) => {
-      if (prId) qc.invalidateQueries({ queryKey: ["reviews", prId] });
+      if (prId) {
+        qc.invalidateQueries({ queryKey: ["reviews", prId] });
+        // Smart Diff joins these findings with its own query; invalidating
+        // only one half leaves coloured markers with no badge until a reload.
+        qc.invalidateQueries({ queryKey: ["pr-smart-diff", prId] });
+      }
     },
   });
 }

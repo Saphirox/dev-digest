@@ -39,6 +39,27 @@ export function resolveBase(explicit) {
   throw new Error(`cannot resolve a merge-base with ${candidates.join(' / ')}`);
 }
 
+/**
+ * Staged mode (`--staged`, the staged-changes-review skill): the diff is the
+ * index vs HEAD. `mergeBase` is kept for the checks that ask "is this already
+ * in main?" (a migration committed on this branch is still editable).
+ */
+export function resolveStagedBase(explicit) {
+  const head = git(['rev-parse', 'HEAD']).trim();
+  return { ref: 'HEAD', sha: head, staged: true, mergeBase: resolveBase(explicit) };
+}
+
+/** Content the review is about: the index in staged mode, the working tree otherwise. */
+export function readTarget(path, base) {
+  try {
+    return base.staged
+      ? git(['show', `:${path}`], { encoding: 'buffer', quiet: true })
+      : readFileSync(join(repoRoot(), path));
+  } catch {
+    return null;
+  }
+}
+
 export function untrackedFiles() {
   return git(['ls-files', '--others', '--exclude-standard', '-z'])
     .split('\0')
@@ -51,9 +72,16 @@ export function untrackedFiles() {
  * working tree vs the merge-base (committed + staged + unstaged) plus the
  * untracked files. Committing reviewed changes does NOT change it, so a PASS
  * given before `git commit` still holds at `git push` / `gh pr create`.
+ * Staged mode hashes only the index vs HEAD, under its own prefix, so a
+ * staged verdict can never be mistaken for a full one by the gate.
  */
 export function diffHash(base) {
   const h = createHash('sha256');
+  if (base.staged) {
+    h.update(`staged:${base.sha}\n`);
+    h.update(git(['diff', '--cached', '--binary', '--no-color', '--no-ext-diff', base.sha], { encoding: 'buffer' }));
+    return h.digest('hex').slice(0, 16);
+  }
   h.update(`base:${base.sha}\n`);
   h.update(git(['diff', '--binary', '--no-color', '--no-ext-diff', base.sha], { encoding: 'buffer' }));
   for (const path of untrackedFiles()) {

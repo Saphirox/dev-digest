@@ -3,22 +3,29 @@
 // checks, route changed files to skills, and reuse cached reviews for
 // (skill, file) pairs whose patch and skill haven't changed since the last run.
 //
-//   node .claude/skills/pr-self-review/scripts/prepare.mjs [--base <ref>]
+//   node .claude/skills/pr-self-review/scripts/prepare.mjs [--base <ref>] [--staged]
+//
+// --staged reviews only the index vs HEAD (the staged-changes-review skill).
 //
 // Writes .devdigest/self-review/runs/<diffHash>/ and prints a JSON summary
 // whose `units` is the work left for the LLM reviewers.
 
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   SKILL_DIR, cacheDir, diffHash, ensureDir, git, hashDir, matchesAny, readJson,
-  repoRoot, resolveBase, runDir, sha256,
+  readTarget, resolveBase, resolveStagedBase, runDir, sha256,
 } from './lib.mjs';
 import { collectFiles } from './diff.mjs';
 import { runChecks } from './checks.mjs';
 
+// Skills live next to this one, whether that is <repo>/.claude/skills or an
+// installed plugin's cache — never assume the reviewed repo owns them.
+const SKILLS_ROOT = dirname(SKILL_DIR);
+
 const args = process.argv.slice(2);
 const baseArg = args.includes('--base') ? args[args.indexOf('--base') + 1] : undefined;
+const staged = args.includes('--staged');
 
 const toRanges = (lines) => {
   const ranges = [];
@@ -59,7 +66,7 @@ function route(files, routing) {
 
 function unroutedSkills(routing) {
   const known = new Set([...routing.skills.map((r) => r.skill), ...Object.keys(routing.excluded)]);
-  const skillsRoot = join(repoRoot(), '.claude', 'skills');
+  const skillsRoot = SKILLS_ROOT;
   return readdirSync(skillsRoot, { withFileTypes: true })
     .filter((e) => e.isDirectory() && existsSync(join(skillsRoot, e.name, 'SKILL.md')) && !known.has(e.name))
     .map((e) => ({
@@ -75,7 +82,7 @@ function unroutedSkills(routing) {
     }));
 }
 
-const base = resolveBase(baseArg);
+const base = staged ? resolveStagedBase(baseArg) : resolveBase(baseArg);
 const hash = diffHash(base);
 const dir = runDir(hash);
 rmSync(dir, { recursive: true, force: true });
@@ -99,10 +106,10 @@ const cachedUnits = [];
 
 for (const [skill, routed] of route(files, routing)) {
   if (!routed.length) continue;
-  skillHashes[skill] = hashDir(join(repoRoot(), '.claude', 'skills', skill));
+  skillHashes[skill] = hashDir(join(SKILLS_ROOT, skill));
   const todo = [];
   for (const f of routed) {
-    const content = existsSync(join(repoRoot(), f.path)) ? readFileSync(join(repoRoot(), f.path)) : '';
+    const content = readTarget(f.path, base) ?? '';
     const cacheKey = sha256(`${skillHashes[skill]}|${calibration}|${f.path}|${f.patch}|${sha256(content)}`).slice(0, 24);
     const hit = readJson(join(cacheDir(), skill, `${cacheKey}.json`), null);
     if (hit) {
@@ -121,7 +128,7 @@ for (const [skill, routed] of route(files, routing)) {
   );
   units.push({
     skill,
-    skillFile: `.claude/skills/${skill}/SKILL.md`,
+    skillFile: join(SKILLS_ROOT, skill, 'SKILL.md'),
     patch: patchFile,
     findingsFile: join(dir, 'findings', `${skill}.json`),
     files: todo,
@@ -152,6 +159,7 @@ const count = (sev) => checks.findings.filter((f) => f.severity === sev).length;
 console.log(
   JSON.stringify(
     {
+      scope: staged ? 'staged (index vs HEAD)' : 'all open changes vs merge-base',
       runDir: dir,
       diffHash: hash,
       base: `${base.ref} @ ${base.sha.slice(0, 9)}`,

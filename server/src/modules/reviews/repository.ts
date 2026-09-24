@@ -1,6 +1,6 @@
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
-import type { Finding, Intent, RunSummary, RunTrace } from '@devdigest/shared';
+import type { Finding, PrIntentRecord, RunSummary, RunTrace } from '@devdigest/shared';
 
 /**
  * A2 — review data-access. The ONLY layer touching the DB for the review
@@ -21,6 +21,7 @@ export type ReviewRow = typeof t.reviews.$inferSelect;
 import * as reviewRepo from './repository/review.repo.js';
 import * as runRepo from './repository/run.repo.js';
 import * as pullRepo from './repository/pull.repo.js';
+export type { IntentUpsertInput } from './repository/pull.repo.js';
 
 export class ReviewRepository {
   constructor(private db: Db) {}
@@ -62,6 +63,13 @@ export class ReviewRepository {
   /** Reviews for a PR (newest first), each with its findings. */
   reviewsForPull(prId: string): Promise<{ review: ReviewRow; findings: FindingRow[] }[]> {
     return reviewRepo.reviewsForPull(this.db, prId);
+  }
+
+  /** Findings from the latest review PER AGENT on a PR (Smart Diff's
+   *  `finding_lines`) — see `review.repo.ts` for why `selectDistinctOn` is
+   *  keyed on `(prId, agentId)`. */
+  latestFindingRangesForPull(prId: string): Promise<reviewRepo.FindingRangeRow[]> {
+    return reviewRepo.latestFindingRangesForPull(this.db, prId);
   }
 
   getReview(reviewId: string): Promise<ReviewRow | undefined> {
@@ -127,11 +135,11 @@ export class ReviewRepository {
 
   // ---- intent -------------------------------------------------------------
 
-  upsertIntent(prId: string, intent: Intent): Promise<void> {
-    return pullRepo.upsertIntent(this.db, prId, intent);
+  upsertIntent(prId: string, record: pullRepo.IntentUpsertInput): Promise<void> {
+    return pullRepo.upsertIntent(this.db, prId, record);
   }
 
-  getIntent(prId: string): Promise<Intent | undefined> {
+  getIntent(prId: string): Promise<PrIntentRecord | undefined> {
     return pullRepo.getIntent(this.db, prId);
   }
 

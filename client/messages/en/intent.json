@@ -1,0 +1,23 @@
+{
+  "title": "Derived intent",
+  "chip": "Intent",
+  "chipLabel": "Derived intent",
+  "inScope": "In scope",
+  "outOfScope": "Out of scope",
+  "none": "—",
+  "missingContext": "Missing context",
+  "stale": "Stale — new commits since derived",
+  "rederive": "Re-derive",
+  "empty": {
+    "title": "No intent derived yet",
+    "body": "Derive this PR's intent and scope from its title, description, linked issue and changed files.",
+    "cta": "Derive intent"
+  },
+  "risks": {
+    "title": "Risk areas",
+    "none": "No risk areas detected in this diff.",
+    "error": "Couldn't load risk areas.",
+    "expand": "Show details",
+    "collapse": "Hide details"
+  }
+}

@@ -20,7 +20,10 @@ export {
 } from './prompt.js';
 
 // Citation grounding — the mandatory mechanical gate for diff findings.
-export { groundFindings, groundingSummary, type GroundingResult } from './grounding.js';
+// `buildLineIndex` is also exported directly: the server's Risk Areas scan
+// (deterministic diff-grounded risks) reuses the same file→new-line-numbers
+// citation index that `groundFindings` builds internally.
+export { groundFindings, groundingSummary, buildLineIndex, type GroundingResult } from './grounding.js';
 
 // Structured-output helpers (Zod → JSON Schema + parse-with-repair).
 export {

@@ -52,16 +52,18 @@ function parseNameStatus(out) {
 }
 
 export function collectFiles(base) {
+  // Staged mode: index vs HEAD only; unstaged edits and untracked files are out.
+  const cached = base.staged ? ['--cached'] : [];
   const files = parseNameStatus(
-    git(['diff', '--name-status', '-M', '-z', '--no-color', base.sha]),
+    git(['diff', ...cached, '--name-status', '-M', '-z', '--no-color', base.sha]),
   ).map((row) => {
     const paths = row.oldPath ? [row.oldPath, row.path] : [row.path];
-    const patch = git(['diff', '-M', '-U3', '--no-color', '--no-ext-diff', base.sha, '--', ...paths]);
+    const patch = git(['diff', ...cached, '-M', '-U3', '--no-color', '--no-ext-diff', base.sha, '--', ...paths]);
     const binary = /^Binary files /m.test(patch);
     return { ...row, binary, patch, ...(binary ? { added: [], addedText: [] } : parsePatch(patch)) };
   });
 
-  for (const path of untrackedFiles()) {
+  for (const path of base.staged ? [] : untrackedFiles()) {
     let content = '';
     try {
       content = readFileSync(join(repoRoot(), path), 'utf8');

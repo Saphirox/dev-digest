@@ -3,9 +3,11 @@
 "use client";
 
 import React from "react";
+import type { Severity } from "@devdigest/shared";
+import { Icon, SEV } from "@devdigest/ui";
 import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
 import { type Line } from "../helpers";
-import { s, lineRowFor, lineSignFor } from "../styles";
+import { s, lineRowFor, lineSignFor, severityBorderFor, lineBadge, lineBadgeButton } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
 
@@ -14,11 +16,23 @@ export function CodeLine({
   path,
   threads,
   commenting,
+  severity,
+  domId,
+  onSeverityClick,
 }: {
   ln: Line;
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
+  /** Worst severity flagging this line, or `null`/`undefined` for none —
+   *  when set, renders a coloured left border + right-hand marker. */
+  severity?: Severity | null;
+  /** DOM id on the row wrapper, so a badge click can scroll to it. */
+  domId?: string;
+  /** When set, the severity badge renders as a `<button>` that calls this
+   *  instead of a plain `<span>` — the plain `DiffViewer` path never sets it,
+   *  so its render stays byte-identical. */
+  onSeverityClick?: () => void;
 }) {
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
@@ -34,14 +48,17 @@ export function CodeLine({
   const sign = ln.kind === "add" ? "+" : ln.kind === "del" ? "−" : "";
   const target = commenting?.canComment ? commentTargetFor(ln) : null;
   const showAdd = hover && !!target && !composing;
+  const sevMeta = severity ? SEV[severity] : undefined;
+  const SevIcon = Icon[sevMeta?.icon ?? "Info"];
 
   return (
     <div
+      id={domId}
       style={cs.rowWrap}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind)}>
+      <div style={{ ...lineRowFor(ln.kind), ...(severity ? severityBorderFor(severity) : {}) }}>
         <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
           {showAdd && target && (
             <button
@@ -62,6 +79,25 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
+        {severity && onSeverityClick && (
+          // Unlike the old dot (decorative, `aria-hidden`), this badge
+          // carries visible text ("critical"/"warning"/"suggestion") that IS
+          // its accessible name — never hide it from assistive tech. No
+          // `aria-label`/`title`/i18n: the visible label stays the name.
+          <button type="button" style={lineBadgeButton(severity)} onClick={onSeverityClick}>
+            <SevIcon size={11} />
+            {sevMeta?.label}
+          </button>
+        )}
+        {severity && !onSeverityClick && (
+          // Unlike the old dot (decorative, `aria-hidden`), this badge
+          // carries visible text ("critical"/"warning"/"suggestion") that IS
+          // its accessible name — never hide it from assistive tech.
+          <span style={lineBadge(severity)}>
+            <SevIcon size={11} />
+            {sevMeta?.label}
+          </span>
+        )}
       </div>
 
       {commenting &&

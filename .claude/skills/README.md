@@ -18,7 +18,32 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [typescript-expert](typescript-expert/SKILL.md) | Full-stack | Type-level programming, performance, tooling, migrations |
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [pr-self-review](pr-self-review/SKILL.md) | Workflow | **Manual only** (`/pr-self-review`; `disable-model-invocation`). Pre-PR review of all local changes: routes changed files to the skills above, runs repo-rule checks + `arch:check`, blocks `gh pr create`/`git push` on any critical. Add every new skill to its `references/routing.json` |
+| [staged-changes-review](staged-changes-review/SKILL.md) | Workflow | **Manual only** (`/staged-changes-review`). pr-self-review scoped to the git index vs HEAD, for use before a commit. Reuses its scripts (`--staged`), rubric, routing, cache and overrides. Never satisfies the push/PR gate |
+| [git-rebase-sync](git-rebase-sync/SKILL.md) | Workflow | Rebase onto fresh `origin/main` before commits (hook `.claude/hooks/rebase-before-commit.mjs`), conflict summaries, repo-specific resolution rules, recovery |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
+
+All eleven agents in `.claude/agents/` (`brainstorm`, `investigator`,
+`researcher`, `planner`, `implementer`, `test-writer`,
+`architecture-reviewer`, `security-reviewer`, `plan-verifier`, `doc-writer`,
+`insight-curator`)
+load skills lazily by area, never by preload, and the mechanism splits by
+what the agent does: agents that write code — `implementer` and
+`test-writer` — have the `Skill` tool and load skills through it; agents
+that only read for rules — `planner`, `architecture-reviewer`,
+`security-reviewer` (`security/SKILL.md` + `checklists.md`),
+`plan-verifier` (which loads none), `doc-writer`, `brainstorm`,
+`investigator` (`mermaid-diagram`, for Mode B's optional diagram) and
+`insight-curator` (`engineering-insights`) — have no `Skill` tool and read a
+skill's `SKILL.md` (and, for `doc-writer`, `mermaid-diagram`'s
+`examples.md`) directly with `Read`. Since
+`tools:` is an allowlist, omitting `Skill` is what enforces the read-only
+mechanism. The single skill-mapping table lives in `.claude/agents/planner.md`
+("Lazy skill reading"), covering `planner`, `implementer` and `test-writer`;
+each agent follows its own plan/report input's named skills first and falls
+back to that table. When you add or rename a skill, update
+`pr-self-review/references/routing.json` **and** that table — adding an agent
+does **not** require a `routing.json` change, since that file routes files to
+skills for `pr-self-review`, not agents to skills.
 
 ## What Are Skills?
 

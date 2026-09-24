@@ -1,5 +1,5 @@
 import { simpleGit, type SimpleGit } from 'simple-git';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { mkdir, readFile, access, rm } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import type {
@@ -127,7 +127,19 @@ export class SimpleGitClient implements GitClient {
   }
 
   async readFile(repo: RepoRef, path: string): Promise<string> {
-    return readFile(join(this.clonePathFor(repo), path), 'utf8');
+    // Defence in depth: a caller-supplied `path` must resolve INSIDE the
+    // clone root. `join` alone collapses `..` segments without rejecting
+    // them (e.g. `../../../../etc/passwd.md` escapes the clone entirely);
+    // this is the second of three layers guarding the intent-layer doc-link
+    // reader (see `modules/reviews/intent/helpers.ts`'s `sanitizeDocRef`),
+    // and it must not break the `conventions` module's fixed config-path
+    // reads, which are always plain relative filenames.
+    const root = resolve(this.clonePathFor(repo));
+    const resolved = resolve(root, path);
+    if (resolved !== root && !resolved.startsWith(root + sep)) {
+      throw new Error(`readFile: path escapes repo clone root: ${path}`);
+    }
+    return readFile(resolved, 'utf8');
   }
 }
 

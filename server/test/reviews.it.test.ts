@@ -110,6 +110,23 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     await pg?.stop();
   });
 
+/**
+ * Intent fixture for the mocked `openrouter` provider. The review pipeline
+ * derives PR intent as shared pre-work (`run-executor.ts`), which resolves the
+ * `review_intent` feature model to provider `openrouter`. Without an override
+ * here, `container.llm('openrouter')` falls through to `buildLlm` and builds a
+ * LIVE provider from OPENROUTER_API_KEY — so this file used to make real, paid
+ * API calls, and its result depended on a third-party model's latency
+ * (changing `review_intent`'s default model made 4 of 7 cases time out).
+ * Keyed by schemaName so it only answers the intent call.
+ */
+const INTENT_FIXTURE = {
+  summary: 'Adds a rate limiter to the public API.',
+  in_scope: ['rate limiting'],
+  out_of_scope: ['authentication'],
+  missing_context: [],
+};
+
   function appWith(structured: unknown, provider: 'openai' | 'anthropic' = 'openai') {
     return buildApp({
       config: config(),
@@ -119,6 +136,10 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
         git: new MockGitClient({ diff: DIFF }),
         llm: {
           [provider]: new MockLLMProvider(provider, { structured }),
+          // Keeps PR-intent derivation offline — see INTENT_FIXTURE above.
+          openrouter: new MockLLMProvider('openrouter', {
+            structuredBySchema: { PrIntent: INTENT_FIXTURE },
+          }),
         },
       },
     });

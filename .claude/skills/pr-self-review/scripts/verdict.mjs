@@ -3,7 +3,7 @@
 // apply the evidence / baseline / verification rules, fold duplicates, apply
 // user overrides, write the report and the verdict the gate reads.
 //
-//   node .claude/skills/pr-self-review/scripts/verdict.mjs [<runDir>]
+//   node .claude/skills/pr-self-review/scripts/verdict.mjs [<runDir>] [--staged]
 //   node .claude/skills/pr-self-review/scripts/verdict.mjs [<runDir>] --override <findingId> --reason "<why it is a false positive>"
 //
 // Exit: 0 PASS · 2 BLOCK · 3 STALE (diff changed since prepare) · 4 INCOMPLETE (a reviewer produced no output)
@@ -12,7 +12,7 @@ import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   SKILL_DIR, cacheDir, diffHash, ensureDir, fingerprint, git, overridesPath, readJson,
-  resolveBase, runDir, stateDir,
+  resolveBase, resolveStagedBase, runDir, stateDir,
 } from './lib.mjs';
 
 const SEVERITIES = ['critical', 'warning', 'suggestion'];
@@ -22,16 +22,23 @@ const args = process.argv.slice(2);
 const flag = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
 const positional = args.find((a, i) => !a.startsWith('--') && !['--override', '--reason'].includes(args[i - 1]));
 
-const currentHash = () => diffHash(resolveBase(readJson(join(dir, 'meta.json')).base.ref));
-const dir = positional ?? runDir(diffHash(resolveBase()));
+// The run's own meta decides the mode; --staged only picks the default runDir.
+const currentHash = () => {
+  const { base } = readJson(join(dir, 'meta.json'));
+  return diffHash(base.staged ? resolveStagedBase(base.mergeBase.ref) : resolveBase(base.ref));
+};
+const dir = positional ?? runDir(diffHash(args.includes('--staged') ? resolveStagedBase() : resolveBase()));
 if (!existsSync(join(dir, 'meta.json'))) {
   console.error(`No prepared run at ${dir} — run prepare.mjs first.`);
   process.exit(4);
 }
 const meta = readJson(join(dir, 'meta.json'));
+const staged = !!meta.base.staged;
+const label = staged ? 'Staged review' : 'Self-review';
 
 if (currentHash() !== meta.diffHash) {
-  console.log(`STALE: the working tree changed after prepare (${meta.diffHash}). Re-run prepare.mjs; unchanged files come from cache.`);
+  const what = meta.base.staged ? 'the staged changes (or HEAD)' : 'the working tree';
+  console.log(`STALE: ${what} changed after prepare (${meta.diffHash}). Re-run prepare.mjs; unchanged files come from cache.`);
   process.exit(3);
 }
 
@@ -183,7 +190,7 @@ const coverage = [
 ];
 
 const md = [
-  `# Self-review: ${verdict}`,
+  `# ${label}: ${verdict}`,
   '',
   `diff \`${meta.diffHash}\` · branch \`${meta.branch}\` · base ${meta.base.ref}@${meta.base.sha.slice(0, 9)} · ${files.size} files · ${meta.createdAt}`,
   '',
@@ -197,9 +204,9 @@ const md = [
 ].join('\n');
 
 const pr = [
-  `### Self-review: ${verdict === 'PASS' ? 'PASS ✅' : verdict}`,
+  `### ${label}: ${verdict === 'PASS' ? 'PASS ✅' : verdict}`,
   '',
-  `\`pr-self-review\` on diff \`${meta.diffHash}\` (${files.size} files). Skills: ${[...new Set([...plan.units.map((u) => u.skill), ...plan.cachedUnits.map((c) => c.skill)])].join(', ') || 'none needed'}; plus the repo-rule checks and arch:check (${checks.status.archCheck ?? 'n/a'}).`,
+  `\`${staged ? 'staged-changes-review' : 'pr-self-review'}\` on diff \`${meta.diffHash}\` (${files.size} files). Skills: ${[...new Set([...plan.units.map((u) => u.skill), ...plan.cachedUnits.map((c) => c.skill)])].join(', ') || 'none needed'}; plus the repo-rule checks and arch:check (${checks.status.archCheck ?? 'n/a'}).`,
   overridden.length ? `\n**Criticals overridden as false positives (${overridden.length}):**\n${overridden.map((f) => `- ${f.title} — \`${loc(f)}\` (${f.skill}): ${f.override.reason}`).join('\n')}` : '',
   bySev('warning').length ? `\n**Open warnings (${bySev('warning').length}):**\n${bySev('warning').slice(0, 10).map((f) => `- ${f.title} — \`${loc(f)}\``).join('\n')}${bySev('warning').length > 10 ? '\n- …' : ''}` : '',
 ].join('\n');
@@ -209,7 +216,7 @@ writeFileSync(join(dir, 'report.json'), JSON.stringify(report, null, 2));
 writeFileSync(join(dir, 'report.md'), md);
 writeFileSync(join(dir, 'pr-section.md'), pr);
 writeFileSync(
-  join(stateDir(), 'latest.json'),
+  join(stateDir(), staged ? 'latest-staged.json' : 'latest.json'),
   JSON.stringify({ diffHash: meta.diffHash, head: meta.head, verdict, runDir: dir, at: new Date().toISOString() }, null, 2),
 );
 

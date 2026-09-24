@@ -50,6 +50,12 @@ export const PromptAssembly = z.object({
   repo_map: z.string().nullish(),
   /** PR author's description/body (truncated); null when absent. */
   pr_description: z.string().nullish(),
+  /** Derived-intent block (`## Derived intent`); null when no intent was available.
+      `nullish` so traces persisted before it still parse. */
+  intent: z.string().nullish(),
+  /** Tokens the intent block added to the prompt (server tokenizer); null when
+      no intent was attached. Nullish so traces saved before it still parse. */
+  intent_tokens: z.number().int().nullish(),
   user: z.string(),
 });
 export type PromptAssembly = z.infer<typeof PromptAssembly>;

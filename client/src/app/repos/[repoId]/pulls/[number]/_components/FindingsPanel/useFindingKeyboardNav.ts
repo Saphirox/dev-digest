@@ -7,35 +7,51 @@ import { KEY_TO_ACTION } from "./constants";
 /**
  * j/k move the focus through `shown`; a/d act on the focused finding. Keys
  * typed into a text field are ignored. Returns the focused index.
+ *
+ * `anchorIdx` seeds (and re-seeds) the initial focus — used by a deep-linked
+ * finding so keyboard nav continues from that card instead of the top,
+ * keeping exactly ONE notion of "focused". Every other caller omits it and
+ * keeps today's "always starts at 0" behaviour.
+ *
+ * `enabled = false` makes the panel ignore every key (j/k AND a/d). Used while
+ * a deep link is active so only the panel that owns the linked finding reacts.
  */
 export function useFindingKeyboardNav(
   shown: FindingRecord[],
   onAction: (finding: FindingRecord, action: FindingActionKind) => void,
+  anchorIdx = 0,
+  enabled = true,
 ): number {
-  const [focusIdx, setFocusIdx] = React.useState(0);
+  const [focusIdx, setFocusIdx] = React.useState(anchorIdx);
 
   // Toggling a filter can shrink the list past the focused index, which would
   // leave no card highlighted and make a/d silently no-op on an undefined
-  // finding — re-anchor at the top whenever the list changes. Adjusted during
-  // render (not in an effect) so no frame paints the stale focus.
+  // finding — re-anchor whenever the list OR the anchor changes. Adjusted
+  // during render (not in an effect) so no frame paints the stale focus.
   const [prevShown, setPrevShown] = React.useState(shown);
-  if (prevShown !== shown) {
+  const [prevAnchorIdx, setPrevAnchorIdx] = React.useState(anchorIdx);
+  if (prevShown !== shown || prevAnchorIdx !== anchorIdx) {
     setPrevShown(shown);
-    setFocusIdx(0);
+    setPrevAnchorIdx(anchorIdx);
+    setFocusIdx(anchorIdx);
   }
 
   // The listener reads the latest shown/focus/onAction through a ref, so it is
   // subscribed once instead of on every move. (Not React.useEffectEvent: that
   // is React 19.2, but Next 15's App Router runs its own bundled React without
   // it, so the hook crashed in the browser while unit tests passed.)
-  const latest = React.useRef({ shown, focusIdx, onAction });
+  const latest = React.useRef({ shown, focusIdx, onAction, enabled });
   React.useEffect(() => {
-    latest.current = { shown, focusIdx, onAction };
+    latest.current = { shown, focusIdx, onAction, enabled };
   });
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      const { shown, focusIdx, onAction } = latest.current;
+      const { shown, focusIdx, onAction, enabled } = latest.current;
+      // Every mounted panel subscribes to `window`, so with two review runs
+      // open one keypress reaches both. A disabled panel must ignore it, or
+      // `a` would accept the focused finding in EVERY open panel at once.
+      if (!enabled) return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       if (e.key === "j") setFocusIdx((i) => Math.min(i + 1, shown.length - 1));
