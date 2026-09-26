@@ -31,6 +31,7 @@ export function FindingCard({
   pending,
   repoFullName,
   headSha,
+  hideLocation,
 }: {
   f: FindingRecord;
   focused?: boolean;
@@ -39,6 +40,10 @@ export function FindingCard({
   pending?: boolean;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Omit the file:line/confidence row — for a card rendered inline UNDER its
+   *  own flagged line (Smart Diff), where the location is redundant. Default
+   *  leaves the Findings tab's card unchanged. */
+  hideLocation?: boolean;
 }) {
   const t = useTranslations("prReview");
   const [expanded, setExpanded] = React.useState(defaultExpanded ?? false);
@@ -64,12 +69,14 @@ export function FindingCard({
             {accepted && <span style={s.acceptedTag}>{t("finding.accepted")}</span>}
             {dismissed && <span style={s.dismissedTag}>{t("finding.dismissed")}</span>}
           </div>
-          <div style={s.metaRow}>
-            <MonoLink href={fileHref}>
-              {f.file}:{lineLabel(f)}
-            </MonoLink>
-            <ConfidenceNum value={f.confidence} />
-          </div>
+          {!hideLocation && (
+            <div style={s.metaRow}>
+              <MonoLink href={fileHref}>
+                {f.file}:{lineLabel(f)}
+              </MonoLink>
+              <ConfidenceNum value={f.confidence} />
+            </div>
+          )}
         </div>
         <Icon.ChevronDown size={16} style={s.chevron(expanded)} />
       </div>

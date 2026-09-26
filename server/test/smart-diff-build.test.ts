@@ -1,12 +1,12 @@
 /**
  * `buildSmartDiff` — pure assembly of the `SmartDiff` contract
- * (`docs/plans/0004-smart-diff.md` step 4). No repository, no DB: every input
- * is a plain array.
+ * (`docs/plans/0009-smart-diff-spec-completion.md` step 4). No repository,
+ * no DB: every input is a plain array.
  */
 import { describe, it, expect } from 'vitest';
 import { SmartDiff } from '@devdigest/shared';
 import { buildSmartDiff, type SmartDiffInputFile } from '../src/modules/reviews/smart-diff/build.js';
-import { SPLIT_LINES } from '../src/modules/reviews/smart-diff/constants.js';
+import { ROLE_ORDER } from '../src/modules/reviews/smart-diff/constants.js';
 import type { FindingRangeRow } from '../src/modules/reviews/smart-diff/helpers.js';
 
 const CORE_FILE: SmartDiffInputFile = {
@@ -15,9 +15,21 @@ const CORE_FILE: SmartDiffInputFile = {
   deletions: 60,
   patch: null,
 };
+const TESTS_FILE: SmartDiffInputFile = {
+  path: 'server/test/reviews.test.ts',
+  additions: 10,
+  deletions: 0,
+  patch: null,
+};
 const WIRING_FILE: SmartDiffInputFile = {
   path: 'src/config.ts',
   additions: 2,
+  deletions: 0,
+  patch: null,
+};
+const DOCS_FILE: SmartDiffInputFile = {
+  path: 'docs/specs/smart-diff.md',
+  additions: 5,
   deletions: 0,
   patch: null,
 };
@@ -29,51 +41,47 @@ const BOILERPLATE_FILE: SmartDiffInputFile = {
 };
 
 describe('buildSmartDiff', () => {
-  it('emits all three groups, in core → wiring → boilerplate order, even when a group is empty', () => {
+  it('emits all five groups, in core → tests → wiring → docs → boilerplate order, even when a group is empty', () => {
     const result = buildSmartDiff([CORE_FILE], []);
-    expect(result.groups.map((g) => g.role)).toEqual(['core', 'wiring', 'boilerplate']);
+    expect(result.groups.map((g) => g.role)).toEqual(ROLE_ORDER);
     expect(result.groups.find((g) => g.role === 'core')!.files).toHaveLength(1);
+    expect(result.groups.find((g) => g.role === 'tests')!.files).toEqual([]);
     expect(result.groups.find((g) => g.role === 'wiring')!.files).toEqual([]);
+    expect(result.groups.find((g) => g.role === 'docs')!.files).toEqual([]);
     expect(result.groups.find((g) => g.role === 'boilerplate')!.files).toEqual([]);
   });
 
   it('classifies each file into its group and always includes finding_lines (empty when unflagged)', () => {
-    const result = buildSmartDiff([CORE_FILE, WIRING_FILE, BOILERPLATE_FILE], []);
+    const result = buildSmartDiff([CORE_FILE, TESTS_FILE, WIRING_FILE, DOCS_FILE, BOILERPLATE_FILE], []);
     expect(result.groups.find((g) => g.role === 'core')!.files[0]).toMatchObject({
       path: CORE_FILE.path,
       finding_lines: [],
     });
+    expect(result.groups.find((g) => g.role === 'tests')!.files[0]).toMatchObject({ path: TESTS_FILE.path });
     expect(result.groups.find((g) => g.role === 'wiring')!.files[0]).toMatchObject({ path: WIRING_FILE.path });
+    expect(result.groups.find((g) => g.role === 'docs')!.files[0]).toMatchObject({ path: DOCS_FILE.path });
     expect(result.groups.find((g) => g.role === 'boilerplate')!.files[0]).toMatchObject({ path: BOILERPLATE_FILE.path });
   });
 
-  it('dedupes finding_lines when two agents flag the same line', () => {
+  it('finding_lines is the sorted, unique set of start lines — no range expansion (Decision 7)', () => {
     const findingRows: FindingRangeRow[] = [
-      { file: CORE_FILE.path, startLine: 10, endLine: 11 },
-      { file: CORE_FILE.path, startLine: 11, endLine: 12 }, // a second agent, overlapping at line 11
+      { file: CORE_FILE.path, startLine: 11 },
+      { file: CORE_FILE.path, startLine: 10 },
+      { file: CORE_FILE.path, startLine: 11 }, // a second agent, same start line
     ];
     const result = buildSmartDiff([CORE_FILE], findingRows);
     const file = result.groups.find((g) => g.role === 'core')!.files[0]!;
-    expect(file.finding_lines).toEqual([10, 11, 12]);
+    expect(file.finding_lines).toEqual([10, 11]);
   });
 
-  it(`split_suggestion.too_big flips at exactly SPLIT_LINES (${SPLIT_LINES}), and proposed_splits is always []`, () => {
-    // total_lines is the SUM of additions+deletions across every file.
-    const atLimit = buildSmartDiff(
-      [{ path: 'a.ts', additions: SPLIT_LINES / 2, deletions: SPLIT_LINES / 2, patch: null }],
+  it('split_suggestion.too_big is always false, and proposed_splits is always []', () => {
+    const result = buildSmartDiff(
+      [{ path: 'a.ts', additions: 1000, deletions: 1000, patch: null }],
       [],
     );
-    expect(atLimit.split_suggestion.total_lines).toBe(SPLIT_LINES);
-    expect(atLimit.split_suggestion.too_big).toBe(false);
-    expect(atLimit.split_suggestion.proposed_splits).toEqual([]);
-
-    const overLimit = buildSmartDiff(
-      [{ path: 'a.ts', additions: SPLIT_LINES / 2 + 1, deletions: SPLIT_LINES / 2, patch: null }],
-      [],
-    );
-    expect(overLimit.split_suggestion.total_lines).toBe(SPLIT_LINES + 1);
-    expect(overLimit.split_suggestion.too_big).toBe(true);
-    expect(overLimit.split_suggestion.proposed_splits).toEqual([]);
+    expect(result.split_suggestion.total_lines).toBe(2000);
+    expect(result.split_suggestion.too_big).toBe(false);
+    expect(result.split_suggestion.proposed_splits).toEqual([]);
   });
 
   it('always emits pseudocode_summary: null — even for a file whose patch adds exports', () => {
@@ -92,8 +100,8 @@ describe('buildSmartDiff', () => {
   });
 
   it('the result round-trips SmartDiff.parse from @devdigest/shared', () => {
-    const result = buildSmartDiff([CORE_FILE, WIRING_FILE, BOILERPLATE_FILE], [
-      { file: CORE_FILE.path, startLine: 1, endLine: 2 },
+    const result = buildSmartDiff([CORE_FILE, TESTS_FILE, WIRING_FILE, DOCS_FILE, BOILERPLATE_FILE], [
+      { file: CORE_FILE.path, startLine: 1 },
     ]);
     expect(() => SmartDiff.parse(result)).not.toThrow();
     expect(SmartDiff.parse(result)).toEqual(result);

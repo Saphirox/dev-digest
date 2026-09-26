@@ -8,12 +8,13 @@
  * English shipped from the server.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { PrFile } from "@/lib/types";
 import shell from "../../../messages/en/shell.json";
 import { FileCard } from "./FileCard";
 import { AUTO_EXPAND_MAX_LINES } from "./constants";
+import { lineKey } from "./comments";
 
 afterEach(cleanup);
 
@@ -86,5 +87,63 @@ describe("FileCard", () => {
       </NextIntlClientProvider>,
     );
     expect(screen.getByText("added line", { exact: false })).toBeInTheDocument();
+  });
+});
+
+describe("FileCard — lineExtras and footer slots (docs/plans/0009-smart-diff-spec-completion.md)", () => {
+  function twoAddLinesFile(overrides: Partial<PrFile> = {}): PrFile {
+    return {
+      path: "src/app.ts",
+      additions: 2,
+      deletions: 0,
+      patch: "@@ -1,1 +1,3 @@\n context\n+added one\n+added two",
+      ...overrides,
+    };
+  }
+
+  it("lineExtras renders its node under the matching line (RIGHT:<n> via lineKey), not under other lines", () => {
+    const extras = new Map([[lineKey("RIGHT", 3)!, <span key="e">EXTRA-FOR-3</span>]]);
+    renderCard({ file: twoAddLinesFile(), lineExtras: extras, open: true });
+
+    const line1 = screen.getByText("added one");
+    const line2 = screen.getByText("added two");
+    // The rowWrap div is the parent of the line's own row div (which itself
+    // wraps the gutter/sign/text spans) — extras render as its sibling.
+    const row1 = line1.closest("div")!.parentElement!;
+    const row2 = line2.closest("div")!.parentElement!;
+
+    expect(within(row2).getByText("EXTRA-FOR-3")).toBeInTheDocument();
+    expect(within(row1).queryByText("EXTRA-FOR-3")).not.toBeInTheDocument();
+  });
+
+  it("footer renders inside the open body, including when the patch has no lines", () => {
+    const { unmount } = renderCard({
+      file: twoAddLinesFile(),
+      footer: <div>FOOTER-MARKER</div>,
+      open: true,
+    });
+    expect(screen.getByText("FOOTER-MARKER")).toBeInTheDocument();
+    unmount();
+
+    // An off-patch findings footer: no diff lines at all.
+    renderCard({
+      file: twoAddLinesFile({ patch: "" }),
+      footer: <div>FOOTER-MARKER</div>,
+      open: true,
+    });
+    expect(screen.getByText("FOOTER-MARKER")).toBeInTheDocument();
+  });
+
+  it("neither lineExtras nor footer render while the card is collapsed", () => {
+    const extras = new Map([[lineKey("RIGHT", 3)!, <span key="e">EXTRA-FOR-3</span>]]);
+    renderCard({
+      file: twoAddLinesFile(),
+      lineExtras: extras,
+      footer: <div>FOOTER-MARKER</div>,
+      open: false,
+    });
+
+    expect(screen.queryByText("EXTRA-FOR-3")).not.toBeInTheDocument();
+    expect(screen.queryByText("FOOTER-MARKER")).not.toBeInTheDocument();
   });
 });

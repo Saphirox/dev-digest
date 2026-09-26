@@ -2,29 +2,25 @@
  * Pure helpers for Smart Diff (no I/O imports — no DB, fs, GitHub, or
  * container) — same rule as `risks/helpers.ts`.
  */
-import { MAX_FINDING_RANGE_LINES } from './constants.js';
 import type { SmartDiffFile } from '@devdigest/shared';
 
 // ---------------------------------------------------------------------------
-// expandFindingLines — per-file flagged new-side line numbers, deduped
-// across agents.
+// startLinesByFile — per-file flagged new-side START lines, deduped across
+// agents. No range expansion (Decision 7): `finding_lines` is the sorted,
+// unique `start_line` set of non-dismissed in-scope findings.
 // ---------------------------------------------------------------------------
 
 export interface FindingRangeRow {
   file: string;
   startLine: number;
-  endLine: number;
 }
 
-/** Expand each `startLine..endLine` range (capped) into a per-file `Set` of
- *  new-side line numbers, deduping ranges from different agents that flag the
- *  same line, then return ascending arrays. */
-export function expandFindingLines(rows: FindingRangeRow[]): Map<string, number[]> {
+/** Group each row's `startLine` by file into a deduped, ascending array. */
+export function startLinesByFile(rows: FindingRangeRow[]): Map<string, number[]> {
   const byFile = new Map<string, Set<number>>();
   for (const row of rows) {
-    const end = Math.min(Math.max(row.startLine, row.endLine), row.startLine + MAX_FINDING_RANGE_LINES - 1);
     const set = byFile.get(row.file) ?? new Set<number>();
-    for (let n = row.startLine; n <= end; n++) set.add(n);
+    set.add(row.startLine);
     byFile.set(row.file, set);
   }
   const out = new Map<string, number[]>();

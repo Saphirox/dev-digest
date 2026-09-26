@@ -43,41 +43,4 @@ export const s = {
     flexDirection: "column",
     gap: 20,
   } satisfies CSSProperties,
-  groupHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-  } satisfies CSSProperties,
-  groupDot: (color: string): CSSProperties => ({
-    width: 8,
-    height: 8,
-    borderRadius: 2,
-    background: color,
-    flexShrink: 0,
-  }),
-  groupLabel: {
-    fontSize: 13,
-    fontWeight: 700,
-    color: "var(--text-primary)",
-  } satisfies CSSProperties,
-  groupBlurb: {
-    fontSize: 12.5,
-    color: "var(--text-muted)",
-    flex: 1,
-    minWidth: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  } satisfies CSSProperties,
-  groupCount: {
-    fontSize: 12,
-    color: "var(--text-muted)",
-    flexShrink: 0,
-  } satisfies CSSProperties,
-  groupFiles: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-  } satisfies CSSProperties,
 } as const;

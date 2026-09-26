@@ -1,0 +1,1 @@
+export { FindingsDot } from "./FindingsDot";

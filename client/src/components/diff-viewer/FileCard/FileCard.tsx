@@ -12,6 +12,7 @@ import { parsePatch, type Line } from "../helpers";
 import {
   buildThreads,
   keysForLine,
+  keysForLines,
   partitionThreads,
   type CommentThread,
   type DiffCommentApi,
@@ -31,16 +32,33 @@ function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): Commen
   return out;
 }
 
+/** Extra content (e.g. an inline finding card) anchored to a given parsed
+ *  line, looked up the same way as `threadsForLine`. A finding keys as
+ *  `lineKey("RIGHT", start_line)`, so at most one entry normally matches. */
+function extrasForLine(
+  ln: Line,
+  lineExtras?: ReadonlyMap<string, React.ReactNode>
+): React.ReactNode {
+  if (!lineExtras || lineExtras.size === 0) return undefined;
+  const nodes: React.ReactNode[] = [];
+  for (const key of keysForLine(ln)) {
+    const node = lineExtras.get(key);
+    if (node) nodes.push(node);
+  }
+  if (nodes.length === 0) return undefined;
+  return nodes.length === 1 ? nodes[0] : <>{nodes}</>;
+}
+
 export function FileCard({
   file,
   commenting,
   open: openProp,
   onOpenChange,
   severityByLine,
-  lineIdPrefix,
-  scrollToLine,
   pathAdornment,
   onLineSeverityClick,
+  lineExtras,
+  footer,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
@@ -51,10 +69,6 @@ export function FileCard({
   onOpenChange?: (open: boolean) => void;
   /** Worst severity per NEW-side line number (`ln.newNo`). */
   severityByLine?: ReadonlyMap<number, Severity>;
-  /** Prefix for each rendered line's DOM id (`${lineIdPrefix}-L${ln.newNo}`). */
-  lineIdPrefix?: string;
-  /** New-side line number to scroll into view once the card is open. */
-  scrollToLine?: number | null;
   /** Rendered immediately after the file path, before the `+N −M` stat — the
    *  slot for a per-file status marker. It MAY be
    *  interactive: the header `<div>` carries the open/close `onClick`, so an
@@ -63,6 +77,14 @@ export function FileCard({
   /** When set, a flagged line's severity badge becomes a button calling this
    *  with the line's new-side number. Omitted ⇒ badges stay plain spans. */
   onLineSeverityClick?: (line: number) => void;
+  /** Extra content keyed by `lineKey(side, line)` (e.g. an inline finding
+   *  card), looked up with `keysForLine` exactly like `threadsForLine`. A
+   *  map, not a render callback — see `react-best-practices` "Render
+   *  Factories". */
+  lineExtras?: ReadonlyMap<string, React.ReactNode>;
+  /** Rendered after `OutdatedComments`, inside the open body — even when
+   *  `lines.length === 0` (e.g. an off-patch findings block). */
+  footer?: React.ReactNode;
 }) {
   const t = useTranslations("shell");
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(
@@ -78,20 +100,13 @@ export function FileCard({
   );
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
 
-  React.useEffect(() => {
-    if (!isOpen || scrollToLine == null || !lineIdPrefix) return;
-    document.getElementById(`${lineIdPrefix}-L${scrollToLine}`)?.scrollIntoView({ block: "center" });
-  }, [scrollToLine, isOpen, lineIdPrefix]);
-
   // Group this file's comments into threads, then split into ones we can anchor
   // to a rendered line vs. "outdated" (GitHub dropped the line / it's not here).
   const comments = commenting?.comments;
   const { matched, outdated } = React.useMemo(() => {
     if (!comments) return { matched: new Map<string, CommentThread[]>(), outdated: [] };
     const fileThreads = buildThreads(comments.filter((c) => c.path === file.path));
-    const renderedKeys = new Set<string>();
-    for (const ln of lines) for (const k of keysForLine(ln)) renderedKeys.add(k);
-    return partitionThreads(fileThreads, renderedKeys);
+    return partitionThreads(fileThreads, keysForLines(lines));
   }, [comments, file.path, lines]);
 
   const commentCount = commenting
@@ -135,7 +150,7 @@ export function FileCard({
                 threads={threadsForLine(ln, matched)}
                 commenting={commenting}
                 severity={ln.newNo != null ? severityByLine?.get(ln.newNo) : undefined}
-                domId={lineIdPrefix && ln.newNo != null ? `${lineIdPrefix}-L${ln.newNo}` : undefined}
+                extras={extrasForLine(ln, lineExtras)}
                 onSeverityClick={
                   onLineSeverityClick && ln.newNo != null
                     ? () => onLineSeverityClick(ln.newNo!)
@@ -145,6 +160,7 @@ export function FileCard({
             ))
           )}
           {commenting && commenting.showComments && <OutdatedComments threads={outdated} />}
+          {footer}
         </div>
       )}
     </div>

@@ -1,1 +1,0 @@
-export { FindingSeverityDots } from "./FindingSeverityDots";

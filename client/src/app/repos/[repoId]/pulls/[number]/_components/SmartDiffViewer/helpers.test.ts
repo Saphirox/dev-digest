@@ -1,20 +1,23 @@
 /**
- * `SmartDiffViewer/helpers.ts` — pure functions, no React. Mirrors the
- * server's `latestFindingRangesForPull` distinct-on-agent rule
- * (`docs/plans/0004-smart-diff.md`). `severityForFlaggedLines` guards the
- * 0004 correctness fix a plan-verifier caught: a marker must never render for
- * a line the server didn't flag, even if the client's severity map has an
- * entry for it (`docs/plans/0005-smart-diff-ui-fidelity.md`, "risks").
+ * `SmartDiffViewer/helpers.ts` — pure functions, no React
+ * (`docs/plans/0009-smart-diff-spec-completion.md` step 9). Mirrors the
+ * server's `latestFindingRangesForPull` distinct-on-agent rule.
+ * `severityForFlaggedLines` guards the 0004 correctness fix a plan-verifier
+ * caught: a marker must never render for a line the server didn't flag, even
+ * if the client's severity map has an entry for it.
  */
 import { describe, it, expect } from "vitest";
-import type { ReviewRecord } from "@devdigest/shared";
+import type { FindingRecord, ReviewRecord } from "@devdigest/shared";
 import {
   buildSeverityByFile,
-  countFindingsBySeverityByFile,
+  findingsByFile,
+  filesWithFindings,
+  hasReviewRun,
+  partitionFileFindings,
   severityForFlaggedLines,
 } from "./helpers";
 
-function finding(overrides: Partial<ReviewRecord["findings"][number]> = {}): ReviewRecord["findings"][number] {
+function finding(overrides: Partial<FindingRecord> = {}): FindingRecord {
   return {
     id: overrides.id ?? crypto.randomUUID(),
     severity: "WARNING",
@@ -52,20 +55,37 @@ function review(overrides: Partial<ReviewRecord> = {}): ReviewRecord {
 }
 
 describe("buildSeverityByFile", () => {
-  it("the worse severity wins when two findings flag the same line", () => {
-    const agent = "agent-1";
+  it("the worse severity wins when two findings flag the same start_line", () => {
     const reviews: ReviewRecord[] = [
       review({
-        agent_id: agent,
-        created_at: "2026-01-01T00:00:00.000Z",
+        agent_id: "agent-1",
         findings: [
-          finding({ id: "f1", severity: "WARNING", file: "a.ts", start_line: 5, end_line: 5, review_id: "r1" }),
-          finding({ id: "f2", severity: "CRITICAL", file: "a.ts", start_line: 5, end_line: 5, review_id: "r1" }),
+          finding({ id: "f1", severity: "WARNING", file: "a.ts", start_line: 5 }),
+          finding({ id: "f2", severity: "CRITICAL", file: "a.ts", start_line: 5 }),
         ],
       }),
     ];
     const byFile = buildSeverityByFile(reviews);
     expect(byFile.get("a.ts")?.get(5)).toBe("CRITICAL");
+  });
+
+  it("does no range expansion — only start_line gets a colour (Decision 7)", () => {
+    const reviews: ReviewRecord[] = [
+      review({ agent_id: "agent-1", findings: [finding({ file: "a.ts", start_line: 5, end_line: 20 })] }),
+    ];
+    const byFile = buildSeverityByFile(reviews);
+    expect(byFile.get("a.ts")?.get(5)).toBe("WARNING");
+    expect(byFile.get("a.ts")?.has(10)).toBe(false);
+  });
+
+  it("skips dismissed findings (Decision 6)", () => {
+    const reviews: ReviewRecord[] = [
+      review({
+        agent_id: "agent-1",
+        findings: [finding({ file: "a.ts", start_line: 5, dismissed_at: "2026-01-02T00:00:00.000Z" })],
+      }),
+    ];
+    expect(buildSeverityByFile(reviews).has("a.ts")).toBe(false);
   });
 
   it("only the newest review per agent_id counts — an older review's findings are dropped", () => {
@@ -75,45 +95,40 @@ describe("buildSeverityByFile", () => {
         id: "older",
         agent_id: agent,
         created_at: "2026-01-01T00:00:00.000Z",
-        findings: [finding({ id: "f-old", severity: "CRITICAL", file: "a.ts", start_line: 1, end_line: 1, review_id: "older" })],
+        findings: [finding({ id: "f-old", severity: "CRITICAL", file: "a.ts", start_line: 1 })],
       }),
       review({
         id: "newer",
         agent_id: agent,
         created_at: "2026-01-02T00:00:00.000Z",
-        findings: [finding({ id: "f-new", severity: "SUGGESTION", file: "a.ts", start_line: 2, end_line: 2, review_id: "newer" })],
+        findings: [finding({ id: "f-new", severity: "SUGGESTION", file: "a.ts", start_line: 2 })],
       }),
     ];
     const byFile = buildSeverityByFile(reviews);
-    expect(byFile.get("a.ts")?.get(1)).toBeUndefined(); // the older review's line is not counted
-    expect(byFile.get("a.ts")?.get(2)).toBe("SUGGESTION"); // only the newer review's line is
+    expect(byFile.get("a.ts")?.get(1)).toBeUndefined();
+    expect(byFile.get("a.ts")?.get(2)).toBe("SUGGESTION");
   });
 
   it('ignores kind === "summary" reviews entirely', () => {
     const reviews: ReviewRecord[] = [
-      review({
-        kind: "summary",
-        agent_id: "agent-1",
-        findings: [finding({ file: "summary-only.ts", start_line: 1, end_line: 1 })],
-      }),
+      review({ kind: "summary", agent_id: "agent-1", findings: [finding({ file: "summary-only.ts", start_line: 1 })] }),
     ];
-    const byFile = buildSeverityByFile(reviews);
-    expect(byFile.has("summary-only.ts")).toBe(false);
+    expect(buildSeverityByFile(reviews).has("summary-only.ts")).toBe(false);
   });
 
-  it("null agent_ids collapse into ONE group — the newest null-agent review wins, not each independently", () => {
+  it("null agent_ids collapse into ONE group — the newest null-agent review wins", () => {
     const reviews: ReviewRecord[] = [
       review({
         id: "null-older",
         agent_id: null,
         created_at: "2026-01-01T00:00:00.000Z",
-        findings: [finding({ file: "b.ts", start_line: 1, end_line: 1, review_id: "null-older" })],
+        findings: [finding({ file: "b.ts", start_line: 1 })],
       }),
       review({
         id: "null-newer",
         agent_id: null,
         created_at: "2026-01-02T00:00:00.000Z",
-        findings: [finding({ file: "b.ts", start_line: 2, end_line: 2, review_id: "null-newer" })],
+        findings: [finding({ file: "b.ts", start_line: 2 })],
       }),
     ];
     const byFile = buildSeverityByFile(reviews);
@@ -122,50 +137,12 @@ describe("buildSeverityByFile", () => {
   });
 });
 
-describe("countFindingsBySeverityByFile", () => {
-  it("counts findings, not the lines they span", () => {
-    const reviews: ReviewRecord[] = [
-      review({
-        agent_id: "agent-1",
-        findings: [
-          finding({ id: "f1", file: "app.ts", start_line: 91, end_line: 109 }), // spans 19 lines
-          finding({ id: "f2", file: "app.ts", start_line: 110, end_line: 112 }), // spans 3 lines
-        ],
-      }),
-    ];
-    // The badge once read "22 findings" for these two — it was summing the
-    // LINES they span. Guard that regression against the per-severity counts.
-    const counts = countFindingsBySeverityByFile(reviews).get("app.ts");
-    expect(counts?.WARNING).toBe(2); // not 22 (19 + 3)
-    const total = Object.values(counts ?? {}).reduce((a, b) => a + b, 0);
-    expect(total).toBe(2);
-  });
-
-  it("splits the tally per severity, worst-first order coming from SEVERITIES", () => {
-    const reviews: ReviewRecord[] = [
-      review({
-        agent_id: "agent-1",
-        findings: [
-          finding({ id: "c1", severity: "CRITICAL", file: "app.ts" }),
-          finding({ id: "w1", severity: "WARNING", file: "app.ts" }),
-          finding({ id: "w2", severity: "WARNING", file: "app.ts" }),
-        ],
-      }),
-    ];
-    const counts = countFindingsBySeverityByFile(reviews).get("app.ts");
-    expect(counts?.CRITICAL).toBe(1);
-    expect(counts?.WARNING).toBe(2);
-    expect(counts?.SUGGESTION ?? 0).toBe(0);
-  });
-
 describe("severityForFlaggedLines", () => {
   it("a line the client can colour but that is NOT in the server's finding_lines gets no marker", () => {
     const severityByLine = new Map<number, "CRITICAL" | "WARNING" | "SUGGESTION">([
       [5, "CRITICAL"],
       [6, "WARNING"],
     ]);
-    // Server only flagged line 5 — line 6 must be excluded even though the
-    // client has a colour for it.
     const result = severityForFlaggedLines(severityByLine, [5]);
     expect(result.get(5)).toBe("CRITICAL");
     expect(result.has(6)).toBe(false);
@@ -175,4 +152,65 @@ describe("severityForFlaggedLines", () => {
     expect(severityForFlaggedLines(undefined, [1, 2, 3]).size).toBe(0);
   });
 });
+
+describe("findingsByFile", () => {
+  it("includes dismissed findings — partitionFileFindings needs the full list", () => {
+    const reviews: ReviewRecord[] = [
+      review({
+        agent_id: "agent-1",
+        findings: [finding({ id: "f1", file: "a.ts", dismissed_at: "2026-01-02T00:00:00.000Z" })],
+      }),
+    ];
+    expect(findingsByFile(reviews).get("a.ts")?.map((f) => f.id)).toEqual(["f1"]);
+  });
+});
+
+describe("partitionFileFindings", () => {
+  it("a non-dismissed finding on a rendered, in-scope line is inline", () => {
+    const f = finding({ id: "f1", start_line: 5 });
+    const { inlineByKey, offPatch } = partitionFileFindings([f], new Set(["RIGHT:5"]), [5]);
+    expect(inlineByKey.get("RIGHT:5")?.map((x) => x.id)).toEqual(["f1"]);
+    expect(offPatch).toEqual([]);
+  });
+
+  it("a finding whose key isn't rendered (patch null, or line dropped) is off-patch", () => {
+    const f = finding({ id: "f1", start_line: 5 });
+    const { inlineByKey, offPatch } = partitionFileFindings([f], new Set(), [5]);
+    expect(inlineByKey.size).toBe(0);
+    expect(offPatch.map((x) => x.id)).toEqual(["f1"]);
+  });
+
+  it("a dismissed finding on a rendered line is inline even though it's excluded from finding_lines", () => {
+    const f = finding({ id: "f1", start_line: 5, dismissed_at: "2026-01-02T00:00:00.000Z" });
+    // Server excludes dismissed findings from `finding_lines` (Decision 6) —
+    // an empty findingLines array here mirrors that.
+    const { inlineByKey, offPatch } = partitionFileFindings([f], new Set(["RIGHT:5"]), []);
+    expect(inlineByKey.get("RIGHT:5")?.map((x) => x.id)).toEqual(["f1"]);
+    expect(offPatch).toEqual([]);
+  });
+
+  it("a non-dismissed finding with a rendered key but missing from finding_lines is shown nowhere (query skew)", () => {
+    const f = finding({ id: "f1", start_line: 5 });
+    const { inlineByKey, offPatch } = partitionFileFindings([f], new Set(["RIGHT:5"]), []);
+    expect(inlineByKey.size).toBe(0);
+    expect(offPatch).toEqual([]);
+  });
+});
+
+describe("filesWithFindings", () => {
+  it("counts only files with a non-empty finding_lines", () => {
+    const files = [
+      { path: "a.ts", pseudocode_summary: null, additions: 1, deletions: 0, finding_lines: [1] },
+      { path: "b.ts", pseudocode_summary: null, additions: 1, deletions: 0, finding_lines: [] },
+    ];
+    expect(filesWithFindings(files)).toBe(1);
+  });
+});
+
+describe("hasReviewRun", () => {
+  it("true only when a kind === 'review' row exists", () => {
+    expect(hasReviewRun([review({ kind: "summary" })])).toBe(false);
+    expect(hasReviewRun([review({ kind: "review" })])).toBe(true);
+    expect(hasReviewRun(undefined)).toBe(false);
+  });
 });

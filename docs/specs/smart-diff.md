@@ -1,359 +1,274 @@
 # Smart Diff
 
-Documented against `59eb758` (dirty tree — several files below are staged/
-modified but not yet committed; see `git status --short` for the exact file
-list).
+Documents **uncommitted work on top of `4c48764`** — a rewrite of Smart Diff
+from the earlier 3-role (`core`/`wiring`/`boilerplate`) version this page used
+to describe. Design intent is in
+[`docs/plans/0009-smart-diff-spec-completion.md`](../plans/0009-smart-diff-spec-completion.md);
+this page documents the code as it reads in the working tree, not the plan's
+intentions — where they disagree, the code wins (see *Documented deviation*
+below).
 
-Smart Diff sorts a PR's changed files by review risk — `core` before `wiring`
-before `boilerplate` — so a reviewer sees business logic before lock files and
-generated churn. It is deterministic and makes **no LLM call**: it joins
-`pr_files` (already imported from GitHub) with the findings of the latest
-review already stored in Postgres. It mirrors [Risk Areas](risk-areas.md)'s
-precedent (recomputed on every read, one counts-only log line) but lives in
-the "Files changed" tab rather than the Overview tab's Intent card.
+Smart Diff sorts a PR's changed files into five review-risk groups —
+`core → tests → wiring → docs → boilerplate` — so a reviewer sees business
+logic before tests, wiring, docs and generated churn. It makes **no LLM
+call**: it classifies files by path alone and joins in finding line numbers
+already stored in Postgres from a past run.
 
-**Where the shipped UI differs from the driving plans:** `docs/plans/0004-smart-diff.md`
-and `docs/plans/0005-smart-diff-ui-fidelity.md` describe the design intent and
-are useful for *why*, but several UI details moved after they were written —
-including the summariser both plans specify, which was built and then removed
-entirely (see *The summary field: computed as null, on purpose* below). This
-page documents the code as it reads today; divergences are called out under
-*Where the code and the plans disagree*.
+## Product view
 
-## API surface
+The "Files changed" tab (`DiffTab`,
+`client/src/app/repos/[repoId]/pulls/[number]/_components/DiffTab/DiffTab.tsx:22-86`)
+renders `SmartDiffViewer`
+(`.../SmartDiffViewer/SmartDiffViewer.tsx:28-121`), which always shows all
+five groups, in order, via `SmartDiffGroup`
+(`.../SmartDiffViewer/_components/SmartDiffGroup/SmartDiffGroup.tsx:16-60`):
 
-`GET /pulls/:id/smart-diff` → `SmartDiff`
-(`server/src/modules/reviews/routes.ts:190-197`, module docblock at
-`routes.ts:20`), handled by `ReviewService.getSmartDiff`
-(`server/src/modules/reviews/service.ts:315-350`). It sits directly after
-`getRisks` (`service.ts:275-305`), which is the precedent it mirrors: no rate
-limit (`routes.ts:187-189` — "spends no money, like `/risks`"), recomputed on
-every call, and a single `logger?.info` line carrying only counts —
-`prId`, `files`, `core`/`wiring`/`boilerplate` counts, `totalLines`,
-`findingLines` — never a provider, model or cost field
-(`service.ts:334-347`).
+- Each group header shows its label/blurb (`GROUP_META`,
+  `.../SmartDiffViewer/constants.ts:33-39`) and either a `● N`
+  files-with-findings counter (`FindingsDot`, once a `kind: "review"` review
+  has run — `hasReviewRun`, `.../SmartDiffViewer/helpers.ts:115-120`) or the
+  literal string "review not run yet" (`SmartDiffGroup.tsx:49-54`,
+  `smartDiff.reviewNotRun` in
+  `client/messages/en/prReview.json:75`). `docs`/`boilerplate` groups start
+  collapsed (`filesCollapsed: true`, `constants.ts:37-38`); the others obey
+  `AUTO_EXPAND_MAX_LINES` per file instead.
+- Each file row (`SmartDiffFileRow.tsx:18-110`) shows a plain, non-clickable
+  "has findings" dot (`FindingsDot`,
+  `.../SmartDiffViewer/_components/FindingsDot/FindingsDot.tsx:8-15`) next to
+  the path when `file.finding_lines.length > 0`
+  (`SmartDiffFileRow.tsx:100`) — one marker, not a per-severity count.
+- A flagged line renders a coloured left border plus a right-hand badge
+  reading `blocker`/`warning`/`suggestion` (`LINE_BADGE_LABEL`,
+  `client/src/components/diff-viewer/constants.ts:13-17`, deliberately not
+  `@devdigest/ui`'s "Critical"/"Warning"/"Suggestion" labels). Clicking the
+  badge (`onLineSeverityClick`, `CodeLine.tsx:84-93`) opens the file card and
+  scrolls to the matching inline finding card
+  (`SmartDiffFileRow.tsx:67-74`, `reveal` state remounts the card via a
+  `revealNonce`, `InlineFindings.tsx:14-41`).
+- A finding whose flagged line renders in the current patch gets an
+  `InlineFindings` card (`.../InlineFindings/InlineFindings.tsx:43-70`)
+  directly under that line, each with Accept/Dismiss buttons
+  (`FindingCard.tsx:100-119`). A finding whose line isn't in the patch (a
+  `null` patch, or a line GitHub's diff doesn't render) goes to an
+  "Findings outside the diff" block at the end of the file
+  (`OffPatchFindings.tsx:11-28`, `smartDiff.offPatchTitle`).
+- One hide toggle in `DiffTab` (`DiffTab.tsx:69-82`) hides both GitHub review
+  comments and Smart Diff findings together; it starts ON (visible) whenever
+  there are findings (`showComments = showOverride ?? findingCount > 0`,
+  `DiffTab.tsx:42`) and stays a manual override once clicked.
+- A "Smart order" / "Original order" toggle
+  (`SmartDiffViewer.tsx:76-83`) switches between the five grouped columns and
+  the plain, unsorted `DiffViewer` (`SmartDiffViewer.tsx:86-87`) — the latter
+  is also the fallback while loading, on error, or when `prId` is null
+  (`SmartDiffViewer.tsx:46-48`).
+- After a review run finishes, the PR page invalidates both `["reviews",
+  prId]` and `["pr-smart-diff", prId]`
+  (`client/src/app/repos/[repoId]/pulls/[number]/page.tsx:65-71`, on the
+  falling edge of `reviewRunning`), so the Diff tab's counters, dots and
+  cards refresh even if the reader is still on that tab — `useRunReview`,
+  `useFindingAction`, `useDeleteRun` and `useDeleteReview`
+  (`client/src/lib/hooks/reviews.ts:67-74`, `:89-93`, `:138-145`,
+  `:166-175`) invalidate the same pair for their own triggers.
 
-`getSmartDiff` does exactly three things: `this.repo.getPull` (404 via
-`NotFoundError` if missing), `this.repo.getPrFiles(pull.id)`, and
-`this.repo.latestFindingRangesForPull(pull.id)`, run concurrently
-(`service.ts:316-322`), then hands the results to the pure `buildSmartDiff`.
-It never calls `loadDiff` or `PullsService.getDetail` — both of those can
-reach out to GitHub — so the route performs **zero network I/O**;
-`getPrFiles` (`server/src/modules/reviews/repository/pull.repo.ts:29-34`) is a
-plain `select` from the `pr_files` table already populated at import time.
+Smart Diff makes no LLM call anywhere in this path: `ReviewService.getSmartDiff`
+(`server/src/modules/reviews/service.ts:316-351`) only reads `pr_files` and
+finding rows already in Postgres.
 
-## The pure domain: `server/src/modules/reviews/smart-diff/`
+## API
 
-A five-file module with no adapter import, no `container.db`, and no network.
+`GET /pulls/:id/smart-diff`
+(`server/src/modules/reviews/routes.ts:191-196`) returns the `SmartDiff`
+contract (`server/src/vendor/shared/contracts/brief.ts:145-177`,
+mirrored byte-for-byte in `client/src/vendor/shared/contracts/brief.ts`), now
+validated against a `response: { 200: SmartDiff }` schema
+(`routes.ts:192`). `SmartDiffRole` is a 5-value enum:
 
-- `constants.ts` — every pattern and threshold, in one place
-  (`server/src/modules/reviews/smart-diff/constants.ts`).
-- `classify.ts` — `classifyFile(path, additions, deletions): SmartDiffRole`
-  (`classify.ts:37-54`), pure.
-- `helpers.ts` — `expandFindingLines`, `sortFiles`
-  (`server/src/modules/reviews/smart-diff/helpers.ts:22`, `:41`).
-- `build.ts` — `buildSmartDiff(files, findingRows): SmartDiff`
-  (`build.ts:23-54`), pure.
-- `index.ts` — barrel re-exporting `buildSmartDiff`, `classifyFile`
-  (`index.ts:3-4`).
-
-### The classifier — rule order is the contract
-
-`classifyFile` (`classify.ts:37-54`) evaluates seven rules in a fixed order,
-documented in the function's own comment (`classify.ts:21-36`):
-
-1. basename ∈ `LOCK_BASENAMES` → `boilerplate`
-   (`constants.ts:13-25` — `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`,
-   `npm-shrinkwrap.json`, `bun.lockb`, `Cargo.lock`, `composer.lock`,
-   `Gemfile.lock`, `poetry.lock`, `Pipfile.lock`, `go.sum`);
-2. `GENERATED_PATH_RE` or `GENERATED_FILE_RE` → `boilerplate`
-   (`constants.ts:29-34`);
-3. `TEST_FILE_RE` (a filename ending `.test.`/`.spec.` + `[cm]?[jt]sx?`, so
-   `*.test.ts`, `*.spec.tsx`, `*.it.test.ts` all match), or `TEST_PATH_RE` (a
-   path segment `test/`, `tests/`, `__tests__/`, `__mocks__/`, `e2e/`)
-   **unless** the file also matches `WIRING_FILE_RE` → `boilerplate`
-   (`classify.ts:47-48`, patterns at `constants.ts:61-70`). The `WIRING_FILE_RE`
-   exception keeps markdown/prose that merely *lives* inside a test directory
-   (`e2e/CLAUDE.md`) classified as `wiring`, not `boilerplate` — it is prose,
-   not a test (`classify.ts:45-46`);
-4. `additions + deletions >= BOILERPLATE_MIN_CHANGED_LINES` (800,
-   `constants.ts:75`) → `boilerplate`;
-5. basename ∈ `WIRING_BASENAMES`, or `WIRING_PATH_RE`, or `WIRING_FILE_RE`
-   (markdown/`.mdx`/`.txt`, `constants.ts:47`) → `wiring`;
-6. `additions + deletions <= WIRING_MAX_CHANGED_LINES` (6, `constants.ts:79`)
-   → `wiring`;
-7. else → `core`.
-
-Rule order is: **lock basenames → generated path/ext → tests → size ≥ 800 →
-wiring (basenames/path/markdown) → size ≤ 6 → core.** Both the lock-file rule
-and the new test rule are checked before every size rule, and are
-size-independent for the same reason: a lock file must be `boilerplate`
-regardless of size (`classify.ts:23-27`), and a tiny test edit must not fall
-through to `wiring` via the size rule just because it is small
-(`classify.ts:44` comment, `server/test/smart-diff-classify.test.ts:102-105`).
-`WIRING_FILE_RE` (`constants.ts:47`) is not in the plan's original spec — it
-was added so a root-level `CLAUDE.md`/`INSIGHTS.md` groups with wiring instead
-of falling through to `core` and crowding out real source changes (comment at
-`constants.ts:42-46`).
-
-Adding the test rule changes classification results on real PRs used for
-manual verification during this feature's development: PR #4 went from
-core×5/boilerplate×0 to core×3/boilerplate×2, and PR #1 from
-core×11/boilerplate×6 to core×8/boilerplate×11 — every `*.test.ts`/
-`*.it.test.ts`/`*.spec.tsx` file that previously read as `core` (or, if small,
-`wiring`) now collapses into the collapsed-by-default `boilerplate` group.
-
-`expandFindingLines` (`helpers.ts:22-33`) turns finding ranges into a
-per-file, deduped, ascending array of new-side line numbers, each range capped
-at `MAX_FINDING_RANGE_LINES` (200, `constants.ts:87`). `sortFiles`
-(`helpers.ts:41-51`) orders files within a group by findings count desc, then
-changed lines desc, then path asc.
-
-### The summary field: computed as `null`, on purpose
-
-`buildSmartDiff` always sets `pseudocode_summary: null` for every file
-(`build.ts:34-38`). The rule-based summariser that used to fill this field
-(`summarizePatch`, plus its `EXPORT_SYMBOL_RE`/`HUNK_HEADER_RE`/
-`CONTEXT_SYMBOL_RE`/`NEW_FILE_RE`/`MAX_SUMMARY_SYMBOLS`/
-`MAX_SUMMARY_SCAN_LINES` constants) has been deleted from `helpers.ts` and
-`constants.ts` entirely, and the `✦ summary` chip / `✦ What this does:` row
-that rendered it in the UI are gone too (see *Shipped UI* below). The
-`pseudocode_summary` field itself stays in the `SmartDiff` contract — it is
-hand-vendored and both `server/src/vendor/shared` and `client/src/vendor/shared`
-copies still declare it — but nothing populates it any more
-(`build.ts:34-37` comment).
-
-**Why:** the summariser was regexes over the diff text, never a model call
-(this feature's constraint is no LLM on the Smart Diff path). Regexes can only
-*name* a symbol — "exports X", "changes Y", "new file · N added lines" — they
-cannot say what the code *does*, so a UI label reading "What this does" was
-promising something the mechanism could never deliver. The rule-based text
-was also hardcoded English generated server-side, bypassing the client's
-`smartDiff.json` i18n namespace entirely.
-
-## The findings query — newest review per agent, not the single newest row
-
-`latestFindingRangesForPull(db, prId)`
-(`server/src/modules/reviews/repository/review.repo.ts:99-114`) is modelled
-on `PullsRepository.latestScores`. It uses
-`db.selectDistinctOn([t.reviews.prId, t.reviews.agentId], …)` with the
-distinct columns leading `orderBy` (`review.repo.ts:100-104`), then fetches
-`{file, startLine, endLine}` from `findings` for those review ids
-(`review.repo.ts:109-113`). This matters because a PR can carry several
-agents' reviews: a single-latest-row query would silently hide every finding
-but one agent's most recent pass. `reviews.agentId` is nullable, so every
-NULL-agent review (the seeded demo data) collapses into one distinct-on group
-and contributes at most one review's findings (`review.repo.ts:94-97`).
-`ReviewRepository.latestFindingRangesForPull` (`server/src/modules/reviews/repository.ts:71-73`)
-delegates straight through.
-
-## Client: the server owns *which* lines, the client owns their *colour*
-
-`usePrSmartDiff(prId)` (`client/src/lib/hooks/smart-diff.ts:11-17`) is a
-`useQuery` on `["pr-smart-diff", prId]`, `GET /pulls/:id/smart-diff`. The
-global TanStack defaults apply — `staleTime: 30_000`,
-`refetchOnWindowFocus: false` (`client/src/lib/providers.tsx:28-29`). All four
-mutations that can change findings invalidate `["pr-smart-diff", prId]`
-alongside `["reviews", prId]`: `useDeleteRun`
-(`client/src/lib/hooks/reviews.ts:67-71`), `useDeleteReview` (`:89-90`),
-`useRunReview` (`:139-142`), and `useFindingAction` (`:168-171`) — each
-comment notes why: "Smart Diff joins these findings with its own query;
-invalidating only one half leaves coloured markers with no badge until a
-reload."
-
-`SmartDiffViewer`
-(`client/src/app/repos/[repoId]/pulls/[number]/_components/SmartDiffViewer/SmartDiffViewer.tsx`)
-is rendered by `DiffTab` in place of a direct `<DiffViewer>` call
-(`.../DiffTab/DiffTab.tsx:9`, `:62`). It composes the shared `diff-viewer`'s
-`FileCard` (`client/src/components/diff-viewer/index.ts:4-6` — the barrel
-exports exactly `DiffViewer`, `DiffCommentApi`, `FileCard`) rather than
-duplicating its rendering.
-
-The split is the architectural idea: `SmartDiffFile.finding_lines`
-(server-computed, already capped at `MAX_FINDING_RANGE_LINES`) is the single
-authoritative set of flagged lines (`SmartDiffViewer.tsx:57-58`); the client
-only supplies each line's colour, by joining the `/pulls/:id/reviews` payload
-the page already has. `buildSeverityByFile` (`.../SmartDiffViewer/helpers.ts:43-55`)
-builds a `Map<path, Map<line, Severity>>`, worst severity wins on a shared
-line (`helpers.ts:12-14`), ordered by `SEVERITIES` from
-`client/src/lib/severity.ts`. `severityForFlaggedLines` (`helpers.ts:106-117`)
-then intersects that map with the server's `finding_lines`, so **a marker can
-never render from the raw client map** — only from a line the server actually
-flagged.
-
-The client re-implements the server's latest-per-agent rule in
-`latestFindingsPerAgent` (`.../SmartDiffViewer/helpers.ts:25-35`): only
-`kind === "review"` rows, only the newest per `agent_id`, null agent ids
-collapsed into one group — deliberately duplicated rather than touching the
-hand-vendored `SmartDiff` contract or adding a new endpoint. Both
-`buildSeverityByFile` and `countFindingsBySeverityByFile` (`helpers.ts:65-79`,
-the per-severity, findings-count-not-lines dot numbers) go through this one
-function so the dots' counts and the line colours can never disagree about
-which review they describe. `firstLineOfSeverity` (`helpers.ts:88-97`) then
-picks a dot's click target from `severityForFlaggedLines`'s **markers** map,
-never the raw per-file severity map — the target line can never fall outside
-the server's `finding_lines`.
-
-`GROUP_META` (`.../SmartDiffViewer/constants.ts:20-42`) is one
-`Record<SmartDiffRole, …>` carrying `labelKey`/`blurbKey`/`defaultOpen`
-(`boilerplate.defaultOpen: false`) and `dotColor` for the group header dot —
-there is no per-role summary-visibility policy any more; the field the old
-`showSummary` flag gated (`pseudocode_summary`) is always `null` now, so there
-is nothing left to conditionally show. `GROUP_ORDER` is a local
-`as const satisfies readonly SmartDiffRole[]` literal (`constants.ts:11`),
-never a runtime import of the vendored `SmartDiffRole` `z.enum` — that 500s
-the page under `next dev` per `client/INSIGHTS.md`. Every `@devdigest/shared`
-import in this feature is `import type` only.
-
-## Shipped UI (verified in a browser) — where the plans are stale
-
-- **Header**: a two-row block — `t("header")` ("Reviewer-ordered diff") then a
-  stats line built with `t.rich("stats", …)` rendering `<add>`/`<del>` tags in
-  `var(--code-add-text)`/`var(--code-del-text)`
-  (`SmartDiffViewer.tsx:141-151`, `client/messages/en/smartDiff.json:3`), and
-  a Smart/Original toggle (`SmartDiffViewer.tsx:152-167`).
-- **Group headers** are a single flex row — a coloured dot
-  (`s.groupDot(meta.dotColor)`), the bold label, the muted blurb, and a
-  right-aligned `t("groups.fileCount", …)` ICU-plural count
-  (`SmartDiffViewer.tsx:184-188`). **A group with zero files renders
-  nothing** — `if (!group || group.files.length === 0) return null;`
-  (`SmartDiffViewer.tsx:181`), even though the server contract always emits
-  all three groups.
-- **Per-line badges** are icon + lowercase text, not a bare dot: `CodeLine`
-  renders `<SevIcon size={11}/>{sevMeta?.label}` inside `lineBadge(severity)`
-  (`client/src/components/diff-viewer/CodeLine/CodeLine.tsx:77-85`), reading
-  colour/background from `@devdigest/ui`'s `SEV[sev].c`/`.bg`
-  (`client/src/components/diff-viewer/styles.ts`) and lowercasing via
-  `textTransform: "lowercase"` rather than a second i18n string — the DOM text
-  is still `SEV[sev].label` ("Critical"). The badge carries no `aria-hidden`,
-  since its text is now its accessible name (comment at `CodeLine.tsx:78-80`).
-- **The per-file findings indicator is one dot-with-count per present
-  severity**, beside the file path, worst-first. `FileCard` has exactly one
-  slot left for this: `pathAdornment` (`client/src/components/diff-viewer/FileCard/FileCard.tsx:57-61`,
-  rendered inside `s.pathWrap` right after the path, `:102-107`) — a generic
-  `React.ReactNode`. The two other slots that used to exist for the removed
-  summary UI, `headerExtras` and `bodyLead`, are gone; `FileCard`'s props are
-  now `open`/`onOpenChange`/`severityByLine`/`lineIdPrefix`/`scrollToLine`/
-  `pathAdornment` (`FileCard.tsx:34-62`). `SmartDiffViewer` renders
-  `<FindingSeverityDots>` in that slot
-  (`.../SmartDiffViewer/_components/FindingSeverityDots/FindingSeverityDots.tsx`):
-  one `<button>` per severity present in `counts` (`counts[sev] > 0`),
-  iterating `SEVERITIES` so the order can never disagree with the rest of the
-  app (`FindingSeverityDots.tsx:30-31`, `:49-51`), each carrying its count as
-  a **visible text child** (`{counts[sev]}`, `FindingSeverityDots.tsx:62`) and
-  a real accessible name via `aria-label` (e.g. `"3 Critical findings"`, from
-  `t("severityFindingsBadge", { count, severity })`,
-  `messages/en/smartDiff.json:23`) — not `@devdigest/ui`'s `Badge`, which
-  drops `aria-label` silently. Colours come from `SEV[sev].c`/`.bg`
-  (`FindingSeverityDots.tsx:55`). Clicking a dot opens the card and scrolls to
-  **the first line flagged with that severity**
-  (`SmartDiffViewer.tsx:60-63`, `firstLineOfSeverity`) — no round-robin
-  through all flagged lines any more. A review the client cannot join to any
-  severity but that still has flagged lines (`flaggedLineCount > 0`) renders
-  one neutral fallback dot instead (`FindingSeverityDots.tsx:32-46`), which
-  scrolls to the first flagged line on click (`SmartDiffViewer.tsx:65-69`).
-  This supersedes both plans' "N findings chip" text and the single-dot
-  aria-label-only version shipped between them.
-- **The rule-based summary UI is gone.** There is no `✦ summary` chip and no
-  `✦ What this does: …` row anywhere in `SmartDiffViewer` or `FileCard` — see
-  *The summary field: computed as `null`, on purpose* above for why.
-- **`DiffTab` no longer shows its own "Files changed · N files" label** — the
-  comment at `DiffTab.tsx:47-49` explains the count now lives in
-  `SmartDiffViewer`'s own header row instead. Plan 0004 step 10 said
-  `DiffTab` "keeps its `SectionLabel`"; the shipped code drops it.
-- The `diff-viewer` barrel exports exactly `DiffViewer`, `DiffCommentApi`,
-  `FileCard` (`client/src/components/diff-viewer/index.ts:4-6`) — **not**
-  `parsePatch`/`type Line`, which plan 0004 step 8 originally called for;
-  plan 0005's architecture constraints correct that, and the code matches
-  0005, not 0004.
-
-## Where the code and the plans disagree
-
-| Topic | Plan said | Code does |
-|---|---|---|
-| Findings indicator | Plan 0004: an "N findings" chip next to the path; Plan 0005: a single dot, count in `aria-label` only | One `<FindingSeverityDots>` `<button>` per present severity, worst-first, as a `pathAdornment` **inside** `FileCard`'s header, beside the path, each with a visible count and a real accessible name |
-| Per-file summary | Both plans specify a rule-based `pseudocode_summary` rendered as a `✦` chip/row | Removed entirely: `buildSmartDiff` always emits `pseudocode_summary: null` (`build.ts:34-38`), and no UI renders it |
-| `diff-viewer` barrel | Plan 0004 step 8: export `FileCard`, `parsePatch`, `type Line` | Exports exactly `DiffViewer`, `DiffCommentApi`, `FileCard` (plan 0005's correction; `index.ts:4-6`) |
-| `DiffTab`'s own file-count label | Plan 0004 step 10: `DiffTab` keeps its `SectionLabel` ("Files changed · N files") | Removed; `SmartDiffViewer`'s own stats row is the only file count (`DiffTab.tsx:47-49`) |
-| Wiring classification of prose files | Not in plan 0004's constants list | `WIRING_FILE_RE` (`.md`/`.mdx`/`.txt`) was added so root docs don't crowd `core` (`constants.ts:42-47`) |
-| Boilerplate classification of tests | Not in either plan | Added later: `TEST_FILE_RE`/`TEST_PATH_RE` route test files to `boilerplate` regardless of size, ahead of the size rules (`classify.ts:47-48`) |
-
-## Tests
-
-- Server: `server/test/smart-diff-classify.test.ts`, `smart-diff-helpers.test.ts`,
-  `smart-diff-build.test.ts` (unit, no DB — `smart-diff-helpers.test.ts` covers
-  only `expandFindingLines`/`sortFiles` now; it no longer has a `summarizePatch`
-  suite), and `smart-diff.it.test.ts` (`*.it.test.ts`, testcontainers-backed,
-  exercises three agents on one PR to prove `latestFindingRangesForPull` keeps
-  the newest review **per agent** rather than one newest row overall).
-- Client: `.../SmartDiffViewer/SmartDiffViewer.test.tsx` and `helpers.test.ts`
-  (per-severity dot rendering, findings-vs-lines counts, latest-per-agent
-  collapsing), plus `client/src/components/diff-viewer/CodeLine.test.tsx` and
-  `FileCard.test.tsx` covering the surviving optional props (`severity`,
-  `domId`, `pathAdornment`) — `FileCard.test.tsx` no longer exercises
-  `headerExtras`/`bodyLead`, since neither prop exists any more.
-
-## Known gaps (recorded, not papered over)
-
-- `e2e/specs/05-pr-diff.flow.json` has **never been run** against this work.
-  The expectation that it still passes (a collapsed `FileCard` hides only its
-  body, never its path header; the loading/error path falls back to the plain
-  `DiffViewer`, `SmartDiffViewer.tsx:123-125`) is reasoning from reading the
-  code, not a passing run. More generally, `pnpm e2e:hermetic` has still never
-  been run for this feature in this worktree.
-- `hasDocker()`/`dockerAvailable()`-style gates on `*.it.test.ts` files
-  (including `smart-diff.it.test.ts`) can silently skip a whole test file when
-  Docker is unavailable or flaky — **a green exit code is not sufficient
-  evidence that the DB-backed assertions ran**; the skipped-test count must be
-  checked, not just the process exit code.
-- The dev DB used for manual verification had **zero lock-file rows**, so the
-  live "lock file is boilerplate regardless of size" check passed vacuously.
-  `server/test/smart-diff-classify.test.ts` is what actually proves that
-  acceptance criterion (every `LOCK_BASENAMES` entry at both a tiny and a huge
-  size).
-- `reviews`/`findings` carry no index, and this route adds a per-view query on
-  `findings.review_id` (`review.repo.ts:109-112`) — flagged as a future
-  migration candidate, deliberately not addressed here.
-- `pr_files` has no `status` column (`server/src/db/schema/pulls.ts:36-45`);
-  GitHub's per-file `status` is fetched by `listFiles` but dropped before the
-  row reaches the DB (`server/src/adapters/github/octokit.ts:79-84`,
-  `:106-111` — the mapped object has no `status` field). The same adapter
-  method also calls `per_page: 100` with no pagination
-  (`octokit.ts:83`), so a PR with more than 100 changed files loses the tail
-  — Smart Diff only ever sees what `pr_files` was seeded with.
-
-## Diagrams
-
-Request path — every hop is deterministic and DB-only; nothing here reaches
-an LLM or GitHub:
-
-```mermaid
-flowchart LR
-  R["GET /pulls/:id/smart-diff\nroutes.ts:190-197"] --> S["ReviewService.getSmartDiff\nservice.ts:315-350"]
-  S --> P1["repo.getPull"]
-  S --> P2["repo.getPrFiles\npull.repo.ts:29-34"]
-  S --> P3["repo.latestFindingRangesForPull\nreview.repo.ts:99-114\n(distinctOn prId, agentId)"]
-  P2 --> B["buildSmartDiff (pure)\nbuild.ts:23-54"]
-  P3 --> B
-  B --> C["classifyFile\nclassify.ts:37-54"]
-  B --> S
-  S --> L["pino info: counts only\nNO provider / model / cost"]
+```ts
+export const SmartDiffRole = z.enum(['core', 'tests', 'wiring', 'docs', 'boilerplate']);
 ```
+(`brief.ts:145`)
 
-`pseudocode_summary` is intentionally absent from this diagram: `buildSmartDiff`
-sets it to `null` for every file and calls nothing to derive it.
+Handled by `ReviewService.getSmartDiff` (`service.ts:316-351`), which reads
+`pr_files` and `latestFindingRangesForPull` concurrently
+(`service.ts:320-323`) and hands them to the pure `buildSmartDiff`
+(`server/src/modules/reviews/smart-diff/build.ts:19-52`). Per file:
 
-Client severity join — the server decides *which* lines are flagged, the
-client decides only their *colour*:
+- `finding_lines` — the unique, sorted `start_line` values of every
+  **non-dismissed** finding from the **newest review per agent**
+  (`startLinesByFile`,
+  `server/src/modules/reviews/smart-diff/helpers.ts:19-29`, fed by
+  `latestFindingRangesForPull`,
+  `server/src/modules/reviews/repository/review.repo.ts:104-119`). No range
+  expansion — only `start_line`.
+- `pseudocode_summary` — always `null` (`build.ts:34`); the field stays in
+  the contract (hand-vendored, both copies keep it) but nothing populates it.
+- `additions`/`deletions` — copied straight from the `pr_files` row
+  (`build.ts:35-36`).
+
+`split_suggestion` is a minimal placeholder, matching the assignment: `{
+too_big: false, total_lines: <sum of every file's additions+deletions>,
+proposed_splits: [] }` (`build.ts:44-51`) — `too_big` is always `false` and
+`proposed_splits` always empty; the split-suggestion feature was never built
+past this.
+
+Code lines are **not** part of this response. They come from `GET
+/pulls/:id` (`server/src/modules/pulls/routes.ts:37`), whose `PrDetail.files`
+is an array of `PrFile { path, additions, deletions, patch }`
+(`server/src/vendor/shared/contracts/platform.ts:197-203`). The client joins
+`SmartDiff`'s per-file metadata to a `PrFile.patch` by `path`
+(`filesByPath`, `SmartDiffViewer.tsx:37`; used in `SmartDiffFileRow.tsx:45-50`).
+
+## Classifier
+
+`classifyFile(path)` (`server/src/modules/reviews/smart-diff/classify.ts:20-29`)
+is path-only and pure — arity 1, no size/line-count params
+(pinned by `server/test/smart-diff-classify.test.ts:98-100`). Reusable
+without HTTP: it has no I/O import, so any caller can classify a path off the
+critical path of a request.
+
+Two ordered passes, both walking `CLASSIFY_PRIORITY = ['boilerplate', 'tests',
+'wiring', 'docs']`
+(`server/src/modules/reviews/smart-diff/constants.ts:51`): all of
+`SPEC_RULES` first, then all of `EXTRA_RULES`, first match wins, else `core`.
+The priority is enforced by the loop over `CLASSIFY_PRIORITY`, not by the
+literal order inside `SPEC_RULES`/`EXTRA_RULES` (both are `Record<NonCoreRole,
+…>`, so there is no array order to get wrong) — `classify.ts:22-27`.
 
 ```mermaid
 flowchart TD
-  SD["usePrSmartDiff\ngroups[].files[].finding_lines"] --> V["SmartDiffViewer"]
-  RV["usePrReviews\ncached under [\"reviews\", prId]"] --> LFA["latestFindingsPerAgent\nhelpers.ts:25-35"]
-  LFA --> M["buildSeverityByFile\nMap path -> line -> Severity\nworst severity wins"]
-  M --> J["severityForFlaggedLines\nintersect with server's finding_lines\nhelpers.ts:106-117"]
-  SD --> J
-  J --> V
-  V --> FC["FileCard\nseverityByLine / pathAdornment (FindingSeverityDots)"]
-  FC --> CL["CodeLine\nicon + lowercase severity badge"]
+  P["path"] --> S1{"boilerplate?\nSPEC_RULES"}
+  S1 -- yes --> Rb["boilerplate"]
+  S1 -- no --> S2{"tests?\nSPEC_RULES"}
+  S2 -- yes --> Rt["tests"]
+  S2 -- no --> S3{"wiring?\nSPEC_RULES"}
+  S3 -- yes --> Rw["wiring"]
+  S3 -- no --> S4{"docs?\nSPEC_RULES"}
+  S4 -- yes --> Rd["docs"]
+  S4 -- no --> E1{"boilerplate?\nEXTRA_RULES"}
+  E1 -- yes --> Rb
+  E1 -- no --> E2{"tests?\nEXTRA_RULES"}
+  E2 -- yes --> Rt
+  E2 -- no --> E3{"wiring?\nEXTRA_RULES"}
+  E3 -- yes --> Rw
+  E3 -- no --> E4{"docs?\nEXTRA_RULES"}
+  E4 -- yes --> Rd
+  E4 -- no --> C["core"]
 ```
+
+### Rule table (`constants.ts`)
+
+`SPEC_RULES` (`constants.ts:76-116`) — the assignment's own glob list:
+
+| Role | Patterns |
+|---|---|
+| boilerplate | `*.lock`, `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `dist/**`, `build/**`, `**/__snapshots__/**`, `*.snap`, `*.generated.*`, `*.min.js` |
+| tests | `*.test.ts(x)`, `*.it.test.ts`, `*.spec.ts`, `**/test/**`, `**/tests/**`, `**/__tests__/**`, `e2e/**` |
+| wiring | `index.ts`/`index.js`, `*.config.*`, `tsconfig*.json`, `.eslintrc*`, `.env*`, `docker-compose*.yml`, `.github/**`, `.claude/**` |
+| docs | `*.md`, `docs/**`, `README*`, `CHANGELOG*`, `LICENSE` |
+
+`EXTRA_RULES` (`constants.ts:166-171`) — project-specific patterns that only
+ever fire where a `SPEC_RULES` glob would have called the path `core`:
+
+| Role | Patterns |
+|---|---|
+| boilerplate | `npm-shrinkwrap.json`/`bun.lockb`/`go.sum`; a `dist`/`build`/`out`/`coverage`/`node_modules`/`.next`/`__snapshots__`/`generated`/`vendor`/`fixtures` path segment; `.min.css`/`.map`/`.svg`/`.png`/`.jpe?g`/`.gif`/`.ico`/`.woff2?`/`.pdf` extensions |
+| tests | any `.test`/`.spec` extension combo (`.spec.tsx`, `.test.jsx`, …); `__mocks__`/`e2e` at any depth |
+| wiring | basenames `index.tsx`/`package.json`/`Dockerfile`; a `config(s)`/`route(s)`/`middleware`/`migrations`/`scripts`/`messages`/`type(s)`/`constants`/`schema(s)` path segment |
+| docs | a `doc(s)` path segment at any depth; `.mdx`/`.txt` extensions |
+
+### Pinned edge cases (`server/test/smart-diff-classify.test.ts`)
+
+Three priority-order cases, called out in the test file itself
+(lines 15-17):
+
+- `src/__tests__/__snapshots__/x.snap` → `boilerplate` (a snapshot inside a
+  test dir is still boilerplate: `boilerplate` precedes `tests` in
+  `CLASSIFY_PRIORITY`).
+- `.claude/skills/security/SKILL.md` → `wiring` (`.claude/**` precedes the
+  `docs` `*.md` glob).
+- `e2e/README.md` → `tests` (`e2e/**` precedes the `docs` `*.md` glob).
+
+And the three deliberate `EXTRA_RULES` decisions the assignment doesn't
+specify, pinned in the same table:
+
+- `server/src/vendor/shared/contracts/brief.ts` → `boilerplate` (the `vendor`
+  path segment).
+- `server/docs/diagram.png` → `boilerplate`, not `docs` — within the EXTRA
+  pass, `boilerplate` is still checked before `docs`
+  (`CLASSIFY_PRIORITY`), so an image extension under a `docs/` folder never
+  reaches the `docs?` segment rule.
+- `server/src/modules/reviews/smart-diff/constants.ts`,
+  `client/src/lib/types.ts`, `server/src/db/schema/reviews.ts` → `wiring`
+  (the classifier's own source file, and any `constants.ts`/`types.ts`/
+  `schema/` file, match the `WIRING_PATH_RE` segment rule) — same rule that
+  also routes `server/src/modules/reviews/routes.ts` to `wiring`.
+
+## Client structure
+
+```mermaid
+flowchart TD
+  H1["usePrSmartDiff\nclient/src/lib/hooks/smart-diff.ts:11-17"] --> V["SmartDiffViewer\nSmartDiffViewer.tsx:28-121"]
+  H2["usePrReviews\nclient/src/lib/hooks/reviews.ts:51-57"] --> LFA["latestFindingsPerAgent\nclient/src/lib/latest-findings.ts:16-26"]
+  LFA --> BSF["buildSeverityByFile\nhelpers.ts:26-36"]
+  LFA --> FBF["findingsByFile\nhelpers.ts:62-70"]
+  V --> G["SmartDiffGroup (x5)\n_components/SmartDiffGroup"]
+  G --> R["SmartDiffFileRow\n_components/SmartDiffFileRow"]
+  BSF --> R
+  FBF --> R
+  R --> PFF["partitionFileFindings\nhelpers.ts:85-106"]
+  PFF --> IL["InlineFindings (inline, per line)"]
+  PFF --> OP["OffPatchFindings (end of file)"]
+  IL --> FC["FindingCard\nAccept / Dismiss"]
+  OP --> IL
+  R --> FCard["FileCard\nlineExtras / footer / pathAdornment"]
+```
+
+`SmartDiffViewer` (`SmartDiffViewer.tsx:28-121`) calls both `usePrSmartDiff`
+and `usePrReviews`, builds `severityByFile`/`findingsByFileMap` once per
+render (`:35-36`), and renders one `SmartDiffGroup` per `GROUP_ORDER` entry
+(`constants.ts:11-17`), each containing a `SmartDiffFileRow` per file.
+`SmartDiffFileRow` (`SmartDiffFileRow.tsx:18-110`) wires the reused
+`FileCard` (`client/src/components/diff-viewer/FileCard/FileCard.tsx:52-168`)
+with `lineExtras` (a `Map<lineKey, ReactNode>` of `InlineFindings`,
+`SmartDiffFileRow.tsx:76-91`) and a `footer` slot for `OffPatchFindings`
+(`:103-107`) when there are off-patch findings.
+
+`partitionFileFindings` (`.../SmartDiffViewer/helpers.ts:85-106`) decides
+where each finding renders:
+
+- **inline** — its `lineKey("RIGHT", start_line)` is a line actually rendered
+  by the current patch (`renderedKeys`, from `lineKeysForPatch`) **and**
+  either its `start_line` is in the server's `finding_lines`, or the finding
+  is dismissed (a dismissed finding is excluded from `finding_lines` by
+  construction, so it needs its own admission rule to still render as a
+  muted card, `helpers.ts:78-83`);
+- **off-patch** — its key isn't rendered by the patch at all (including every
+  finding on a file with a `null` patch);
+- **shown nowhere** — a non-dismissed finding whose key IS rendered but whose
+  `start_line` is missing from `finding_lines`: treated as transient skew
+  between the two queries racing, not an error state.
+
+Dismissed findings are never filtered out before this point —
+`findingsByFile` (`helpers.ts:62-70`) keeps them so `partitionFileFindings`
+can still place them inline as muted cards; only `buildSeverityByFile`
+(`helpers.ts:26-36`) drops a dismissed finding's line marker (`:29`) since a
+dismissed finding has no severity to show on the line itself.
+
+## Documented deviation: "latest review" = newest per agent
+
+The assignment's "the latest review" is interpreted as the **newest review
+per agent**, not the single newest `reviews` row overall — both server
+(`server/src/modules/reviews/repository/review.repo.ts:89-103`) and client
+(`client/src/lib/latest-findings.ts:1-26`) implement the same rule
+independently (the client can't reuse the server's SQL, and duplicating a
+few lines was preferred over adding a new endpoint). Reason, from the
+server-side docblock: a PR can carry one `reviews` row per agent from a
+multi-agent run; taking the single newest row across all agents would
+silently drop every agent's findings but the most recently run one. A `null`
+`agent_id` (the seeded demo review has none) collapses every agent-less
+review into one distinct-on group and contributes at most one review's
+findings — accepted, since a real multi-agent PR always sets `agentId`
+(`review.repo.ts:99-102`). Non-dismissed only: `isNull(findings.dismissedAt)`
+on the server (`review.repo.ts:117`), `!finding.dismissed_at` where the
+client needs the exclusion (e.g. `buildSeverityByFile`,
+`.../SmartDiffViewer/helpers.ts:29`).
