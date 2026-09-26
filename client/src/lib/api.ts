@@ -18,19 +18,28 @@ export class ApiError extends Error {
   }
 }
 
+/** How many times a request is repeated when the API answers 429 (rate limited). */
+const MAX_RATE_LIMIT_RETRIES = 3;
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
-      ...init,
-      headers: {
-        // Only declare a JSON body when one is actually sent — otherwise a
-        // body-less POST/PUT (e.g. tour generate, refresh, reindex) trips
-        // Fastify's "Body cannot be empty when content-type is application/json".
-        ...(init?.body != null ? { "content-type": "application/json" } : {}),
-        ...(init?.headers ?? {}),
-      },
-    });
+    const send = () =>
+      fetch(`${API_BASE}${path}`, {
+        ...init,
+        headers: {
+          // Only declare a JSON body when one is actually sent — otherwise a
+          // body-less POST/PUT (e.g. tour generate, refresh, reindex) trips
+          // Fastify's "Body cannot be empty when content-type is application/json".
+          ...(init?.body != null ? { "content-type": "application/json" } : {}),
+          ...(init?.headers ?? {}),
+        },
+      });
+    res = await send();
+    // Rate limited: the window is short, so just try again.
+    for (let attempt = 0; res.status === 429 && attempt < MAX_RATE_LIMIT_RETRIES; attempt++) {
+      res = await send();
+    }
   } catch (e) {
     // network failure / API down → full-screen error candidate
     throw new ApiError(

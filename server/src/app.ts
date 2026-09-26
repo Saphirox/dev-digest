@@ -15,6 +15,8 @@ import { loadConfig, type AppConfig } from './platform/config.js';
 import { createDb, type Db } from './db/client.js';
 import { Container, type ContainerOverrides } from './platform/container.js';
 import { AppError } from './platform/errors.js';
+import { rateLimitedSnapshot, recordRateLimited } from './platform/rate-limit-metrics.js';
+import { record } from './platform/rate-limit-store.js';
 import { modules } from './modules/index.js';
 import { ReviewService } from './modules/reviews/service.js';
 
@@ -90,14 +92,35 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(cors, { origin: [config.webOrigin], credentials: true });
   await app.register(FastifySSEPlugin);
 
-  // Global rate limit. Disabled under test so integration suites can hammer
-  // endpoints via inject(); per-route overrides live on the routes themselves.
-  if (config.nodeEnv !== 'test') {
-    await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
-  }
+  // Global rate limit; per-route overrides live on the routes themselves.
+  // Tunable per deployment: RATE_LIMIT_MAX (requests) / RATE_LIMIT_WINDOW (e.g. "1 minute").
+  await app.register(rateLimit, {
+    max: Number(process.env.RATE_LIMIT_MAX ?? 120),
+    timeWindow: process.env.RATE_LIMIT_WINDOW ?? '1 minute',
+    // Behind the Next.js dev proxy every request shares one socket address, so
+    // bucket by the forwarded client address instead.
+    keyGenerator: (req) => (req.headers['x-forwarded-for'] as string | undefined) ?? req.ip,
+    // Local tooling (curl, the studio itself) is never limited.
+    allowList: ['127.0.0.1'],
+    errorResponseBuilder: (_req, ctx) => ({
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: `Rate limit exceeded, retry in ${ctx.after}`,
+    }),
+  });
+  // Count throttled clients so we can see who is hammering the API.
+  app.addHook('onSend', async (req, reply) => {
+    if (reply.statusCode === 429) {
+      recordRateLimited(req.ip);
+      record(req.ip, req.headers);
+    }
+  });
 
   // Liveness check (no module, no DB, no rate limit).
   app.get('/health', { config: { rateLimit: false } }, async () => ({ status: 'ok' }));
+
+  // Who has been throttled since boot: { "<ip>": <count of 429s> }.
+  app.get('/debug/rate-limits', async () => rateLimitedSnapshot());
 
   // Readiness check — verifies the DB is reachable with a cheap `SELECT 1`.
   // 503 (not 500) so orchestrators treat it as "not ready yet", not a crash.
