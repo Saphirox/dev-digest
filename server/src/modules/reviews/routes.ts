@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { RunRequest } from '@devdigest/shared';
-import type { IntentDeriveResult, PrIntentRecord, PrRisks, RunEvent, SmartDiff } from '@devdigest/shared';
+import { RunRequest, SmartDiff } from '@devdigest/shared';
+import type { IntentDeriveResult, PrIntentRecord, PrRisks, RunEvent } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { NotFoundError } from '../../platform/errors.js';
@@ -17,7 +17,7 @@ import { ReviewService } from './service.js';
  *   GET    /pulls/:id/intent                            → stored intent (or null); `stale` vs head_sha
  *   POST   /pulls/:id/intent/derive                     → always re-derive intent (spends money)
  *   GET    /pulls/:id/risks                              → deterministic diff-grounded risk scan (no model call)
- *   GET    /pulls/:id/smart-diff                          → reviewer-ordered diff (core/wiring/boilerplate; no model call)
+ *   GET    /pulls/:id/smart-diff                          → reviewer-ordered diff (core/tests/wiring/docs/boilerplate; no model call)
  */
 const FINDING_ACTIONS = ['accept', 'dismiss'] as const;
 export default async function reviewsRoutes(appBase: FastifyInstance) {
@@ -189,7 +189,7 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
   // (like /risks, this endpoint spends no money).
   app.get(
     '/pulls/:id/smart-diff',
-    { schema: { params: IdParams } },
+    { schema: { params: IdParams, response: { 200: SmartDiff } } },
     async (req): Promise<SmartDiff> => {
       const { workspaceId } = await getContext(container, req);
       return service.getSmartDiff(workspaceId, req.params.id, req.log);

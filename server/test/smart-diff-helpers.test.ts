@@ -1,6 +1,6 @@
 /**
- * Smart Diff pure helpers (`docs/plans/0004-smart-diff.md` step 3):
- * `expandFindingLines` and `sortFiles`.
+ * Smart Diff pure helpers (`docs/plans/0009-smart-diff-spec-completion.md`
+ * step 4): `startLinesByFile` and `sortFiles`.
  *
  * `summarizePatch` and its tests were removed. It built `pseudocode_summary`
  * from regexes over the diff ("exports X", "changes Y", "new file · N added
@@ -10,38 +10,35 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  expandFindingLines,
+  startLinesByFile,
   sortFiles,
   type FindingRangeRow,
 } from '../src/modules/reviews/smart-diff/helpers.js';
-import { MAX_FINDING_RANGE_LINES } from '../src/modules/reviews/smart-diff/constants.js';
 import type { SmartDiffFile } from '@devdigest/shared';
 
-describe('expandFindingLines', () => {
-  it('dedupes overlapping ranges from different agents on the same file into one ascending array', () => {
+describe('startLinesByFile', () => {
+  it('dedupes the same start line from different agents into one ascending array', () => {
     const rows: FindingRangeRow[] = [
-      { file: 'src/app.ts', startLine: 10, endLine: 12 },
-      { file: 'src/app.ts', startLine: 11, endLine: 13 }, // a second agent, overlapping
+      { file: 'src/app.ts', startLine: 12 },
+      { file: 'src/app.ts', startLine: 10 },
+      { file: 'src/app.ts', startLine: 10 }, // a second agent, same start line
     ];
-    const result = expandFindingLines(rows);
-    expect(result.get('src/app.ts')).toEqual([10, 11, 12, 13]);
+    const result = startLinesByFile(rows);
+    expect(result.get('src/app.ts')).toEqual([10, 12]);
   });
 
-  it(`caps a single range at MAX_FINDING_RANGE_LINES (${MAX_FINDING_RANGE_LINES})`, () => {
-    const rows: FindingRangeRow[] = [{ file: 'src/big.ts', startLine: 1, endLine: 500 }];
-    const result = expandFindingLines(rows);
-    const lines = result.get('src/big.ts')!;
-    expect(lines).toHaveLength(MAX_FINDING_RANGE_LINES);
-    expect(lines[0]).toBe(1);
-    expect(lines[lines.length - 1]).toBe(MAX_FINDING_RANGE_LINES);
+  it('does no range expansion — only the exact start_line is recorded (Decision 7)', () => {
+    const rows: FindingRangeRow[] = [{ file: 'src/big.ts', startLine: 1 }];
+    const result = startLinesByFile(rows);
+    expect(result.get('src/big.ts')).toEqual([1]);
   });
 
   it('keeps different files in separate entries', () => {
     const rows: FindingRangeRow[] = [
-      { file: 'a.ts', startLine: 1, endLine: 1 },
-      { file: 'b.ts', startLine: 5, endLine: 5 },
+      { file: 'a.ts', startLine: 1 },
+      { file: 'b.ts', startLine: 5 },
     ];
-    const result = expandFindingLines(rows);
+    const result = startLinesByFile(rows);
     expect(result.get('a.ts')).toEqual([1]);
     expect(result.get('b.ts')).toEqual([5]);
   });

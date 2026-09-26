@@ -1,117 +1,131 @@
 /**
- * `classifyFile` — pure path+size classifier for Smart Diff
- * (`docs/plans/0004-smart-diff.md` step 2). The rule ORDER is the contract
- * under test: lock-file basename beats size (the acceptance criterion —
- * lock files are `boilerplate` regardless of size), generated paths beat
- * size, size beats wiring path, and only what's left is `core`.
+ * `classifyFile` — pure PATH-ONLY classifier for Smart Diff
+ * (`docs/plans/0009-smart-diff-spec-completion.md` step 1/3). Size
+ * thresholds are gone; the rule ORDER is the contract under test: all
+ * `SPEC_RULES` (boilerplate → tests → wiring → docs), then all
+ * `EXTRA_RULES` (same priority), else `core`.
  */
+import { posix } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { classifyFile } from '../src/modules/reviews/smart-diff/classify.js';
-import {
-  LOCK_BASENAMES,
-  BOILERPLATE_MIN_CHANGED_LINES,
-  WIRING_MAX_CHANGED_LINES,
-} from '../src/modules/reviews/smart-diff/constants.js';
+import { ROLE_ORDER, CLASSIFY_PRIORITY, SPEC_RULES, EXTRA_RULES } from '../src/modules/reviews/smart-diff/constants.js';
 
-describe('classifyFile — lock files are boilerplate regardless of size', () => {
-  for (const base of LOCK_BASENAMES) {
-    it(`${base} at 1 changed line`, () => {
-      expect(classifyFile(base, 1, 0)).toBe('boilerplate');
-    });
-    it(`${base} at 10,000 changed lines`, () => {
-      expect(classifyFile(base, 5000, 5000)).toBe('boilerplate');
-    });
-  }
-
-  it('a lock file nested inside src/ is still boilerplate — the basename rule fires before any path rule', () => {
-    // `src/` matches no generated/wiring path segment on its own, so this only
-    // passes if LOCK_BASENAMES is checked first, exactly as the implementation
-    // orders it.
-    expect(classifyFile('src/lib/package-lock.json', 1, 0)).toBe('boilerplate');
-  });
-});
-
-describe('classifyFile — generated paths/extensions are boilerplate', () => {
-  it('dist/ path segment', () => {
-    expect(classifyFile('dist/main.js', 10, 0)).toBe('boilerplate');
-  });
-  it('*.min.js extension', () => {
-    expect(classifyFile('public/app.min.js', 10, 0)).toBe('boilerplate');
-  });
-  it('__snapshots__/ path segment', () => {
-    expect(classifyFile('src/__snapshots__/Foo.test.tsx.snap', 10, 0)).toBe('boilerplate');
-  });
-  it('vendor/ path segment', () => {
-    expect(classifyFile('vendor/lib.js', 10, 0)).toBe('boilerplate');
-  });
-});
-
-describe('classifyFile — markdown is wiring, not core', () => {
-  it('CLAUDE.md (root-level doc, via WIRING_FILE_RE, not the basename list)', () => {
-    expect(classifyFile('CLAUDE.md', 50, 50)).toBe('wiring');
-  });
-  it('INSIGHTS.md nested under a module', () => {
-    expect(classifyFile('server/INSIGHTS.md', 50, 50)).toBe('wiring');
-  });
-});
-
-describe('classifyFile — wiring paths/basenames', () => {
-  it('src/config.ts', () => {
-    expect(classifyFile('src/config.ts', 50, 0)).toBe('wiring');
-  });
-  it('a routes.ts file', () => {
-    expect(classifyFile('src/modules/reviews/routes.ts', 50, 0)).toBe('wiring');
-  });
-  it('package.json (basename, any directory)', () => {
-    expect(classifyFile('package.json', 50, 0)).toBe('wiring');
-  });
-});
-
-describe('classifyFile — size boundaries', () => {
-  it(`a ${WIRING_MAX_CHANGED_LINES}-line edit to a core-looking file is wiring (exactly at the boundary)`, () => {
-    expect(classifyFile('src/modules/reviews/service.ts', 3, 3)).toBe('wiring');
-  });
-  it(`${WIRING_MAX_CHANGED_LINES + 1} changed lines on the same path is core, not wiring`, () => {
-    expect(classifyFile('src/modules/reviews/service.ts', 4, 3)).toBe('core');
-  });
-  it('a 120-line change to src/modules/reviews/service.ts is core', () => {
-    expect(classifyFile('src/modules/reviews/service.ts', 60, 60)).toBe('core');
-  });
-  it(`exactly ${BOILERPLATE_MIN_CHANGED_LINES} changed lines on a core-looking file flips it to boilerplate`, () => {
-    expect(classifyFile('src/modules/reviews/service.ts', 400, 400)).toBe('boilerplate');
-  });
-  it(`${BOILERPLATE_MIN_CHANGED_LINES - 1} changed lines stays core (just under the boilerplate cap)`, () => {
-    expect(classifyFile('src/modules/reviews/service.ts', 400, 399)).toBe('core');
-  });
-});
-
-describe('classifyFile — tests are boilerplate regardless of size', () => {
-  // Real paths from the dev DB's pr_files, not invented ones.
+describe('classifyFile — path → role table', () => {
   it.each([
-    'client/src/lib/format-usd.test.ts',
-    'client/src/components/run-cost-badge/RunCostBadge.test.tsx',
-    'server/test/rate-limit.test.ts',
-    'server/test/smart-diff.it.test.ts',
-    'src/foo.spec.ts',
-    'src/__tests__/bar.ts',
-    'e2e/specs/05-pr-diff.flow.json',
-  ])('%s → boilerplate', (path) => {
-    expect(classifyFile(path, 120, 0)).toBe('boilerplate');
+    // --- edge cases (spec priority order matters) ---
+    ['src/__tests__/__snapshots__/x.snap', 'boilerplate', 'edge 1 (snapshot > tests)'],
+    ['.claude/skills/security/SKILL.md', 'wiring', 'edge 2 (.claude/** > docs)'],
+    ['e2e/README.md', 'tests', 'edge 3 (e2e/** > docs)'],
+
+    // --- boilerplate: spec lock rules, nested basenames ---
+    ['server/pnpm-lock.yaml', 'boilerplate', 'spec lock rule, nested'],
+    ['reviewer-core/package-lock.json', 'boilerplate', 'spec lock rule, nested'],
+    ['Cargo.lock', 'boilerplate', 'spec *.lock rule'],
+
+    // --- boilerplate: spec generated paths/extensions ---
+    ['dist/main.js', 'boilerplate', 'spec dist/**'],
+    ['public/app.min.js', 'boilerplate', 'spec *.min.js'],
+    ['src/api.generated.ts', 'boilerplate', 'spec *.generated.*'],
+
+    // --- boilerplate: extras (vendor path segment, image extension) ---
+    ['server/src/vendor/shared/contracts/brief.ts', 'boilerplate', 'extra vendor path segment'],
+    ['assets/logo.png', 'boilerplate', 'extra image extension'],
+    // Pinned deliberate outcome: within the EXTRA pass, boilerplate is
+    // checked before docs (CLASSIFY_PRIORITY), so an image extension under a
+    // `docs/` folder is boilerplate, not docs — the image extra fires before
+    // the `docs?` segment extra ever runs. Contrast with `server/docs/diagram.dot`
+    // below, a non-image extension, which DOES reach the docs? extra.
+    ['server/docs/diagram.png', 'boilerplate', 'extra image extension beats extra docs? segment, pinned'],
+
+    // --- tests: spec ---
+    ['server/test/smart-diff-build.test.ts', 'tests', 'spec *.test.ts'],
+    ['client/src/components/diff-viewer/FileCard.test.tsx', 'tests', 'spec *.test.tsx'],
+    ['server/test/smart-diff.it.test.ts', 'tests', 'spec *.it.test.ts'],
+    ['e2e/specs/05-pr-diff.flow.json', 'tests', 'spec e2e/**'],
+    ['server/test/helpers/pg.ts', 'tests', 'spec **/test/**'],
+
+    // --- tests: extras ---
+    ['src/foo.spec.tsx', 'tests', 'extra TEST_FILE_RE (.spec.tsx)'],
+    ['src/__mocks__/api.ts', 'tests', 'extra __mocks__ segment'],
+    // Pinned: a capitalized component's `.spec.tsx` colocated test, same
+    // extra rule, real client-shaped path.
+    ['client/src/components/Foo.spec.tsx', 'tests', 'extra TEST_FILE_RE (.spec.tsx), pinned'],
+
+    // --- wiring: spec ---
+    ['client/src/components/diff-viewer/index.ts', 'wiring', 'spec index.ts'],
+    ['client/next.config.mjs', 'wiring', 'spec *.config.*'],
+    ['server/tsconfig.json', 'wiring', 'spec tsconfig*.json'],
+    ['server/.env.example', 'wiring', 'spec .env*'],
+    ['docker-compose.yml', 'wiring', 'spec docker-compose*.yml'],
+    ['.github/workflows/client.yml', 'wiring', 'spec .github/**'],
+
+    // --- wiring: extras ---
+    ['server/src/modules/reviews/routes.ts', 'wiring', 'extra WIRING_PATH_RE (routes)'],
+    ['server/src/db/migrations/0011_petite_molecule_man.sql', 'wiring', 'extra WIRING_PATH_RE (migrations)'],
+    ['client/messages/en/prReview.json', 'wiring', 'extra WIRING_PATH_RE (messages)'],
+    ['client/package.json', 'wiring', 'extra basename package.json'],
+    // Pinned deliberate outcomes (not look-alikes): the classifier's OWN
+    // source file matches its own "constants" wiring segment, same as any
+    // other module's constants.ts.
+    ['server/src/modules/reviews/smart-diff/constants.ts', 'wiring', 'extra WIRING_PATH_RE (constants), pinned'],
+    ['client/src/lib/types.ts', 'wiring', 'extra WIRING_PATH_RE (types), pinned'],
+    ['server/src/db/schema/reviews.ts', 'wiring', 'extra WIRING_PATH_RE (schema), pinned'],
+
+    // --- docs: spec ---
+    ['docs/specs/smart-diff.md', 'docs', 'spec docs/**'],
+    ['README.md', 'docs', 'spec README*'],
+    ['server/INSIGHTS.md', 'docs', 'spec **/*.md'],
+    ['CHANGELOG.md', 'docs', 'spec CHANGELOG*'],
+    ['LICENSE', 'docs', 'spec LICENSE'],
+
+    // --- docs: extras (moved from wiring — Decision 2) ---
+    ['server/docs/diagram.dot', 'docs', 'extra docs? path segment'],
+    ['notes.txt', 'docs', 'extra .txt extension'],
+
+    // --- core: fall-through / segment anchoring (no look-alike false hits) ---
+    ['server/src/modules/reviews/service.ts', 'core', 'fall-through'],
+    ['reviewer-core/src/prompt.ts', 'core', 'fall-through'],
+    [
+      'client/src/app/repos/[repoId]/pulls/[number]/_components/SmartDiffViewer/SmartDiffViewer.tsx',
+      'core',
+      'fall-through',
+    ],
+    ['contest.ts', 'core', 'segment anchoring (not a "test" segment)'],
+    ['latest/x.ts', 'core', 'segment anchoring (not a "test" segment)'],
+  ] as const)('%s → %s (%s)', (path, role) => {
+    expect(classifyFile(path)).toBe(role);
   });
 
-  it('a tiny test edit is still boilerplate — it must not fall through to wiring via the size rule', () => {
-    expect(classifyFile('client/src/lib/api.test.ts', 2, 1)).toBe('boilerplate');
+  it('has arity 1 — path only, no size params', () => {
+    expect(classifyFile.length).toBe(1);
   });
 
-  it('docs that merely live in a test directory stay wiring, not boilerplate', () => {
-    expect(classifyFile('e2e/CLAUDE.md', 10, 0)).toBe('wiring');
-    expect(classifyFile('e2e/INSIGHTS.md', 10, 0)).toBe('wiring');
+  it('ROLE_ORDER is the five roles in display order', () => {
+    expect(ROLE_ORDER).toEqual(['core', 'tests', 'wiring', 'docs', 'boilerplate']);
+  });
+});
+
+describe('CLASSIFY_PRIORITY is the enforced source of truth for rule precedence', () => {
+  it('is boilerplate → tests → wiring → docs', () => {
+    expect(CLASSIFY_PRIORITY).toEqual(['boilerplate', 'tests', 'wiring', 'docs']);
   });
 
-  it.each(['src/latest/foo.ts', 'src/contest.ts', 'src/attestation.ts', 'src/lib/testing-utils.ts'])(
-    'does not catch look-alikes: %s stays core',
-    (path) => {
-      expect(classifyFile(path, 50, 0)).toBe('core');
-    },
-  );
+  it('SPEC_RULES and EXTRA_RULES both key exactly the CLASSIFY_PRIORITY roles — no missing/extra role bucket', () => {
+    const expected = [...CLASSIFY_PRIORITY].sort();
+    expect(Object.keys(SPEC_RULES).sort()).toEqual(expected);
+    expect(Object.keys(EXTRA_RULES).sort()).toEqual(expected);
+  });
+
+  it('a path matching two roles resolves to the earlier role in CLASSIFY_PRIORITY, not rule-list order', () => {
+    // `.github/CONTRIBUTING.md` matches BOTH the SPEC wiring `.github/**`
+    // glob and the SPEC docs `**/*.md` glob (distinct from the pinned
+    // edge-case paths above, to prove the mechanism generically).
+    const path = '.github/CONTRIBUTING.md';
+    const base = posix.basename(path);
+    expect(SPEC_RULES.wiring.some((test) => test(path, base))).toBe(true);
+    expect(SPEC_RULES.docs.some((test) => test(path, base))).toBe(true);
+    // wiring precedes docs in CLASSIFY_PRIORITY, so it wins over docs.
+    expect(CLASSIFY_PRIORITY.indexOf('wiring')).toBeLessThan(CLASSIFY_PRIORITY.indexOf('docs'));
+    expect(classifyFile(path)).toBe('wiring');
+  });
 });

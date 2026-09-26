@@ -57,6 +57,19 @@ export default function PRDetailPage() {
   const invalidateRunHistory = () => {
     if (prId) qc.invalidateQueries({ queryKey: ["pr-runs", prId] });
   };
+  // Falling edge of `reviewRunning`: only the Findings tab's `onRunDone`
+  // refetches today, and only `reviews` — so the Diff tab's counters (finding
+  // dots, group counters, the comments+findings toggle) go stale after a run
+  // if the reader is on that tab. Previous value in a ref, not state, so this
+  // never triggers its own extra render.
+  const prevReviewRunning = React.useRef(reviewRunning);
+  React.useEffect(() => {
+    if (prevReviewRunning.current && !reviewRunning && prId) {
+      qc.invalidateQueries({ queryKey: ["reviews", prId] });
+      qc.invalidateQueries({ queryKey: ["pr-smart-diff", prId] });
+    }
+    prevReviewRunning.current = reviewRunning;
+  }, [reviewRunning, prId, qc]);
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
@@ -184,13 +197,7 @@ export default function PRDetailPage() {
         )}
 
         {tab === "diff" && (
-          <DiffTab
-            prId={prId}
-            filesCount={pr.files_count}
-            files={pr.files}
-            canComment={pr.status === "open"}
-            onOpenFinding={(id) => setParams({ tab: "findings", finding: id })}
-          />
+          <DiffTab prId={prId} filesCount={pr.files_count} files={pr.files} canComment={pr.status === "open"} />
         )}
       </div>
 

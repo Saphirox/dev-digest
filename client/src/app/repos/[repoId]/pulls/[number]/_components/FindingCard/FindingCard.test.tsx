@@ -58,3 +58,17 @@ describe("FindingCard (smoke, both themes)", () => {
     expect(onAction).toHaveBeenCalledWith("dismiss");
   });
 });
+
+describe("FindingCard — hideLocation (Smart Diff inline card)", () => {
+  it("without hideLocation (Findings tab default), the file:line/confidence row is present", () => {
+    renderWithIntl(<FindingCard f={FINDING} defaultExpanded onAction={() => {}} />);
+    expect(screen.getByText("src/config.ts:11")).toBeInTheDocument();
+  });
+
+  it("with hideLocation, the file:line/confidence row is absent", () => {
+    renderWithIntl(<FindingCard f={FINDING} defaultExpanded onAction={() => {}} hideLocation />);
+    expect(screen.queryByText("src/config.ts:11")).not.toBeInTheDocument();
+    // The rest of the card is unaffected — title still renders.
+    expect(screen.getByText("Hardcoded Stripe secret key")).toBeInTheDocument();
+  });
+});

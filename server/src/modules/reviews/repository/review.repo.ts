@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { Finding } from '@devdigest/shared';
@@ -78,18 +78,23 @@ export async function getReview(db: Db, reviewId: string): Promise<ReviewRow | u
   return row;
 }
 
-/** One finding range, the shape Smart Diff needs to build `finding_lines`. */
+/** One finding start line, the shape Smart Diff needs to build
+ *  `finding_lines` (Decision 7: sorted, unique `start_line`, no range
+ *  expansion). */
 export interface FindingRangeRow {
   file: string;
   startLine: number;
-  endLine: number;
 }
 
 /**
  * The findings from the LATEST review per agent on a PR (`kind='review'`
- * only — `'summary'` rows carry no findings worth flagging). Modelled on
- * `PullsRepository.latestScores` (`modules/pulls/repository.ts:79-86`):
- * `selectDistinctOn` needs its distinct columns to lead `orderBy`.
+ * only — `'summary'` rows carry no findings worth flagging), EXCLUDING
+ * dismissed findings (Decision 6 — precedent `pulls/repository.ts:110`
+ * `openFindingCounts`, same `isNull(dismissedAt)` filter): a dismissed
+ * finding contributes no line bar/label and doesn't count toward the file
+ * dot or the group counter. Modelled on `PullsRepository.latestScores`
+ * (`modules/pulls/repository.ts:79-86`): `selectDistinctOn` needs its
+ * distinct columns to lead `orderBy`.
  *
  * `reviews.agentId` is nullable, so every NULL-agent review (the seeded demo
  * data has no agent) collapses into ONE distinct-on group and contributes at
@@ -107,9 +112,9 @@ export async function latestFindingRangesForPull(db: Db, prId: string): Promise<
   if (ids.length === 0) return [];
 
   const rows = await db
-    .select({ file: t.findings.file, startLine: t.findings.startLine, endLine: t.findings.endLine })
+    .select({ file: t.findings.file, startLine: t.findings.startLine })
     .from(t.findings)
-    .where(inArray(t.findings.reviewId, ids));
+    .where(and(inArray(t.findings.reviewId, ids), isNull(t.findings.dismissedAt)));
   return rows;
 }
 

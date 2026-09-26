@@ -3,7 +3,7 @@
    DiffComments.tsx. Comments are GitHub PR review comments, proxied live. */
 import type { CSSProperties } from "react";
 import type { PrReviewComment } from "../../lib/types";
-import type { Line } from "./helpers";
+import { parsePatch, type Line } from "./helpers";
 
 /** What the viewer needs to read + write inline comments. */
 export interface DiffCommentApi {
@@ -71,6 +71,19 @@ export function keysForLine(ln: Line): string[] {
     if (k) keys.push(k);
   }
   return keys;
+}
+
+/** All keys a parsed line array can host a thread/finding on — the core
+ *  `FileCard` reuses to build its `renderedKeys` set. */
+export function keysForLines(lines: Line[]): Set<string> {
+  const keys = new Set<string>();
+  for (const ln of lines) for (const k of keysForLine(ln)) keys.add(k);
+  return keys;
+}
+
+/** All keys a patch's rendered lines can host a thread/finding on. */
+export function lineKeysForPatch(patch: string | null | undefined): Set<string> {
+  return keysForLines(parsePatch(patch));
 }
 
 /** The (line, side) a "+" on this row should comment on, or null if none. */

@@ -7,6 +7,7 @@ import type { Severity } from "@devdigest/shared";
 import { Icon, SEV } from "@devdigest/ui";
 import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
 import { type Line } from "../helpers";
+import { LINE_BADGE_LABEL } from "../constants";
 import { s, lineRowFor, lineSignFor, severityBorderFor, lineBadge, lineBadgeButton } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
@@ -17,7 +18,7 @@ export function CodeLine({
   threads,
   commenting,
   severity,
-  domId,
+  extras,
   onSeverityClick,
 }: {
   ln: Line;
@@ -27,8 +28,10 @@ export function CodeLine({
   /** Worst severity flagging this line, or `null`/`undefined` for none —
    *  when set, renders a coloured left border + right-hand marker. */
   severity?: Severity | null;
-  /** DOM id on the row wrapper, so a badge click can scroll to it. */
-  domId?: string;
+  /** Rendered after the comment threads, before the inline composer — the
+   *  slot for an inline finding card. Optional; the plain `DiffViewer` path
+   *  never sets it. */
+  extras?: React.ReactNode;
   /** When set, the severity badge renders as a `<button>` that calls this
    *  instead of a plain `<span>` — the plain `DiffViewer` path never sets it,
    *  so its render stays byte-identical. */
@@ -53,7 +56,6 @@ export function CodeLine({
 
   return (
     <div
-      id={domId}
       style={cs.rowWrap}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -81,21 +83,21 @@ export function CodeLine({
         </span>
         {severity && onSeverityClick && (
           // Unlike the old dot (decorative, `aria-hidden`), this badge
-          // carries visible text ("critical"/"warning"/"suggestion") that IS
+          // carries visible text (`blocker`/`warning`/`suggestion`) that IS
           // its accessible name — never hide it from assistive tech. No
           // `aria-label`/`title`/i18n: the visible label stays the name.
           <button type="button" style={lineBadgeButton(severity)} onClick={onSeverityClick}>
             <SevIcon size={11} />
-            {sevMeta?.label}
+            {LINE_BADGE_LABEL[severity]}
           </button>
         )}
         {severity && !onSeverityClick && (
           // Unlike the old dot (decorative, `aria-hidden`), this badge
-          // carries visible text ("critical"/"warning"/"suggestion") that IS
+          // carries visible text (`blocker`/`warning`/`suggestion`) that IS
           // its accessible name — never hide it from assistive tech.
           <span style={lineBadge(severity)}>
             <SevIcon size={11} />
-            {sevMeta?.label}
+            {LINE_BADGE_LABEL[severity]}
           </span>
         )}
       </div>
@@ -105,6 +107,8 @@ export function CodeLine({
         threads.map((th) => (
           <CommentThreadView key={th.rootId} thread={th} commenting={commenting} path={path} />
         ))}
+
+      {extras}
 
       {commenting && composing && target && (
         <InlineComposer

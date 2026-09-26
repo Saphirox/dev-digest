@@ -1,0 +1,1 @@
+export { SmartDiffFileRow } from "./SmartDiffFileRow";

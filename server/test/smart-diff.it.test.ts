@@ -1,10 +1,11 @@
 /**
- * `latestFindingRangesForPull` (`docs/plans/0004-smart-diff.md` step 5) —
- * DB-backed (testcontainers Postgres), because the single-latest-row bug this
- * query exists to avoid can only be proven against a real `selectDistinctOn`.
- * With three agents reviewing one PR, a naive "latest review overall" query
- * would keep only ONE agent's findings; `latestFindingRangesForPull` must
- * keep the newest review PER AGENT.
+ * `latestFindingRangesForPull` (`docs/plans/0009-smart-diff-spec-completion.md`
+ * step 4) — DB-backed (testcontainers Postgres), because the single-latest-row
+ * bug this query exists to avoid can only be proven against a real
+ * `selectDistinctOn`. With three agents reviewing one PR, a naive "latest
+ * review overall" query would keep only ONE agent's findings;
+ * `latestFindingRangesForPull` must keep the newest review PER AGENT, and
+ * exclude dismissed findings (Decision 6).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startPg, dockerAvailable, type PgFixture } from './helpers/pg.js';
@@ -119,9 +120,9 @@ d('latestFindingRangesForPull (Testcontainers pg)', () => {
     // A naive "one latest review overall" query would return only agent C's
     // (most recent) findings and drop A's and B's entirely.
     expect(ranges).toHaveLength(3);
-    expect(byFile.get('a.ts')).toMatchObject({ startLine: 2, endLine: 2 }); // A's NEWER review, not the older one
-    expect(byFile.get('b.ts')).toMatchObject({ startLine: 5, endLine: 5 });
-    expect(byFile.get('c.ts')).toMatchObject({ startLine: 20, endLine: 20 }); // C's NEWER review
+    expect(byFile.get('a.ts')).toMatchObject({ startLine: 2 }); // A's NEWER review, not the older one
+    expect(byFile.get('b.ts')).toMatchObject({ startLine: 5 });
+    expect(byFile.get('c.ts')).toMatchObject({ startLine: 20 }); // C's NEWER review
   });
 
   it("excludes kind='summary' rows even when they carry findings", async () => {

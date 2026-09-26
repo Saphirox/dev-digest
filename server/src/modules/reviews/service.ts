@@ -22,7 +22,7 @@ import { resolveFeatureModel } from '../settings/feature-models.js';
 import { RunLogger } from '../../platform/run-logger.js';
 import { loadDiff } from './diff-loader.js';
 import { deriveRisks } from './risks/index.js';
-import { buildSmartDiff } from './smart-diff/index.js';
+import { buildSmartDiff, ROLE_ORDER } from './smart-diff/index.js';
 
 // Re-export DTO types + converters for backward-compatible imports from
 // './service.js' (these previously lived here; logic now in ./helpers.ts).
@@ -308,10 +308,11 @@ export class ReviewService {
   // Smart Diff
   // ===========================================================================
 
-  /** Reviewer-ordered diff (`core`/`wiring`/`boilerplate`) — deterministic,
-   *  recomputed on every read, zero network I/O: only `pr_files` (already
-   *  persisted) and the latest-per-agent finding ranges are read. No
-   *  `loadDiff`, no `PullsService.getDetail`, no adapter call. */
+  /** Reviewer-ordered diff (`core`/`tests`/`wiring`/`docs`/`boilerplate`) —
+   *  deterministic, recomputed on every read, zero network I/O: only
+   *  `pr_files` (already persisted) and the latest-per-agent, non-dismissed
+   *  finding start lines are read. No `loadDiff`, no
+   *  `PullsService.getDetail`, no adapter call. */
   async getSmartDiff(workspaceId: string, prId: string, logger?: Logger): Promise<SmartDiff> {
     const pull = await this.repo.getPull(workspaceId, prId);
     if (!pull) throw new NotFoundError('Pull request not found');
@@ -332,18 +333,18 @@ export class ReviewService {
       0,
     );
     // Counts only — never a matched line's text, never a provider/model/cost
-    // field: this route makes no model call.
+    // field: this route makes no model call. All five roles, derived from
+    // `ROLE_ORDER` so a sixth role can't silently drop out of the log line.
+    const countsByRole = Object.fromEntries(ROLE_ORDER.map((role) => [role, byRole[role] ?? 0]));
     logger?.info(
       {
         prId,
         files: files.length,
-        core: byRole.core ?? 0,
-        wiring: byRole.wiring ?? 0,
-        boilerplate: byRole.boilerplate ?? 0,
+        ...countsByRole,
         totalLines: smartDiff.split_suggestion.total_lines,
         findingLines,
       },
-      `smart-diff: ${files.length} files → core×${byRole.core ?? 0}, wiring×${byRole.wiring ?? 0}, boilerplate×${byRole.boilerplate ?? 0}`,
+      `smart-diff: ${files.length} files → ${ROLE_ORDER.map((role) => `${role}×${countsByRole[role]}`).join(', ')}`,
     );
 
     return smartDiff;
