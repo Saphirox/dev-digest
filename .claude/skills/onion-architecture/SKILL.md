@@ -1,15 +1,17 @@
 ---
 name: onion-architecture
-description: "Onion Architecture for the DevDigest backend (server/ Fastify + Drizzle API and the reviewer-core engine): which ring a piece of code belongs to, which way imports may point, and how Fastify routes, services, Drizzle repositories, ports/adapters, the DI container and tests fit the rings. Use whenever you add or change backend code: a new module, route, service, repository, query, adapter, port, job handler, SSE stream or reviewer-core feature; when you decide where a backend function or file belongs; move logic out of a route; add a transaction; wire something into platform/container.ts; review a server PR for layering; or answer 'where should this go' on the backend. Trigger on routes.ts, service.ts, repository.ts, ports.ts, helpers.ts, container.db, container.ts, adapters/, drizzle in a route, port, adapter, dependency injection, layering, clean/hexagonal/onion architecture, dependency-cruiser, arch:check, even when the user doesn't say 'architecture'. Not for Fastify API mechanics, Drizzle query syntax or Postgres schema design: those live in fastify-best-practices, drizzle-orm-patterns and postgresql-table-design."
+description: "Onion Architecture for the DevDigest backend (server/ Fastify + Drizzle API, the reviewer-core engine, and the mcp/ stdio MCP server, which mirrors server/'s module layout): which ring a piece of code belongs to, which way imports may point, and how Fastify routes, services, Drizzle repositories, ports/adapters, the DI container and tests fit the rings. Use whenever you add or change backend code: a new module, route, service, repository, query, adapter, port, job handler, SSE stream, reviewer-core feature, or MCP tool/service in mcp/; when you decide where a backend function or file belongs; move logic out of a route; add a transaction; wire something into platform/container.ts; review a server PR for layering; or answer 'where should this go' on the backend. Trigger on routes.ts, tools.ts, service.ts, repository.ts, ports.ts, helpers.ts, container.db, container.ts, adapters/, drizzle in a route, port, adapter, dependency injection, layering, clean/hexagonal/onion architecture, dependency-cruiser, arch:check, even when the user doesn't say 'architecture'. Not for Fastify API mechanics, Drizzle query syntax or Postgres schema design: those live in fastify-best-practices, drizzle-orm-patterns and postgresql-table-design."
 metadata:
-  version: "1.0.0"
-  updated: "2026-09-19"
+  version: "1.1.0"
+  updated: "2026-09-26"
 ---
 
 # Onion Architecture (backend)
 
 Where backend code lives and which way it may depend. Scope: `server/`
-(`@devdigest/api`) and `reviewer-core/` (`@devdigest/reviewer-core`). This
+(`@devdigest/api`), `reviewer-core/` (`@devdigest/reviewer-core`) and `mcp/`
+(`@devdigest/mcp`). `mcp/` uses **the same module layout and rules** as
+`server/`, with `tools.ts` in place of `routes.ts`; see `references/mcp-package.md`. This
 skill covers placement and dependency direction. It doesn't cover how to use
 Fastify or Drizzle.
 
@@ -28,6 +30,7 @@ Fastify or Drizzle.
 | [references/application-services.md](references/application-services.md) | Writing a service, executor or pipeline; service dependencies; transactions across repositories |
 | [references/drizzle-infrastructure.md](references/drizzle-infrastructure.md) | Writing a repository, mapping rows to contracts, `tx`, translating Postgres errors |
 | [references/ports-and-adapters.md](references/ports-and-adapters.md) | Adding an external system (LLM, GitHub, git, a parser), a new port, or wiring the DI container; anything in `reviewer-core` |
+| [references/mcp-package.md](references/mcp-package.md) | Anything under `mcp/`: the folder → ring map mirroring `server/src`, import rules, MCP-specific presentation rules, and how `architecture.test.ts` enforces them |
 | [references/testing-and-enforcement.md](references/testing-and-enforcement.md) | Choosing the test type per ring; running or changing `arch:check` (dependency-cruiser) |
 
 Sources for every rule: [references.md](references.md).
@@ -175,3 +178,4 @@ A change that raises the warning count adds debt, so fix it or justify it in the
 - [ ] `reviewer-core` stays pure: no DB, fs, GitHub, `process.env`. Only `src/llm/` touches an SDK.
 - [ ] Tests match the ring: pure unit tests for domain and services (with fakes), `*.it.test.ts` for repositories.
 - [ ] `arch:check`: 0 errors, and the warning count is not above the baseline.
+- [ ] `mcp/` changes: `modules/<f>/{tools,service,helpers}.ts` layout as in `references/mcp-package.md`; `tools.ts` may import its own module's `ports`/`repository` (to build its repository + service from `container.client`/`container.resolver`, like `routes.ts` from `container.db`) and calls one service method — it never imports `adapters/` directly, nor another module's internals; only `messages.ts` writes model-facing error text; `cd mcp && npm test` (incl. `architecture.test.ts`) passes.
