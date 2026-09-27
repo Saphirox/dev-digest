@@ -9,7 +9,7 @@ import { git, repoRoot, untrackedFiles } from './lib.mjs';
 
 export function packageOf(path) {
   if (path.startsWith('server/src/modules/repo-intel/')) return 'repo-intel';
-  for (const pkg of ['client', 'server', 'reviewer-core', 'e2e']) {
+  for (const pkg of ['client', 'server', 'reviewer-core', 'e2e', 'mcp']) {
     if (path.startsWith(`${pkg}/`)) return pkg;
   }
   return 'root';

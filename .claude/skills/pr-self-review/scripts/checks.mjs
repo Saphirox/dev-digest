@@ -80,7 +80,7 @@ function lockfiles(files) {
     const dir = dirname(f.path);
     const competing =
       f.status === 'A' &&
-      ((name === 'pnpm-lock.yaml' && /^(reviewer-core|e2e)$/.test(dir)) ||
+      ((name === 'pnpm-lock.yaml' && /^(reviewer-core|e2e|mcp)$/.test(dir)) ||
         (name === 'package-lock.json' && /^(server|client)$/.test(dir)) ||
         name === 'pnpm-workspace.yaml');
     if (competing) {
@@ -91,7 +91,7 @@ function lockfiles(files) {
           f.path,
           1,
           `Stray ${name} — wrong package manager for ${dir}`,
-          'server/client are pnpm, reviewer-core/e2e are npm; a second lockfile makes installs non-deterministic and CI resolves different versions than local. Delete the file (CLAUDE.md "Do not touch").',
+          'server/client are pnpm, reviewer-core/e2e/mcp are npm; a second lockfile makes installs non-deterministic and CI resolves different versions than local. Delete the file (CLAUDE.md "Do not touch").',
         ),
       );
     } else if (
@@ -281,6 +281,63 @@ function archCheck(files) {
   return { findings, status: `ran: ${findings.length} new, ${preExisting} pre-existing ignored` };
 }
 
+/**
+ * `mcp/` has its own `architecture.test.ts` and no `arch:check` reach from
+ * `server/` (see `archCheck` above), so a change under `mcp/src/**` or
+ * `mcp/test/**` gets its own typecheck + test run here instead — the same
+ * "prove it, don't just read it" pattern.
+ */
+function mcpCheck(files) {
+  const touched = files.filter((f) => f.status !== 'D' && /^mcp\/(?:src|test)\/.+\.ts$/.test(f.path));
+  if (!touched.length) return { findings: [], status: 'not-needed' };
+  const mcpDir = join(repoRoot(), 'mcp');
+  const tsc = join(mcpDir, 'node_modules', '.bin', 'tsc');
+  const vitest = join(mcpDir, 'node_modules', '.bin', 'vitest');
+  if (!existsSync(tsc) || !existsSync(vitest)) {
+    return { findings: [], status: 'skipped: mcp/node_modules not installed (run `npm ci` in mcp/)' };
+  }
+  const findings = [];
+  try {
+    execFileSync(tsc, ['--noEmit', '-p', join(mcpDir, 'tsconfig.json')], {
+      cwd: mcpDir,
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (err) {
+    findings.push(
+      d(
+        'mcp-typecheck-failed',
+        'critical',
+        'mcp/tsconfig.json',
+        1,
+        'mcp: tsc --noEmit failed',
+        String(err.stdout || err.message).slice(0, 2000),
+      ),
+    );
+  }
+  try {
+    execFileSync(vitest, ['run'], {
+      cwd: mcpDir,
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (err) {
+    findings.push(
+      d(
+        'mcp-tests-failed',
+        'critical',
+        'mcp/test',
+        1,
+        'mcp: vitest run failed',
+        String(err.stdout || err.message).slice(0, 2000),
+      ),
+    );
+  }
+  return { findings, status: `ran: ${findings.length} failing` };
+}
+
 function diffSize(files) {
   const lines = files.reduce((n, f) => n + f.added.length, 0);
   return lines > LARGE_DIFF_LINES
@@ -300,6 +357,7 @@ function diffSize(files) {
 export function runChecks(files, base) {
   if (!files.length) return { findings: [], status: {} };
   const arch = archCheck(files);
+  const mcp = mcpCheck(files);
   return {
     findings: [
       ...migrations(files, base),
@@ -308,9 +366,10 @@ export function runChecks(files, base) {
       ...secrets(files),
       ...dbTestNaming(files, base),
       ...arch.findings,
+      ...mcp.findings,
       ...e2eSpecs(files),
       ...diffSize(files),
     ],
-    status: { archCheck: arch.status },
+    status: { archCheck: arch.status, mcpCheck: mcp.status },
   };
 }
