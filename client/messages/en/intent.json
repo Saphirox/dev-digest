@@ -1,7 +1,6 @@
 {
   "title": "Derived intent",
   "chip": "Intent",
-  "chipLabel": "Derived intent",
   "inScope": "In scope",
   "outOfScope": "Out of scope",
   "none": "—",

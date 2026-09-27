@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Badge, Button, Card, EmptyState, Icon } from "@devdigest/ui";
+import { Badge, Button, Card, EmptyState, Icon, SectionLabel } from "@devdigest/ui";
 import { usePrIntent, useDeriveIntent } from "@/lib/hooks";
 import { RiskAreas } from "./_components/RiskAreas";
 import { s } from "./styles";
@@ -37,6 +37,7 @@ export function IntentCard({ prId, headSha, repoFullName }: IntentCardProps) {
     return (
       <section>
         <Card>
+          <SectionLabel icon="Target">{t("chip")}</SectionLabel>
           <EmptyState
             icon="Sparkles"
             title={t("empty.title")}
@@ -54,31 +55,30 @@ export function IntentCard({ prId, headSha, repoFullName }: IntentCardProps) {
 
   return (
     <section>
-      <div style={s.header}>
-        <span role="img" aria-label={t("chipLabel")} style={s.chipWrap}>
-          <Icon.Target size={14} style={s.chipIcon} aria-hidden="true" />
-          <span style={s.chip} aria-hidden="true">
-            {t("chip")}
-          </span>
-        </span>
-        <div style={s.actions}>
-          {stale && (
-            <Badge color="var(--warn)" bg="var(--warn-bg)">
-              {t("stale")}
-            </Badge>
-          )}
-          <Button
-            type="button"
-            size="sm"
-            icon="RefreshCw"
-            loading={derive.isPending}
-            onClick={() => derive.mutate()}
-          >
-            {t("rederive")}
-          </Button>
-        </div>
-      </div>
       <Card>
+        <SectionLabel
+          icon="Target"
+          right={
+            <div style={s.actions}>
+              {stale && (
+                <Badge color="var(--warn)" bg="var(--warn-bg)">
+                  {t("stale")}
+                </Badge>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                icon="RefreshCw"
+                loading={derive.isPending}
+                onClick={() => derive.mutate()}
+              >
+                {t("rederive")}
+              </Button>
+            </div>
+          }
+        >
+          {t("chip")}
+        </SectionLabel>
         <p style={s.sentence}>&ldquo;{intent.intent}&rdquo;</p>
 
         <div style={s.columns}>

@@ -1,28 +1,6 @@
 import type { CSSProperties } from "react";
 
 export const s = {
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    marginBottom: 14,
-  } satisfies CSSProperties,
-  chipWrap: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-  } satisfies CSSProperties,
-  chipIcon: {
-    color: "var(--warn)",
-  } satisfies CSSProperties,
-  chip: {
-    fontSize: 12,
-    fontWeight: 700,
-    textTransform: "uppercase",
-    letterSpacing: "0.07em",
-    color: "var(--warn)",
-  } satisfies CSSProperties,
   actions: {
     display: "flex",
     alignItems: "center",
@@ -32,7 +10,7 @@ export const s = {
     margin: "0 0 16px",
     fontSize: 14.5,
     lineHeight: 1.55,
-    color: "var(--text)",
+    color: "var(--text-primary)",
     fontStyle: "italic",
   } satisfies CSSProperties,
   columns: {
@@ -45,9 +23,9 @@ export const s = {
     display: "flex",
     alignItems: "center",
     gap: 6,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 700,
-    letterSpacing: "0.06em",
+    letterSpacing: "0.07em",
     textTransform: "uppercase",
     color: ok ? "var(--ok)" : "var(--text-muted)",
     marginBottom: 8,
@@ -56,8 +34,11 @@ export const s = {
     margin: 0,
     padding: 0,
     listStyle: "none",
-    fontSize: 13.5,
+    fontSize: 13,
     lineHeight: 1.6,
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
   } satisfies CSSProperties,
   listItem: (inScope: boolean): CSSProperties => ({
     display: "flex",
