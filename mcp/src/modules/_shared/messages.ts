@@ -6,9 +6,9 @@
  * one into the `isError:true` text the model sees, always naming the next
  * tool or step. The few non-error ("ok") states (`run_agent_on_pr` timing
  * out, `get_findings` still running/none, `get_conventions` empty) and the
- * stub texts (`list_agents`' "No agents configured.", `get_blast_radius`'s
- * placeholder) are rendered by the small helper functions below and embedded
- * in a successful `structuredContent.next` / `content` text by each module's
+ * `list_agents`' "No agents configured." text, and `get_blast_radius`'s
+ * degraded-reason / "no callers" texts, are rendered by the small helper
+ * functions below and embedded in a successful `content` text by each module's
  * `tools.ts` — they are informational, not `isError`. A module's `render.ts`
  * is the separate, sibling catalogue for structured RESULT lines (one line
  * per finding/agent/convention row); it never composes error or ok/stub prose.
@@ -138,7 +138,25 @@ export function noAgentsMessage(): string {
   return 'No agents configured.';
 }
 
-/** `get_blast_radius`: homework stub, not implemented. */
-export function blastRadiusStubMessage(): string {
-  return 'get_blast_radius is not implemented yet. Use get_findings for review results.';
+// Hand-typed literal union, not imported from `modules/blast/ports.ts`
+// (`shared-messages`'s allowlist has no `ports` entry — this catalogue stays
+// self-contained, per `mcp-package.md`'s import rules).
+type BlastDegradedReason = 'flag_off' | 'index_failed' | 'index_partial' | 'repo_too_large' | 'no_data';
+
+const BLAST_DEGRADED_REASON_TEXT: Record<BlastDegradedReason, string> = {
+  flag_off: 'Repo-intel indexing is turned off for this repo — blast radius is unavailable.',
+  index_failed: 'The repo-intel index failed to build, so this result may be incomplete. Resync the repo, then retry.',
+  index_partial: 'The repo-intel index is only partially built, so this result may be incomplete.',
+  repo_too_large: 'This repo is too large for a full repo-intel index, so this result is limited.',
+  no_data: 'No repo-intel index data is available for this repo yet.',
+};
+
+/** `get_blast_radius`: the degraded-reason line shown above the blast-radius text when `degraded:true`. */
+export function degradedReasonMessage(reason: BlastDegradedReason): string {
+  return BLAST_DEGRADED_REASON_TEXT[reason];
+}
+
+/** `get_blast_radius`: a changed symbol with zero callers found in the indexed code. */
+export function noCallersMessage(): string {
+  return 'No callers found in the indexed code; nothing else references this symbol.';
 }

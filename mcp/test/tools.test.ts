@@ -19,6 +19,7 @@ import type { DevDigestApiClient } from '../src/adapters/devdigest-api/client.js
 import type { RepoRecord, PullRecord } from '../src/modules/_shared/ports.js';
 import type { ConventionListRecord } from '../src/modules/conventions/ports.js';
 import type { RunStatusRecord, StartReviewRunRecord } from '../src/modules/reviews/ports.js';
+import type { BlastRadiusRecord } from '../src/modules/blast/ports.js';
 import { fakeAgent } from './fakes.js';
 import {
   toToolResult,
@@ -68,6 +69,24 @@ class FakeApiClient {
     }
     if (path === `/pulls/${PR.id}/runs/active`) return [];
     if (path === `/pulls/${PR.id}/reviews`) return [];
+    if (path === `/pulls/${PR.id}/blast`) {
+      return {
+        changed_symbols: [{ name: 'processPayment', file: 'src/payments.ts', kind: 'function' }],
+        downstream: [
+          {
+            symbol: 'processPayment',
+            file: 'src/payments.ts',
+            callers: [{ name: 'handleCheckout', file: 'src/checkout.ts', line: 42 }],
+            endpoints_affected: ['POST /checkout'],
+            crons_affected: [],
+          },
+        ],
+        summary: null,
+        degraded: true,
+        reason: 'index_partial',
+        indexed_sha: 'abc123',
+      } satisfies BlastRadiusRecord;
+    }
     throw new Error(`FakeApiClient: unhandled GET ${path}`);
   }
 
@@ -147,14 +166,23 @@ describe('mcp tools (InMemoryTransport contract)', () => {
     expect(size).toBeLessThanOrEqual(6_000);
   });
 
-  it('returns a non-error stub result for get_blast_radius', async () => {
+  it('renders the blast radius with the caller file:line and the degraded reason text', async () => {
     const result = await client.callTool({
       name: 'get_blast_radius',
       arguments: { repo: 'acme/payments-api', pr: 7 },
     });
     expect(result.isError).toBeFalsy();
     const content = result.content as { type: string; text: string }[];
-    expect(content[0]?.text).toContain('get_findings');
+    expect(content[0]?.text).toContain('src/checkout.ts:42');
+    expect(content[0]?.text).toContain('partially built');
+  });
+
+  it('returns isError for an unknown PR on get_blast_radius', async () => {
+    const result = await client.callTool({
+      name: 'get_blast_radius',
+      arguments: { repo: 'acme/payments-api', pr: 999 },
+    });
+    expect(result.isError).toBe(true);
   });
 
   it('returns status "running" with the run_id and a get_findings pointer once the wait budget is exhausted', async () => {

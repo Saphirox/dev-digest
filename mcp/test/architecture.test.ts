@@ -122,7 +122,7 @@ const files = loadSourceFiles();
 
 // ---- Kind/module resolution -------------------------------------------
 
-const MODULE_NAMES = ['agents', 'reviews', 'conventions', 'repo-intel'] as const;
+const MODULE_NAMES = ['agents', 'reviews', 'conventions', 'blast'] as const;
 
 /** File kinds that belong to a named feature module (`modules/<name>/<kind>.ts`). */
 type ModuleKind = 'tools' | 'service' | 'repository' | 'ports' | 'helpers' | 'constants' | 'render';
@@ -173,7 +173,7 @@ const MODULE_KIND_SET = new Set<Kind>([
 ]);
 
 interface Resolved {
-  /** The named module (`agents`/`reviews`/`conventions`/`repo-intel`), `_shared`, or `null` for platform/adapter/composition/lib files. */
+  /** The named module (`agents`/`reviews`/`conventions`/`blast`), `_shared`, or `null` for platform/adapter/composition/lib files. */
   module: string | null;
   kind: Kind;
 }
@@ -303,7 +303,7 @@ describe('mcp onion layering (src/**, kind-resolved allowlists, mirrors server/)
     for (const name of MODULE_NAMES) {
       expect(resolvedFiles.some((f) => f.module === name && f.kind === 'tools')).toBe(true);
     }
-    for (const name of ['agents', 'reviews', 'conventions']) {
+    for (const name of ['agents', 'reviews', 'conventions', 'blast']) {
       expect(resolvedFiles.some((f) => f.module === name && f.kind === 'service')).toBe(true);
       expect(resolvedFiles.some((f) => f.module === name && f.kind === 'repository')).toBe(true);
       expect(resolvedFiles.some((f) => f.module === name && f.kind === 'ports')).toBe(true);

@@ -41,7 +41,7 @@ MCP tools in place of Fastify routes; see
 [`.claude/skills/onion-architecture/references/mcp-package.md`](../.claude/skills/onion-architecture/references/mcp-package.md)
 for the authoritative folder → ring map and import matrix. Summary:
 
-- `src/modules/<agents|reviews|conventions|repo-intel>/` — one folder per
+- `src/modules/<agents|reviews|conventions|blast>/` — one folder per
   feature, each owning its own contracts (no central `ports.ts`/`domain/`):
   - `ports.ts` — the module's record shapes (fields this package reads from
     the API, see below) + its `<Feature>Store` interface, declared next to
@@ -67,9 +67,11 @@ for the authoritative folder → ring map and import matrix. Summary:
   - `reviews/` covers both `run_agent_on_pr` and `get_findings` (one
     `tools.ts` builds one `ReviewsService` and registers both tools against
     it via `registerReviewsTools(server, container)`, like a module with two
-    Fastify routes sharing a service). `repo-intel/` is a `tools.ts`-only
-    stub for `get_blast_radius` — no service/repository yet, so its
-    registration function takes no container.
+    Fastify routes sharing a service). `blast/` is a full module for
+    `get_blast_radius` (`ports`/`repository`/`service`/`helpers`/`render`/
+    `tools.ts`), reading a PR's precomputed repo-intel blast radius (changed
+    symbols, their callers, dependent endpoints/crons) plus prior PRs
+    touching the same files, text-only content with no `outputSchema`.
 - `src/modules/_shared/` — cross-module resolution, used directly by every
   module's `service.ts` (not gated behind the container):
   - `ports.ts` — `RepoRecord`, `PullRecord`, `AgentRef` (just enough of an
@@ -147,9 +149,10 @@ for the authoritative folder → ring map and import matrix. Summary:
   know tool names (`MalformedResponse`'s `endpoint` is an HTTP path
   template, not a tool name). The same rule covers the handful of
   non-error, non-exception prose strings a tool needs (`list_agents`' "No
-  agents configured.", `get_blast_radius`'s stub text) — they live in
-  `messages.ts` too (`noAgentsMessage()`, `blastRadiusStubMessage()`), never
-  inlined in a `tools.ts`.
+  agents configured.", `get_blast_radius`'s degraded-reason and "no callers"
+  lines) — they live in `messages.ts` too (`noAgentsMessage()`,
+  `degradedReasonMessage()`, `noCallersMessage()`), never inlined in a
+  `tools.ts`.
 - **Tool descriptions and the whole `tools/list` payload are size-budgeted**
   (`instructions` ≤ 160 chars, serialized `tools/list` ≤ ~6,000 chars) and
   the budget is enforced by `test/tools.test.ts`, not by convention — a new

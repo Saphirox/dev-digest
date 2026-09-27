@@ -11,6 +11,7 @@ import { LookupApiRepository } from '../src/modules/_shared/repository.js';
 import { AgentsApiRepository } from '../src/modules/agents/repository.js';
 import { ReviewsApiRepository } from '../src/modules/reviews/repository.js';
 import { ConventionsApiRepository } from '../src/modules/conventions/repository.js';
+import { BlastApiRepository } from '../src/modules/blast/repository.js';
 
 class FakeClient {
   get = vi.fn();
@@ -143,5 +144,46 @@ describe('ConventionsApiRepository', () => {
     const err = await repo.listConventions('r1').catch((e: unknown) => e);
     expect(err).toBeInstanceOf(MalformedResponse);
     expect((err as MalformedResponse).endpoint).toBe('GET /repos/:id/conventions');
+  });
+});
+
+describe('BlastApiRepository', () => {
+  it('getBlastRadius parses the blast radius shape, percent-encoding prId', async () => {
+    const blast = {
+      changed_symbols: [{ name: 'processPayment', file: 'src/payments.ts', kind: 'function' }],
+      downstream: [
+        {
+          symbol: 'processPayment',
+          file: 'src/payments.ts',
+          callers: [{ name: 'handleCheckout', file: 'src/checkout.ts', line: 42 }],
+          endpoints_affected: ['POST /checkout'],
+          crons_affected: [],
+        },
+      ],
+      summary: null,
+      degraded: true,
+      reason: 'index_partial',
+      indexed_sha: 'abc123',
+    };
+    const fake = new FakeClient();
+    fake.get.mockResolvedValue(blast);
+    const repo = new BlastApiRepository(client(fake));
+
+    await expect(repo.getBlastRadius('pr id/with slash')).resolves.toEqual(blast);
+    expect(fake.get).toHaveBeenCalledWith(`/pulls/${encodeURIComponent('pr id/with slash')}/blast`);
+  });
+
+  it('rejects with MalformedResponse(endpoint) when a downstream entry fails the local schema', async () => {
+    const fake = new FakeClient();
+    fake.get.mockResolvedValue({
+      changed_symbols: [],
+      downstream: [{ symbol: 'x' /* missing callers/endpoints_affected/crons_affected */ }],
+      summary: null,
+    });
+    const repo = new BlastApiRepository(client(fake));
+
+    const err = await repo.getBlastRadius('p1').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(MalformedResponse);
+    expect((err as MalformedResponse).endpoint).toBe('GET /pulls/:id/blast');
   });
 });
