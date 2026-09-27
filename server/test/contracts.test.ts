@@ -84,6 +84,33 @@ describe('AI contracts parse fixtures', () => {
       }),
     ).not.toThrow();
     expect(() =>
+      BlastRadius.parse({
+        changed_symbols: [{ name: 'rateLimit', file: 'a.ts', kind: 'function' }],
+        downstream: [
+          {
+            symbol: 'rateLimit',
+            file: 'a.ts',
+            callers: [],
+            endpoints_affected: [],
+            crons_affected: [],
+          },
+        ],
+        summary: null,
+        degraded: true,
+        reason: 'index_partial',
+        indexed_sha: null,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      BlastRadius.parse({
+        changed_symbols: [],
+        downstream: [],
+        summary: null,
+        degraded: true,
+        reason: 'not_a_real_reason',
+      }),
+    ).toThrow();
+    expect(() =>
       Risks.parse({
         risks: [{ kind: 'auth_surface', title: 't', explanation: 'e', severity: 'high', refs: [] }],
       }),

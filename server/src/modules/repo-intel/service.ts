@@ -33,6 +33,7 @@ import type {
   BlastCallerRow,
   BlastChangedSymbol,
   BlastResult,
+  DegradedReason,
   FileRankRow,
   IndexResult,
   IndexState,
@@ -218,19 +219,35 @@ export class RepoIntelService implements RepoIntel {
    * clone (not the index). T2 promotes this path to the persistent layer.
    */
   async getBlastRadius(repoId: string, changedFiles: string[]): Promise<BlastResult> {
+    // Flag off: never touch the clone / codeIndex fallback either.
+    if (!this.container.config.repoIntelEnabled) {
+      return {
+        changedSymbols: [],
+        callers: [],
+        impactedEndpoints: [],
+        degraded: true,
+        reason: 'flag_off',
+      };
+    }
+
     // T3: serve from the persistent index when it's built. Falls through to the
-    // ripgrep best-effort below when the flag is off / index is absent.
-    if (this.container.config.repoIntelEnabled && changedFiles.length > 0) {
+    // ripgrep best-effort below when the index is absent/failed.
+    if (changedFiles.length > 0) {
       const persistent = await this.tryPersistentBlast(repoId, changedFiles);
       if (persistent) return persistent;
     }
+
+    // Below this point the index is unusable (no row, or status 'degraded'/
+    // 'failed') — the fallback reason reflects WHY, not a generic 'no_data'.
+    const state = await this.repo.tryGetIndexState(repoId);
+    const fallbackReason: DegradedReason = state?.status === 'failed' ? 'index_failed' : 'no_data';
 
     const empty: BlastResult = {
       changedSymbols: [],
       callers: [],
       impactedEndpoints: [],
       degraded: true,
-      reason: 'no_data',
+      reason: fallbackReason,
     };
 
     const repo = await this.repo.getRepoBasics(repoId);
@@ -299,7 +316,7 @@ export class RepoIntelService implements RepoIntel {
       callers: callerRows,
       impactedEndpoints: [...endpoints],
       degraded: true,
-      reason: 'no_data',
+      reason: fallbackReason,
     };
   }
 
@@ -310,7 +327,10 @@ export class RepoIntelService implements RepoIntel {
    *
    * Callers are PRECISE: only references whose `decl_file` resolved to a changed
    * file count. That favours precision over recall — an ambiguous
-   * (NULL decl_file) reference is not asserted as a caller.
+   * (NULL decl_file) reference is not asserted as a caller. A `partial` index
+   * still returns its (possibly incomplete) data, tagged `degraded:true,
+   * reason:'index_partial'` so consumers can show a "may be incomplete" notice
+   * without losing the data they do have.
    */
   private async tryPersistentBlast(
     repoId: string,
@@ -318,6 +338,7 @@ export class RepoIntelService implements RepoIntel {
   ): Promise<BlastResult | null> {
     const state = await this.repo.tryGetIndexState(repoId);
     if (!state || (state.status !== 'full' && state.status !== 'partial')) return null;
+    const partial = state.status === 'partial';
 
     // Changed symbols = declared in a changed file. Skip the qualified
     // `Class.method` dual-emit (the bare form already covers the name).
@@ -325,6 +346,10 @@ export class RepoIntelService implements RepoIntel {
     const changedSymbols: BlastChangedSymbol[] = [];
     const nameSet = new Set<string>();
     const seenSym = new Set<string>();
+    // Bare-name → declaring file(s), so a caller whose fromPath already IS the
+    // declaring file (a self-reference) can be excluded below — the facade
+    // otherwise reported the changed symbol as its own caller.
+    const declFilesByName = new Map<string, Set<string>>();
     for (const s of declRows) {
       if (s.name.includes('.')) continue;
       const key = `${s.name}:${s.path}`;
@@ -333,13 +358,26 @@ export class RepoIntelService implements RepoIntel {
         changedSymbols.push({ file: s.path, name: s.name, kind: s.kind });
       }
       nameSet.add(s.name);
+      const files = declFilesByName.get(s.name) ?? new Set<string>();
+      files.add(s.path);
+      declFilesByName.set(s.name, files);
     }
     if (nameSet.size === 0) {
-      return { changedSymbols, callers: [], impactedEndpoints: [], degraded: false };
+      return {
+        changedSymbols,
+        callers: [],
+        impactedEndpoints: [],
+        degraded: partial,
+        reason: partial ? 'index_partial' : undefined,
+      };
     }
 
-    // Resolved cross-file callers.
-    const callerRows = await this.repo.getResolvedCallers(repoId, changedFiles, [...nameSet]);
+    // Resolved cross-file callers, minus references sitting in the changed
+    // symbol's own declaring file (not a real external caller).
+    const rawCallerRows = await this.repo.getResolvedCallers(repoId, changedFiles, [...nameSet]);
+    const callerRows = rawCallerRows.filter(
+      (c) => !declFilesByName.get(c.toSymbol)?.has(c.fromPath),
+    );
     const callerFiles = [...new Set(callerRows.map((c) => c.fromPath))];
 
     // Enclosing caller symbol from the callers' persistent symbol rows.
@@ -371,6 +409,17 @@ export class RepoIntelService implements RepoIntel {
     }
     callers.sort((a, b) => b.rank - a.rank);
 
+    // Cap PER SYMBOL (not globally): a global slice after the cross-symbol
+    // rank sort could starve a low-rank symbol of every one of its callers.
+    const perSymbolCount = new Map<string, number>();
+    const cappedCallers: BlastCallerRow[] = [];
+    for (const c of callers) {
+      const n = perSymbolCount.get(c.viaSymbol) ?? 0;
+      if (n >= MAX_CALLERS_PER_SYMBOL) continue;
+      perSymbolCount.set(c.viaSymbol, n + 1);
+      cappedCallers.push(c);
+    }
+
     // Precomputed facts per caller file (endpoints + crons), so consumers can
     // attribute them to the changed symbol whose callers live in that file.
     const facts = await this.repo.getFileFacts(repoId, callerFiles);
@@ -383,10 +432,11 @@ export class RepoIntelService implements RepoIntel {
 
     return {
       changedSymbols,
-      callers: callers.slice(0, MAX_CALLERS_PER_SYMBOL),
+      callers: cappedCallers,
       impactedEndpoints: [...endpoints],
       factsByFile,
-      degraded: false,
+      degraded: partial,
+      reason: partial ? 'index_partial' : undefined,
     };
   }
 
