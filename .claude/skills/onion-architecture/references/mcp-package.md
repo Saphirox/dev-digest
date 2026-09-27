@@ -34,7 +34,7 @@ fields it reads and validates them with `safeParse` at the adapter boundary.
 | — | `modules/<f>/render.ts` | presentation | model-facing line text for that module's tools (including any "DONE …" header line — never inlined in `tools.ts`) |
 | `modules/_shared/context.ts` | `modules/_shared/resolver.ts` + `ports.ts` + `repository.ts` | application / port / infra | `owner/name` + PR number + agent → ids (process cache). Its own contracts (`RepoRecord`, `PullRecord`, `AgentRef`, `LookupStore`) live in `_shared/ports.ts`, implemented by `_shared/repository.ts` |
 | `modules/_shared/schemas.ts` | `modules/_shared/schemas.ts` | presentation | shared zod input fields (`repo`, `pr`, `agent`) |
-| `app.ts` error handler | `modules/_shared/messages.ts` | presentation | domain error → forward-leading text (`toToolResult`), the **only** prose catalogue — every non-error ("ok") forward-leading text and stub text (e.g. `list_agents`' "No agents configured.", `get_blast_radius`'s stub line) lives here too, never inlined in a `tools.ts` |
+| `app.ts` error handler | `modules/_shared/messages.ts` | presentation | domain error → forward-leading text (`toToolResult`), the **only** prose catalogue — every non-error ("ok") forward-leading text (e.g. `list_agents`' "No agents configured.", `get_blast_radius`'s degraded-reason and "no callers" lines) lives here too, never inlined in a `tools.ts` |
 
 There is **no** central `ports.ts` / `domain/types.ts`: each module owns its
 contracts, as in `server/`. A record shape needed by two modules is declared
@@ -42,9 +42,10 @@ structurally in each (only the fields that module reads), or in `_shared/ports.t
 when it belongs to the resolver.
 
 Modules: `agents/` (`list_agents`), `reviews/` (`run_agent_on_pr`,
-`get_findings`), `conventions/` (`get_conventions`), `repo-intel/`
-(`get_blast_radius`, a stub for now — no repository/service yet, so its
-registration function takes no container).
+`get_findings`), `conventions/` (`get_conventions`), `blast/`
+(`get_blast_radius`, a full module — `ports`/`repository`/`service`/
+`helpers`/`render`/`tools.ts` — reading a PR's precomputed blast radius plus
+prior PRs touching the same files).
 
 ## Import rules
 
