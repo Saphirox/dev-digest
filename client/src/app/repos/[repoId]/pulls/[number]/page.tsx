@@ -13,6 +13,7 @@ import { RepoNotFound } from "@/components/repo-not-found";
 import { PrDetailHeader } from "./_components/PrDetailHeader";
 import { OverviewTab } from "./_components/OverviewTab";
 import { IntentCard } from "./_components/IntentCard";
+import { BlastRadiusCard } from "./_components/BlastRadiusCard";
 import { FindingsTab } from "./_components/FindingsTab";
 import { DiffTab } from "./_components/DiffTab";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
@@ -164,7 +165,10 @@ export default function PRDetailPage() {
       <div style={{ padding: "24px 32px 44px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1080, margin: "0 auto" }}>
         {tab === "overview" && (
           <>
-            <IntentCard prId={prId} headSha={pr.head_sha} repoFullName={repoFullName} />
+            <div className="overview-grid">
+              <IntentCard prId={prId} headSha={pr.head_sha} repoFullName={repoFullName} />
+              <BlastRadiusCard prId={prId} repoId={repoId} headSha={pr.head_sha} repoFullName={repoFullName} />
+            </div>
             <OverviewTab prBody={pr.body} />
           </>
         )}

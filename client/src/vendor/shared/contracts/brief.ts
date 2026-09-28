@@ -64,18 +64,46 @@ export const BlastCaller = z.object({
 });
 export type BlastCaller = z.infer<typeof BlastCaller>;
 
+/** Mirrors repo-intel's `DegradedReason` (repo-intel/types.ts:27-32) —
+ *  extends the wire contract to carry the per-call degraded signal the
+ *  facade already produces internally (repo-intel/types.ts:15-21,
+ *  "DEGRADED CONTRACT"). */
+export const BlastDegradedReason = z.enum([
+  'flag_off',
+  'index_failed',
+  'index_partial',
+  'repo_too_large',
+  'no_data',
+]);
+export type BlastDegradedReason = z.infer<typeof BlastDegradedReason>;
+
 export const DownstreamImpact = z.object({
   symbol: z.string(),
+  /** The symbol's own declaring file, so a caller in the same file can
+   *  be told apart from a real external caller. */
+  file: z.string().optional(),
   callers: z.array(BlastCaller),
   endpoints_affected: z.array(z.string()),
   crons_affected: z.array(z.string()),
+  /** Highest caller rank for this symbol, for sort/emphasis. */
+  rank: z.number().optional(),
 });
 export type DownstreamImpact = z.infer<typeof DownstreamImpact>;
 
 export const BlastRadius = z.object({
   changed_symbols: z.array(ChangedSymbol),
   downstream: z.array(DownstreamImpact),
-  summary: z.string(),
+  /** Deterministic count string on the read path; only ever
+   *  LLM-authored text if/when the P2 summary trigger (Step 15) is
+   *  built. Nullable so the deterministic path can omit it. */
+  summary: z.string().nullable(),
+  /** True when this specific call fell back to a non-persistent path. */
+  degraded: z.boolean().optional(),
+  reason: BlastDegradedReason.optional(),
+  /** The repo-intel index's `lastIndexedSha` at the time of this read,
+   *  for an accurate GitHub blob link (falls back to the PR's
+   *  head_sha client-side when absent). */
+  indexed_sha: z.string().nullable().optional(),
 });
 export type BlastRadius = z.infer<typeof BlastRadius>;
 

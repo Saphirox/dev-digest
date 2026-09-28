@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { RepoIntelService } from '../src/modules/repo-intel/service.js';
-import type { RepoBasics } from '../src/modules/repo-intel/repository.js';
+import type {
+  FullSymbolRow,
+  RepoBasics,
+  ResolvedCallerRow,
+} from '../src/modules/repo-intel/repository.js';
 import type { IndexState } from '../src/modules/repo-intel/types.js';
 
 /**
@@ -121,5 +125,123 @@ describe('RepoIntel facade — degraded contract (flag on, but no data)', () => 
   it('getCallerSignatures with empty changedFiles → []', async () => {
     const svc = buildDegradedService({ flag: true, basics: { id: 'r1', owner: 'a', name: 'b', clonePath: '/tmp' } });
     await expect(svc.getCallerSignatures('r1', [])).resolves.toEqual([]);
+  });
+
+  it('getBlastRadius: flag off gives exactly flag_off (no clone/codeIndex touched)', async () => {
+    const svc = buildDegradedService({ flag: false });
+    const blast = await svc.getBlastRadius('r1', ['a.ts']);
+    expect(blast.degraded).toBe(true);
+    expect(blast.reason).toBe('flag_off');
+  });
+});
+
+/**
+ * T4 (Blast Radius, Step 4) — persistent-index `getBlastRadius` behaviour:
+ * partial/failed status pass-through, per-symbol caller cap, and same-file
+ * caller exclusion. `state.status` drives `tryPersistentBlast`; a `partial`
+ * state still returns data, tagged `degraded:true, reason:'index_partial'`.
+ */
+function buildPersistentService(opts: {
+  status: IndexState['status'];
+  symbolRows: FullSymbolRow[];
+  callerRows: ResolvedCallerRow[];
+}): RepoIntelService {
+  const container = {
+    config: { repoIntelEnabled: true },
+    db: {} as never,
+    codeIndex: { symbols: async () => [], references: async () => [] } as never,
+  } as never;
+  const svc = new RepoIntelService(container);
+  const state: IndexState = {
+    repoId: 'r1',
+    status: opts.status,
+    filesIndexed: 10,
+    filesSkipped: 0,
+    durationMs: 100,
+    lastIndexedSha: 'sha1',
+    indexerVersion: 2,
+    updatedAt: new Date(),
+  };
+  (svc as unknown as { repo: Record<string, unknown> }).repo = {
+    getRepoBasics: async () => null,
+    tryGetIndexState: async () => state,
+    getSymbolRows: async (_repoId: string, paths: string[]) =>
+      opts.symbolRows.filter((s) => paths.includes(s.path)),
+    getResolvedCallers: async () => opts.callerRows,
+    getFileFacts: async () => [],
+  };
+  return svc;
+}
+
+describe('RepoIntel facade — getBlastRadius (persistent index)', () => {
+  const changedSymbol: FullSymbolRow = {
+    path: 'a.ts',
+    name: 'rateLimit',
+    kind: 'function',
+    line: 1,
+    endLine: 5,
+    exported: true,
+    signature: null,
+  };
+
+  it('partial index status: degraded:true, reason:index_partial, callers present', async () => {
+    const svc = buildPersistentService({
+      status: 'partial',
+      symbolRows: [changedSymbol],
+      callerRows: [{ fromPath: 'b.ts', toSymbol: 'rateLimit', line: 10, rank: 5 }],
+    });
+    const blast = await svc.getBlastRadius('r1', ['a.ts']);
+    expect(blast.degraded).toBe(true);
+    expect(blast.reason).toBe('index_partial');
+    expect(blast.callers).toHaveLength(1);
+    expect(blast.callers[0]!.file).toBe('b.ts');
+  });
+
+  it('full index status with no changed symbols: not degraded', async () => {
+    const svc = buildPersistentService({ status: 'full', symbolRows: [], callerRows: [] });
+    const blast = await svc.getBlastRadius('r1', ['a.ts']);
+    expect(blast.degraded).toBeFalsy();
+    expect(blast.reason).toBeUndefined();
+  });
+
+  it('failed index status falls back to ripgrep path with reason:index_failed', async () => {
+    const svc = buildPersistentService({ status: 'failed', symbolRows: [], callerRows: [] });
+    const blast = await svc.getBlastRadius('r1', ['a.ts']);
+    expect(blast.degraded).toBe(true);
+    expect(blast.reason).toBe('index_failed');
+  });
+
+  it('caps callers PER SYMBOL: 25 callers on each of 2 symbols gives 20 each', async () => {
+    const symbolRows: FullSymbolRow[] = [
+      changedSymbol,
+      { path: 'a2.ts', name: 'otherFn', kind: 'function', line: 1, endLine: 5, exported: true, signature: null },
+    ];
+    const callerRows: ResolvedCallerRow[] = [];
+    for (let i = 0; i < 25; i++) {
+      callerRows.push({ fromPath: `caller-rateLimit-${i}.ts`, toSymbol: 'rateLimit', line: i + 1, rank: i });
+      callerRows.push({ fromPath: `caller-otherFn-${i}.ts`, toSymbol: 'otherFn', line: i + 1, rank: i });
+    }
+    const svc = buildPersistentService({ status: 'full', symbolRows, callerRows });
+    const blast = await svc.getBlastRadius('r1', ['a.ts', 'a2.ts']);
+    const byViaSymbol = new Map<string, number>();
+    for (const c of blast.callers) {
+      byViaSymbol.set(c.viaSymbol, (byViaSymbol.get(c.viaSymbol) ?? 0) + 1);
+    }
+    expect(byViaSymbol.get('rateLimit')).toBe(20);
+    expect(byViaSymbol.get('otherFn')).toBe(20);
+  });
+
+  it('excludes a caller reference sitting in the changed symbol\'s own declaring file', async () => {
+    const svc = buildPersistentService({
+      status: 'full',
+      symbolRows: [changedSymbol],
+      callerRows: [
+        { fromPath: 'a.ts', toSymbol: 'rateLimit', line: 3, rank: 9 }, // self-file — excluded
+        { fromPath: 'b.ts', toSymbol: 'rateLimit', line: 10, rank: 5 }, // real caller
+      ],
+    });
+    const blast = await svc.getBlastRadius('r1', ['a.ts']);
+    expect(blast.callers).toHaveLength(1);
+    expect(blast.callers[0]!.file).toBe('b.ts');
   });
 });

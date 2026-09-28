@@ -164,6 +164,16 @@ export interface GitHubClient {
   getIssue(repo: RepoRef, n: number): Promise<IssueMeta>;
   /** GET /user — for "posting as @user". */
   currentLogin(): Promise<string>;
+  /**
+   * Most recent commit SHAs that touched `path` on the default branch, newest
+   * first, capped at `limit` (Blast Radius "Prior PRs" history).
+   */
+  listCommitShasForPath(repo: RepoRef, path: string, limit: number): Promise<string[]>;
+  /** Merged and open PRs whose history includes commit `sha`. */
+  listPullsForCommit(
+    repo: RepoRef,
+    sha: string,
+  ): Promise<{ number: number; title: string; author: string; merged_at: string | null }[]>;
 }
 
 // ---------- Git (simple-git, heavy) ----------

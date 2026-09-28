@@ -42,7 +42,7 @@ export function RiskRow({ risk, open, onToggle, derivedForSha, repoFullName }: R
   return (
     <div style={s.row}>
       <div style={s.rowHeader}>
-        <I size={15} style={{ color: SEVERITY_COLOR[risk.severity], flexShrink: 0 }} />
+        <I size={14} style={{ color: SEVERITY_COLOR[risk.severity], flexShrink: 0 }} />
         <div style={s.rowMain}>
           <div style={s.title}>{risk.title}</div>
           {firstRef && (
@@ -52,6 +52,7 @@ export function RiskRow({ risk, open, onToggle, derivedForSha, repoFullName }: R
           )}
         </div>
         <IconBtn
+          size={26}
           icon={open ? "ChevronDown" : "ChevronRight"}
           label={open ? t("risks.collapse") : t("risks.expand")}
           onClick={onToggle}

@@ -13,12 +13,12 @@ export const s = {
   row: {
     border: "1px solid var(--border)",
     borderRadius: 8,
-    padding: "10px 12px",
+    padding: "8px 10px",
   } satisfies CSSProperties,
   rowHeader: {
     display: "flex",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   } satisfies CSSProperties,
   rowMain: {
     display: "flex",
@@ -29,8 +29,8 @@ export const s = {
   } satisfies CSSProperties,
   title: {
     fontSize: 13.5,
-    fontWeight: 700,
-    color: "var(--text)",
+    fontWeight: 600,
+    color: "var(--text-primary)",
   } satisfies CSSProperties,
   body: {
     marginTop: 10,

@@ -1,18 +1,57 @@
 {
+  "title": "Blast Radius",
+  "loading": "Loading blast radius…",
+  "error": "Couldn't load the blast radius.",
+  "noSymbols": "No changed symbols found in this diff.",
+  "noCallers": "No callers found in the indexed code; nothing else references this symbol.",
+  "endpoints": "Endpoints",
+  "crons": "Crons",
+  "showMoreEndpoints": "{count, plural, one {Show # more endpoint} other {Show # more endpoints}}",
+  "showLessEndpoints": "Show less",
+  "expand": "Expand",
+  "collapse": "Collapse",
   "stat": {
-    "symbols": "symbols",
-    "callers": "callers",
-    "endpoints": "endpoints",
-    "crons": "cron/jobs"
+    "symbols": "{count, plural, one {symbol} other {symbols}}",
+    "callers": "{count, plural, one {caller} other {callers}}",
+    "endpoints": "{count, plural, one {endpoint} other {endpoints}}",
+    "crons": "{count, plural, one {cron/job} other {cron/jobs}}"
   },
   "view": {
     "tree": "tree",
     "graph": "graph"
   },
-  "callerCount": "{count} callers",
+  "callerCount": "{count, plural, one {# caller} other {# callers}}",
   "noDownstream": "{count} changed symbol(s), no downstream callers found.",
+  "degraded": {
+    "title": "Blast radius is degraded",
+    "reason": {
+      "flag_off": "Repo indexing is turned off for this workspace.",
+      "index_failed": "The repo index failed to build.",
+      "index_partial": "The repo index is only partially built — some callers may be missing.",
+      "repo_too_large": "This repo is too large to index fully.",
+      "no_data": "No indexed data is available for this repo yet."
+    },
+    "resync": "Resync repo index",
+    "resyncing": "Resyncing…",
+    "resyncStarted": "Resync started — this can take a few minutes."
+  },
   "graph": {
     "empty": "No downstream callers to graph.",
-    "ariaLabel": "Blast radius graph"
+    "ariaLabel": "Blast radius graph",
+    "truncated": "Graph truncated — showing the most impactful nodes only.",
+    "legend": {
+      "changedSymbol": "changed symbol",
+      "callers": "callers",
+      "endpoints": "endpoints affected"
+    }
+  },
+  "priorPrs": {
+    "title": "Prior PRs touching these files",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "loading": "Loading prior PRs…",
+    "error": "Couldn't load prior PRs.",
+    "none": "No prior PRs found touching these files.",
+    "overlap": "{count, plural, one {# file overlaps} other {# files overlap}}"
   }
 }

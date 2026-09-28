@@ -87,6 +87,9 @@ describe("IntentCard", () => {
     usePrIntent.mockReturnValue({ data: null, isLoading: false });
     renderCard();
 
+    // The "Intent" SectionLabel renders in the !intent branch too (plan
+    // 0012 D3), alongside the empty-state CTA.
+    expect(screen.getByText("Intent")).toBeInTheDocument();
     expect(screen.getByText("No intent derived yet")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /derive intent/i }));
     expect(deriveMutate).toHaveBeenCalledTimes(1);

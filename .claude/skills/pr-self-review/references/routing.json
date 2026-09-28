@@ -3,7 +3,7 @@
   "skills": [
     {
       "skill": "security",
-      "include": ["server/src/**/*.ts", "reviewer-core/src/**/*.ts", "client/src/app/**/route.ts", "client/src/middleware.ts"],
+      "include": ["server/src/**/*.ts", "reviewer-core/src/**/*.ts", "client/src/app/**/route.ts", "client/src/middleware.ts", "mcp/src/adapters/**/*.ts"],
       "exclude": ["server/src/db/migrations/**"],
       "triggers": [
         {
@@ -14,7 +14,7 @@
     },
     {
       "skill": "onion-architecture",
-      "include": ["server/src/**/*.ts", "reviewer-core/src/**/*.ts", "server/test/**/*.ts"],
+      "include": ["server/src/**/*.ts", "reviewer-core/src/**/*.ts", "server/test/**/*.ts", "mcp/src/**/*.ts"],
       "exclude": ["server/src/db/migrations/**"]
     },
     {

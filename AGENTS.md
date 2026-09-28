@@ -5,7 +5,7 @@ review on it. Full picture: [README.md](README.md).
 
 ## Stack
 
-Node ≥22 · pnpm ≥10 · Docker (Postgres/pgvector). 4 standalone packages, **no
+Node ≥22 · pnpm ≥10 · Docker (Postgres/pgvector). 5 standalone packages, **no
 pnpm workspace** — each has its own `package.json`/lockfile, linked via
 tsconfig path aliases, not npm.
 
@@ -24,6 +24,7 @@ cd server && pnpm db:migrate && pnpm db:seed  # NOT run automatically on boot
 | `client/` | `@devdigest/web` | Next.js 15 studio UI | [client/AGENTS.md](client/AGENTS.md) |
 | `reviewer-core/` | `@devdigest/reviewer-core` | diff→prompt→LLM→findings engine | [reviewer-core/AGENTS.md](reviewer-core/AGENTS.md) |
 | `e2e/` | `@devdigest/e2e` | deterministic browser e2e | [e2e/AGENTS.md](e2e/AGENTS.md) |
+| `mcp/` | `@devdigest/mcp` | stdio MCP server over the API | [mcp/AGENTS.md](mcp/AGENTS.md) |
 
 `repo-intel` (codebase indexer) lives *inside* `server/src/modules/repo-intel`,
 not a separate package.
@@ -80,17 +81,18 @@ not a separate package.
 - Merged files under `server/src/db/migrations/` — immutable; add a new
   migration rather than editing an old one.
 - **Lock files** — `client/pnpm-lock.yaml`, `server/pnpm-lock.yaml`,
-  `reviewer-core/package-lock.json`, `e2e/package-lock.json`. Never hand-edit
-  one, and never cross the package managers: `server`/`client` are pnpm,
-  `reviewer-core`/`e2e` are npm. Running `pnpm install` inside an npm package
-  silently writes a competing `pnpm-lock.yaml` (and a stray
-  `pnpm-workspace.yaml`) — check `git status` before committing.
+  `reviewer-core/package-lock.json`, `e2e/package-lock.json`,
+  `mcp/package-lock.json`. Never hand-edit one, and never cross the package
+  managers: `server`/`client` are pnpm, `reviewer-core`/`e2e`/`mcp` are npm.
+  Running `pnpm install` inside an npm package silently writes a competing
+  `pnpm-lock.yaml` (and a stray `pnpm-workspace.yaml`) — check `git status`
+  before committing.
 - `e2e/specs/*.flow.json` and the `devdigest_pgdata` Docker volume — see
   [e2e/AGENTS.md](e2e/AGENTS.md) before touching either.
 
 ## Insights loop — mandatory
 
-Every module (`client`, `server`, `reviewer-core`, `repo-intel`, `e2e`) keeps
+Every module (`client`, `server`, `reviewer-core`, `repo-intel`, `e2e`, `mcp`) keeps
 an append-only `INSIGHTS.md`; cross-cutting lessons live in the root
 [INSIGHTS.md](INSIGHTS.md). None are auto-loaded — they're read on demand,
 lazily (section map first, then only what the task needs).

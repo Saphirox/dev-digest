@@ -369,4 +369,45 @@ export class OctokitGitHubClient implements GitHubClient {
     );
     return res.data.login;
   }
+
+  async listCommitShasForPath(repo: RepoRef, path: string, limit: number): Promise<string[]> {
+    return withRetry(() =>
+      withTimeout(
+        (async () => {
+          const res = await this.octokit.rest.repos.listCommits({
+            owner: repo.owner,
+            repo: repo.name,
+            path,
+            per_page: limit,
+          });
+          return res.data.map((c) => c.sha);
+        })(),
+        TIMEOUT,
+      ),
+    );
+  }
+
+  async listPullsForCommit(
+    repo: RepoRef,
+    sha: string,
+  ): Promise<{ number: number; title: string; author: string; merged_at: string | null }[]> {
+    return withRetry(() =>
+      withTimeout(
+        (async () => {
+          const res = await this.octokit.rest.repos.listPullRequestsAssociatedWithCommit({
+            owner: repo.owner,
+            repo: repo.name,
+            commit_sha: sha,
+          });
+          return res.data.map((pr) => ({
+            number: pr.number,
+            title: pr.title,
+            author: pr.user?.login ?? 'unknown',
+            merged_at: pr.merged_at ?? null,
+          }));
+        })(),
+        TIMEOUT,
+      ),
+    );
+  }
 }

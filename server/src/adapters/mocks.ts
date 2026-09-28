@@ -125,6 +125,13 @@ export interface MockGitHubOptions {
   login?: string;
   /** Existing inline review comments returned by listReviewComments. */
   comments?: PrReviewComment[];
+  /** Commit SHAs returned by `listCommitShasForPath`, keyed by path. */
+  commitsByPath?: Record<string, string[]>;
+  /** PRs returned by `listPullsForCommit`, keyed by commit sha. */
+  pullsBySha?: Record<
+    string,
+    { number: number; title: string; author: string; merged_at: string | null }[]
+  >;
 }
 
 export class MockGitHubClient implements GitHubClient {
@@ -132,6 +139,8 @@ export class MockGitHubClient implements GitHubClient {
   public openedPrs: OpenPrPayload[] = [];
   public committed: CommitFilesPayload[] = [];
   public createdComments: CreateReviewCommentInput[] = [];
+  public listCommitShasForPathCalls: { path: string; limit: number }[] = [];
+  public listPullsForCommitCalls: { sha: string }[] = [];
 
   constructor(private opts: MockGitHubOptions = {}) {}
 
@@ -236,6 +245,19 @@ export class MockGitHubClient implements GitHubClient {
 
   async currentLogin(): Promise<string> {
     return this.opts.login ?? 'mock-user';
+  }
+
+  async listCommitShasForPath(_repo: RepoRef, path: string, limit: number): Promise<string[]> {
+    this.listCommitShasForPathCalls.push({ path, limit });
+    return (this.opts.commitsByPath?.[path] ?? []).slice(0, limit);
+  }
+
+  async listPullsForCommit(
+    _repo: RepoRef,
+    sha: string,
+  ): Promise<{ number: number; title: string; author: string; merged_at: string | null }[]> {
+    this.listPullsForCommitCalls.push({ sha });
+    return this.opts.pullsBySha?.[sha] ?? [];
   }
 }
 
