@@ -26,7 +26,6 @@ const VersionParams = z.object({
  *   GET    /agents/:id/versions/:version → one config snapshot
  *   GET    /agents/:id/skills       → linked skills (ordered)
  *   POST   /agents/:id/skills       → set/reorder linked skills (+ per-link enabled) OR link one
- *   GET    /agents/:id/models       → dynamic model list for the agent's provider
  *   GET    /providers/:id/models    → dynamic model list for a provider (editor)
  */
 
@@ -179,13 +178,6 @@ export default async function agentsRoutes(appBase: FastifyInstance) {
       return links;
     },
   );
-
-  app.get('/agents/:id/models', { schema: { params: IdParams } }, async (req) => {
-    const { workspaceId } = await getContext(app.container, req);
-    const agent = await service.get(workspaceId, req.params.id);
-    if (!agent) throw new NotFoundError('Agent not found');
-    return service.listModels(agent.provider);
-  });
 
   app.get('/providers/:id/models', { schema: { params: ProviderParams } }, async (req) => {
     await getContext(app.container, req);

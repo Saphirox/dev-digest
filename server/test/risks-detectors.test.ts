@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildLineIndex } from '@devdigest/reviewer-core';
-import { parseUnifiedDiff } from '../src/adapters/git/diff-parser.js';
+import { parseUnifiedDiff } from '../src/lib/diff-parser.js';
 import { addedLines, toRanges } from '../src/modules/reviews/risks/helpers.js';
 import { deriveRisks, groundRisks } from '../src/modules/reviews/risks/detectors.js';
 

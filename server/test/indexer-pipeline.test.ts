@@ -69,6 +69,41 @@ function makeRepoStub(opts: {
     insertReferences: async (rows: unknown[]) => {
       references.push(...rows);
     },
+    // Plan 0013 Step 14: the atomic replace methods the pipeline now calls
+    // instead of the delete+insert(+patchFileFacts) sequence directly —
+    // composed from the same delete/insert logic as the ops above (in-memory,
+    // "atomicity" is a given here; the real transaction is covered by
+    // `repo-intel-replace-atomic.it.test.ts`).
+    replaceRepoSymbols: async (
+      _repoId: string,
+      symbolRows: unknown[],
+      referenceRows: unknown[],
+    ) => {
+      symbols.length = 0;
+      references.length = 0;
+      symbols.push(...symbolRows);
+      references.push(...referenceRows);
+    },
+    replaceFileSymbols: async (
+      _repoId: string,
+      paths: string[],
+      symbolRows: unknown[],
+      referenceRows: unknown[],
+      _factRows: unknown[],
+    ) => {
+      const set = new Set(paths);
+      for (let i = symbols.length - 1; i >= 0; i--) {
+        if (set.has((symbols[i] as { path: string }).path)) symbols.splice(i, 1);
+      }
+      for (let i = references.length - 1; i >= 0; i--) {
+        if (set.has((references[i] as { fromPath: string }).fromPath)) {
+          references.splice(i, 1);
+        }
+      }
+      symbols.push(...symbolRows);
+      references.push(...referenceRows);
+      // facts are a no-op in this stub too (see `patchFileFacts` below).
+    },
     upsertIndexState: async (s: {
       repoId: string;
       lastIndexedSha: string;

@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import type { Finding } from '@devdigest/shared';
 import { buildLineIndex } from '@devdigest/reviewer-core';
 import { walkDiff } from '../src/lib/diff-lines.js';
-import { parseUnifiedDiff } from '../src/adapters/git/diff-parser.js';
+import { parseUnifiedDiff } from '../src/lib/diff-parser.js';
 import { groundFindings } from '../src/platform/grounding.js';
 
 // a.ts is a NEW 4-line file; real `git diff` output puts b.ts's headers

@@ -1,5 +1,5 @@
 import { and, desc, eq } from 'drizzle-orm';
-import type { Db } from '../../../db/client.js';
+import type { Db, DbExecutor } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { RunSummary, RunTrace } from '@devdigest/shared';
 
@@ -162,7 +162,7 @@ export interface CompleteRunValues {
 }
 
 export async function completeAgentRun(
-  db: Db,
+  db: DbExecutor,
   runId: string,
   values: CompleteRunValues,
 ): Promise<void> {

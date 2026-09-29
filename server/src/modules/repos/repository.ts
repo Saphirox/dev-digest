@@ -1,27 +1,17 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
+import type { InsertRepo, RepoRecord, RepoStore } from './ports.js';
 
 /**
  * F1 — repos data-access layer. The ONLY place that touches the `repos`
  * table. Every query is scoped by `workspaceId` (tenancy guard).
  */
-
-export type RepoRow = typeof t.repos.$inferSelect;
-
-export interface InsertRepo {
-  workspaceId: string;
-  owner: string;
-  name: string;
-  fullName: string;
-  createdBy: string;
-}
-
-export class RepoRepository {
+export class RepoRepository implements RepoStore {
   constructor(private db: Db) {}
 
   /** Find a repo in a workspace by its `owner/name` full name (dedupe on add). */
-  async findByFullName(workspaceId: string, fullName: string): Promise<RepoRow | undefined> {
+  async findByFullName(workspaceId: string, fullName: string): Promise<RepoRecord | undefined> {
     const [row] = await this.db
       .select()
       .from(t.repos)
@@ -29,11 +19,11 @@ export class RepoRepository {
     return row;
   }
 
-  async list(workspaceId: string): Promise<RepoRow[]> {
+  async list(workspaceId: string): Promise<RepoRecord[]> {
     return this.db.select().from(t.repos).where(eq(t.repos.workspaceId, workspaceId));
   }
 
-  async getById(workspaceId: string, id: string): Promise<RepoRow | undefined> {
+  async getById(workspaceId: string, id: string): Promise<RepoRecord | undefined> {
     const [row] = await this.db
       .select()
       .from(t.repos)
@@ -41,7 +31,7 @@ export class RepoRepository {
     return row;
   }
 
-  async insert(values: InsertRepo): Promise<RepoRow> {
+  async insert(values: InsertRepo): Promise<RepoRecord> {
     const [row] = await this.db
       .insert(t.repos)
       .values({
@@ -83,5 +73,10 @@ export class RepoRepository {
       .where(and(eq(t.repos.workspaceId, workspaceId), eq(t.repos.id, id)))
       .returning({ id: t.repos.id });
     return deleted.length > 0;
+  }
+
+  /** Bump `last_polled_at` only — the manual poll route (no clone path change). */
+  async touchPolledAt(repoId: string): Promise<void> {
+    await this.db.update(t.repos).set({ lastPolledAt: new Date() }).where(eq(t.repos.id, repoId));
   }
 }

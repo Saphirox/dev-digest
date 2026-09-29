@@ -24,7 +24,10 @@ import { estimateCost } from '../adapters/llm/pricing.js';
 import { PriceBook } from './price-book.js';
 import { ConfigError } from './errors.js';
 import { AgentsRepository } from '../modules/agents/repository.js';
-import { ReviewRepository } from '../modules/reviews/repository.js';
+import { RepoRepository } from '../modules/repos/repository.js';
+import { PullsRepository } from '../modules/pulls/repository.js';
+import { SettingsRepository } from '../modules/settings/repository.js';
+import { FeatureModels } from '../modules/settings/feature-models.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
@@ -71,11 +74,13 @@ export class Container {
   // runs). Constructed here, in the composition root, so consuming modules use
   // `container.agentsRepo` instead of reaching into another module's folder.
   private _agentsRepo?: AgentsRepository;
-  private _reviewRepo?: ReviewRepository;
+  private _reposRepo?: RepoRepository;
+  private _pullsRepo?: PullsRepository;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
+  private _featureModels?: FeatureModels;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
     this.config = config;
@@ -96,8 +101,20 @@ export class Container {
     return (this._agentsRepo ??= new AgentsRepository(this.db));
   }
 
-  get reviewRepo(): ReviewRepository {
-    return (this._reviewRepo ??= new ReviewRepository(this.db));
+  get reposRepo(): RepoRepository {
+    return (this._reposRepo ??= new RepoRepository(this.db));
+  }
+
+  /** Per-feature model resolution (workspace override, else registry default). */
+  get featureModels(): FeatureModels {
+    return (this._featureModels ??= new FeatureModels({
+      store: new SettingsRepository(this.db),
+      llm: (id) => this.llm(id),
+    }));
+  }
+
+  get pullsRepo(): PullsRepository {
+    return (this._pullsRepo ??= new PullsRepository(this.db));
   }
 
   get codeIndex(): CodeIndex {

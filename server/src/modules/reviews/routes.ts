@@ -1,11 +1,21 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { z } from 'zod';
 import { RunRequest, SmartDiff } from '@devdigest/shared';
 import type { IntentDeriveResult, PrIntentRecord, PrRisks, RunEvent } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { NotFoundError } from '../../platform/errors.js';
 import { ReviewService } from './service.js';
+
+/**
+ * A missing/`null` JSON body arrives on `req.body` as `undefined`/`null`
+ * (never `{}`) — coerce it to `{}` BEFORE the vendored `RunRequest` contract
+ * runs, so an absent body still validates and reaches `resolveTargets`'
+ * `invalid_run_request` check (contract itself stays untouched; see plan
+ * 0013 Step 10a / Risks: "Empty body").
+ */
+const RunRequestBody = z.preprocess((val) => val ?? {}, RunRequest);
 
 /**
  * reviews module.
@@ -27,13 +37,19 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
 
   // ---- Run a review (manual trigger) -------------------------------
   // Tight per-route limit: each call can fan out to expensive LLM runs.
-  // Body stays a tolerant manual parse (both fields optional; empty body is OK).
+  // Schema-validated (both fields optional; empty/absent body is OK — see
+  // RunRequestBody above).
   app.post(
     '/pulls/:id/review',
-    { schema: { params: IdParams }, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    {
+      schema: { params: IdParams, body: RunRequestBody },
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    },
     async (req) => {
     const { workspaceId } = await getContext(container, req);
-    const body = RunRequest.parse(req.body ?? {});
+    // Fallback for the case Fastify skips body validation entirely on a
+    // genuinely absent body (no content-type / no bytes sent).
+    const body = req.body ?? {};
     const targets = await service.resolveTargets(workspaceId, {
       ...(body.agentId !== undefined ? { agentId: body.agentId } : {}),
       ...(body.all !== undefined ? { all: body.all } : {}),

@@ -1,11 +1,12 @@
-import { eq } from 'drizzle-orm';
 import {
   FEATURE_MODELS,
   FeatureModelChoice,
   type FeatureModelId,
+  type StructuredRequest,
+  type StructuredResult,
 } from '@devdigest/shared';
-import type { Container } from '../../platform/container.js';
-import * as t from '../../db/schema.js';
+import type { LLMProvider } from '@devdigest/shared';
+import type { SettingsStore } from './ports.js';
 import { rowsToSettings } from './helpers.js';
 
 /**
@@ -27,31 +28,50 @@ export function defaultFeatureModel(id: FeatureModelId): FeatureModelChoice {
   return DEFAULTS[id];
 }
 
-/**
- * The workspace's override for `id`, or `undefined` when unset/invalid. Callers
- * that keep their own dynamic default (e.g. conventions) use this directly so
- * that default is preserved; callers with a static default use
- * `resolveFeatureModel` instead.
- */
-export async function getFeatureModelOverride(
-  container: Container,
-  workspaceId: string,
-  id: FeatureModelId,
-): Promise<FeatureModelChoice | undefined> {
-  const rows = await container.db
-    .select({ key: t.settings.key, value: t.settings.value })
-    .from(t.settings)
-    .where(eq(t.settings.workspaceId, workspaceId));
-  const fm = (rowsToSettings(rows) as { feature_models?: Record<string, unknown> }).feature_models;
-  const parsed = FeatureModelChoice.safeParse(fm?.[id]);
-  return parsed.success ? parsed.data : undefined;
+export interface FeatureModelsDeps {
+  store: Pick<SettingsStore, 'list'>;
+  llm: (id: FeatureModelChoice['provider']) => Promise<LLMProvider>;
 }
 
-/** Resolve `id` to a concrete provider+model: workspace override, else registry default. */
-export async function resolveFeatureModel(
-  container: Container,
-  workspaceId: string,
-  id: FeatureModelId,
-): Promise<FeatureModelChoice> {
-  return (await getFeatureModelOverride(container, workspaceId, id)) ?? DEFAULTS[id];
+/**
+ * Resolves a feature's provider+model once per call (never inside a per-call
+ * catch — see the 2026-09-27 lazy-port INSIGHT) and wraps the structured LLM
+ * call for callers that only need one round-trip (conventions extraction,
+ * intent classification).
+ */
+export class FeatureModels {
+  constructor(private deps: FeatureModelsDeps) {}
+
+  /**
+   * The workspace's override for `id`, or `undefined` when unset/invalid.
+   * Callers that keep their own dynamic default (e.g. conventions) use this
+   * directly so that default is preserved; callers with a static default use
+   * `resolve` instead.
+   */
+  async override(workspaceId: string, id: FeatureModelId): Promise<FeatureModelChoice | undefined> {
+    const rows = await this.deps.store.list(workspaceId);
+    const fm = (rowsToSettings(rows) as { feature_models?: Record<string, unknown> }).feature_models;
+    const parsed = FeatureModelChoice.safeParse(fm?.[id]);
+    return parsed.success ? parsed.data : undefined;
+  }
+
+  /** Resolve `id` to a concrete provider+model: workspace override, else registry default. */
+  async resolve(workspaceId: string, id: FeatureModelId): Promise<FeatureModelChoice> {
+    return (await this.override(workspaceId, id)) ?? DEFAULTS[id];
+  }
+
+  /**
+   * Resolve the feature's choice once, resolve its LLM provider once (no
+   * catch), and run one `completeStructured` call.
+   */
+  async completeStructured<T>(
+    workspaceId: string,
+    id: FeatureModelId,
+    req: Omit<StructuredRequest<T>, 'model'>,
+  ): Promise<{ choice: FeatureModelChoice; result: StructuredResult<T> }> {
+    const choice = await this.resolve(workspaceId, id);
+    const llm = await this.deps.llm(choice.provider);
+    const result = await llm.completeStructured<T>({ ...req, model: choice.model });
+    return { choice, result };
+  }
 }

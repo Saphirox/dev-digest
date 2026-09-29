@@ -1,5 +1,5 @@
 import type { UnifiedDiff, DiffHunk } from '@devdigest/shared';
-import { walkDiff } from '../../lib/diff-lines.js';
+import { walkDiff } from './diff-lines.js';
 
 /**
  * Minimal unified-diff parser. Extracts per-file hunks and the set of new-side

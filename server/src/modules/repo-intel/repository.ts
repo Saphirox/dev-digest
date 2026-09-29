@@ -14,7 +14,7 @@
  * facade keeps returning degraded — never throws.
  */
 import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
-import type { Db } from '../../db/client.js';
+import type { Db, DbExecutor } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import { clampIndexedName } from '../../db/schema/context.js';
 import type { DegradedReason, FileRankRow, IndexState, IndexStatus } from './types.js';
@@ -244,8 +244,12 @@ export class RepoIntelRepository {
 
   /** Wipe every cached symbol + reference row for a repo (full-index reset). */
   async deleteAllForRepo(repoId: string): Promise<void> {
-    await this.db.delete(t.symbols).where(eq(t.symbols.repoId, repoId));
-    await this.db.delete(t.references).where(eq(t.references.repoId, repoId));
+    await this.deleteAllForRepoEx(this.db, repoId);
+  }
+
+  private async deleteAllForRepoEx(ex: DbExecutor, repoId: string): Promise<void> {
+    await ex.delete(t.symbols).where(eq(t.symbols.repoId, repoId));
+    await ex.delete(t.references).where(eq(t.references.repoId, repoId));
   }
 
   /**
@@ -254,11 +258,15 @@ export class RepoIntelRepository {
    * Inline-empty guard keeps the no-op refresh path zero-DB.
    */
   async deleteForFiles(repoId: string, paths: string[]): Promise<void> {
+    await this.deleteForFilesEx(this.db, repoId, paths);
+  }
+
+  private async deleteForFilesEx(ex: DbExecutor, repoId: string, paths: string[]): Promise<void> {
     if (paths.length === 0) return;
-    await this.db
+    await ex
       .delete(t.symbols)
       .where(and(eq(t.symbols.repoId, repoId), inArray(t.symbols.path, paths)));
-    await this.db
+    await ex
       .delete(t.references)
       .where(
         and(eq(t.references.repoId, repoId), inArray(t.references.fromPath, paths)),
@@ -267,22 +275,67 @@ export class RepoIntelRepository {
 
   /** Batched insert into `symbols`. Uses the same chunk size as blast. */
   async insertSymbols(rows: IndexerSymbolRow[]): Promise<void> {
+    await this.insertSymbolsEx(this.db, rows);
+  }
+
+  private async insertSymbolsEx(ex: DbExecutor, rows: IndexerSymbolRow[]): Promise<void> {
     if (rows.length === 0) return;
     // Clamp the indexed `name` so a pathological multi-KB identifier can't blow
     // the btree row-size limit and crash the indexer (see clampIndexedName).
     const safe = rows.map((r) => ({ ...r, name: clampIndexedName(r.name) }));
     for (let i = 0; i < safe.length; i += INSERT_CHUNK_SIZE) {
-      await this.db.insert(t.symbols).values(safe.slice(i, i + INSERT_CHUNK_SIZE));
+      await ex.insert(t.symbols).values(safe.slice(i, i + INSERT_CHUNK_SIZE));
     }
   }
 
   /** Batched insert into `references`. */
   async insertReferences(rows: IndexerReferenceRow[]): Promise<void> {
+    await this.insertReferencesEx(this.db, rows);
+  }
+
+  private async insertReferencesEx(ex: DbExecutor, rows: IndexerReferenceRow[]): Promise<void> {
     if (rows.length === 0) return;
     const safe = rows.map((r) => ({ ...r, toSymbol: clampIndexedName(r.toSymbol) }));
     for (let i = 0; i < safe.length; i += INSERT_CHUNK_SIZE) {
-      await this.db.insert(t.references).values(safe.slice(i, i + INSERT_CHUNK_SIZE));
+      await ex.insert(t.references).values(safe.slice(i, i + INSERT_CHUNK_SIZE));
     }
+  }
+
+  /**
+   * Atomically replace a repo's WHOLE symbol/reference cache — the full-index
+   * "delete-then-insert" step in one `db.transaction` so a mid-way failure
+   * leaves the prior symbols/references intact instead of an empty cache.
+   */
+  async replaceRepoSymbols(
+    repoId: string,
+    symbols: IndexerSymbolRow[],
+    references: IndexerReferenceRow[],
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await this.deleteAllForRepoEx(tx, repoId);
+      await this.insertSymbolsEx(tx, symbols);
+      await this.insertReferencesEx(tx, references);
+    });
+  }
+
+  /**
+   * Atomically replace a SLICE of a repo's symbol/reference cache plus its
+   * per-file facts (incremental indexer) in one `db.transaction` — a mid-way
+   * failure leaves the previously-indexed files' rows intact.
+   */
+  async replaceFileSymbols(
+    repoId: string,
+    paths: string[],
+    symbols: IndexerSymbolRow[],
+    references: IndexerReferenceRow[],
+    facts: IndexerFileFactsRow[],
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await this.deleteForFilesEx(tx, repoId, paths);
+      await this.insertSymbolsEx(tx, symbols);
+      await this.insertReferencesEx(tx, references);
+      await this.patchFileFactsEx(tx, repoId, paths, facts);
+    });
   }
 
   /**
@@ -598,8 +651,17 @@ export class RepoIntelRepository {
     files: string[],
     rows: IndexerFileFactsRow[],
   ): Promise<void> {
+    await this.patchFileFactsEx(this.db, repoId, files, rows);
+  }
+
+  private async patchFileFactsEx(
+    ex: DbExecutor,
+    repoId: string,
+    files: string[],
+    rows: IndexerFileFactsRow[],
+  ): Promise<void> {
     if (files.length > 0) {
-      await this.db
+      await ex
         .delete(t.fileFacts)
         .where(and(eq(t.fileFacts.repoId, repoId), inArray(t.fileFacts.filePath, files)));
     }
@@ -612,7 +674,7 @@ export class RepoIntelRepository {
       crons: r.crons,
     }));
     for (let i = 0; i < values.length; i += INSERT_CHUNK_SIZE) {
-      await this.db.insert(t.fileFacts).values(values.slice(i, i + INSERT_CHUNK_SIZE));
+      await ex.insert(t.fileFacts).values(values.slice(i, i + INSERT_CHUNK_SIZE));
     }
   }
 }
