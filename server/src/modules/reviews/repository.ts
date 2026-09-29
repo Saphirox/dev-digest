@@ -23,6 +23,29 @@ import * as runRepo from './repository/run.repo.js';
 import * as pullRepo from './repository/pull.repo.js';
 export type { IntentUpsertInput } from './repository/pull.repo.js';
 
+export interface InsertReviewValues {
+  workspaceId: string;
+  prId: string;
+  agentId: string | null;
+  runId: string | null;
+  kind: 'summary' | 'review';
+  verdict: string | null;
+  summary: string | null;
+  score: number | null;
+  model: string | null;
+}
+
+export interface PersistReviewOutcomeInput {
+  review: InsertReviewValues;
+  findings: Finding[];
+  prId: string;
+  headSha: string;
+  runId: string;
+  /** Everything `completeAgentRun` needs except `findingsCount`, which is
+   *  derived from the just-inserted findings rows. */
+  completion: Omit<runRepo.CompleteRunValues, 'findingsCount'>;
+}
+
 export class ReviewRepository {
   constructor(private db: Db) {}
 
@@ -42,22 +65,36 @@ export class ReviewRepository {
 
   // ---- reviews + findings -------------------------------------------------
 
-  insertReview(values: {
-    workspaceId: string;
-    prId: string;
-    agentId: string | null;
-    runId: string | null;
-    kind: 'summary' | 'review';
-    verdict: string | null;
-    summary: string | null;
-    score: number | null;
-    model: string | null;
-  }): Promise<ReviewRow> {
+  insertReview(values: InsertReviewValues): Promise<ReviewRow> {
     return reviewRepo.insertReview(this.db, values);
   }
 
   insertFindings(reviewId: string, findings: Finding[]): Promise<FindingRow[]> {
     return reviewRepo.insertFindings(this.db, reviewId, findings);
+  }
+
+  /**
+   * Persist a completed run's whole outcome — insert the review, insert its
+   * kept findings, mark the PR reviewed at the run's head sha, and complete
+   * the agent_runs row — in ONE transaction. A mid-way failure (e.g. a NOT
+   * NULL violation on a finding) leaves no review row, no findings,
+   * `last_reviewed_sha` unchanged, and the run still `running` (the caller's
+   * catch block, unchanged, marks it `failed` on the thrown error). The LLM
+   * call itself stays OUTSIDE this transaction — only persistence is atomic.
+   */
+  async persistReviewOutcome(
+    input: PersistReviewOutcomeInput,
+  ): Promise<{ review: ReviewRow; findings: FindingRow[] }> {
+    return this.db.transaction(async (tx) => {
+      const review = await reviewRepo.insertReview(tx, input.review);
+      const findings = await reviewRepo.insertFindings(tx, review.id, input.findings);
+      await pullRepo.markReviewed(tx, input.prId, input.headSha);
+      await runRepo.completeAgentRun(tx, input.runId, {
+        ...input.completion,
+        findingsCount: findings.length,
+      });
+      return { review, findings };
+    });
   }
 
   /** Reviews for a PR (newest first), each with its findings. */

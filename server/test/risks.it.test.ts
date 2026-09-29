@@ -10,7 +10,7 @@ import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/platform/config.js';
 import { seed } from '../src/db/seed.js';
 import { MockGitClient } from '../src/adapters/mocks.js';
-import { parseUnifiedDiff } from '../src/adapters/git/diff-parser.js';
+import { parseUnifiedDiff } from '../src/lib/diff-parser.js';
 import * as t from '../src/db/schema.js';
 
 const hasDocker = await dockerAvailable();

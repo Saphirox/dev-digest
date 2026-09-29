@@ -1,5 +1,5 @@
 /**
- * Shared raw-diff line walker. `adapters/git/diff-parser.ts` (builds the
+ * Shared raw-diff line walker. `lib/diff-parser.ts` (builds the
  * structured `UnifiedDiff`) and `modules/reviews/risks/helpers.ts`
  * (re-scans for risk detection, because `UnifiedDiff` carries new-side line
  * NUMBERS but no line TEXT) both need to walk a raw unified diff and agree

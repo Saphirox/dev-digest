@@ -202,10 +202,9 @@ export async function runIncremental(
     }
   }
 
-  await repository.deleteForFiles(repoId, changed);
-  await repository.insertSymbols(symbolsBuf);
-  await repository.insertReferences(refsBuf);
-  await repository.patchFileFacts(repoId, changed, factsBuf);
+  // Atomic (one transaction) — a mid-way failure leaves the previously-
+  // indexed files' symbols/references/facts intact.
+  await repository.replaceFileSymbols(repoId, changed, symbolsBuf, refsBuf, factsBuf);
 
   // --- T3: rebuild graph + rank, re-resolve, invalidate the repo-map -----
   // The symbol reparse above is sliced, but the graph + rank are global, so we

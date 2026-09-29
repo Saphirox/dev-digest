@@ -18,7 +18,6 @@ import { reviewToDto } from './helpers.js';
 import { IntentService } from './intent/service.js';
 import { INTENT_SCHEMA_NAME, IntentSchema } from './intent/prompt.js';
 import type { IntentModel, IntentSources, IntentStore } from './intent/ports.js';
-import { resolveFeatureModel } from '../settings/feature-models.js';
 import { RunLogger } from '../../platform/run-logger.js';
 import { loadDiff } from './diff-loader.js';
 import { deriveRisks } from './risks/index.js';
@@ -77,16 +76,17 @@ export class ReviewService {
     };
     const model: IntentModel = {
       classify: async (workspaceId, messages) => {
-        const choice = await resolveFeatureModel(container, workspaceId, 'review_intent');
-        const llm = await container.llm(choice.provider);
-        const res = await llm.completeStructured({
-          model: choice.model,
-          schema: IntentSchema,
-          schemaName: INTENT_SCHEMA_NAME,
-          messages,
-          temperature: 0.1,
-        });
-        return { data: res.data, model: res.model, provider: choice.provider, costUsd: res.costUsd };
+        const { choice, result } = await container.featureModels.completeStructured(
+          workspaceId,
+          'review_intent',
+          {
+            schema: IntentSchema,
+            schemaName: INTENT_SCHEMA_NAME,
+            messages,
+            temperature: 0.1,
+          },
+        );
+        return { data: result.data, model: result.model, provider: choice.provider, costUsd: result.costUsd };
       },
     };
     return { store, sources, model, tokens: container.tokenizer };

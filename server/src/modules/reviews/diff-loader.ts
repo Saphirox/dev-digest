@@ -1,6 +1,6 @@
 import type { Container } from '../../platform/container.js';
 import type { UnifiedDiff } from '@devdigest/shared';
-import { parseUnifiedDiff } from '../../adapters/git/diff-parser.js';
+import { parseUnifiedDiff } from '../../lib/diff-parser.js';
 import * as schema from '../../db/schema.js';
 import type { ReviewRepository, PullRow } from './repository.js';
 

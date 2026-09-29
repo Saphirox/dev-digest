@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, sum } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, sql, sum } from 'drizzle-orm';
 import type { PrDetail, PrMeta } from '@devdigest/shared';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
@@ -63,6 +63,14 @@ export class PullsRepository implements PullsStore {
             headSha: pr.head_sha,
             status: pr.status,
             updatedAt: pr.updated_at ? new Date(pr.updated_at) : null,
+            // A PR first imported before this fix has opened_at=NULL forever
+            // otherwise (server/INSIGHTS.md 2026-09-28) — COALESCE backfills
+            // it from a fresh sync without ever overwriting a known date
+            // with NULL (GitHub always sends opened_at on a real PR). The new
+            // value is passed as an ISO string (not a JS Date) — postgres-js's
+            // parameter serializer mishandles a bare `Date` interpolated into
+            // a raw `sql` template.
+            openedAt: sql`COALESCE(${pr.opened_at ?? null}::timestamptz, ${t.pullRequests.openedAt})`,
           },
         });
     }
@@ -111,42 +119,50 @@ export class PullsRepository implements PullsStore {
       .groupBy(t.reviews.prId, t.findings.severity);
   }
 
+  /**
+   * Delete-and-rewrite `pr_files`/`pr_commits` + refresh the PR row in one
+   * `db.transaction` — a mid-way failure (e.g. a NOT NULL violation on a
+   * commit) must roll back to the old files/commits/body, not leave the PR
+   * half-replaced.
+   */
   async replaceDetail(prId: string, detail: PrDetail): Promise<void> {
-    await this.db.delete(t.prFiles).where(eq(t.prFiles.prId, prId));
-    if (detail.files.length > 0) {
-      await this.db.insert(t.prFiles).values(
-        detail.files.map((f) => ({
-          prId,
-          path: f.path,
-          additions: f.additions,
-          deletions: f.deletions,
-          patch: f.patch ?? null,
-        })),
-      );
-    }
-    await this.db.delete(t.prCommits).where(eq(t.prCommits.prId, prId));
-    if (detail.commits.length > 0) {
-      await this.db.insert(t.prCommits).values(
-        detail.commits.map((c) => ({
-          prId,
-          sha: c.sha,
-          message: c.message,
-          author: c.author,
-          committedAt: c.committed_at ? new Date(c.committed_at) : null,
-        })),
-      );
-    }
-    await this.db
-      .update(t.pullRequests)
-      .set({
-        body: detail.body ?? null,
-        // Diff stats aren't on GitHub's PR-list payload — backfill them from
-        // the detail fetch so the Pull Requests list shows real size/files.
-        additions: detail.additions,
-        deletions: detail.deletions,
-        filesCount: detail.files_count,
-      })
-      .where(eq(t.pullRequests.id, prId));
+    await this.db.transaction(async (tx) => {
+      await tx.delete(t.prFiles).where(eq(t.prFiles.prId, prId));
+      if (detail.files.length > 0) {
+        await tx.insert(t.prFiles).values(
+          detail.files.map((f) => ({
+            prId,
+            path: f.path,
+            additions: f.additions,
+            deletions: f.deletions,
+            patch: f.patch ?? null,
+          })),
+        );
+      }
+      await tx.delete(t.prCommits).where(eq(t.prCommits.prId, prId));
+      if (detail.commits.length > 0) {
+        await tx.insert(t.prCommits).values(
+          detail.commits.map((c) => ({
+            prId,
+            sha: c.sha,
+            message: c.message,
+            author: c.author,
+            committedAt: c.committed_at ? new Date(c.committed_at) : null,
+          })),
+        );
+      }
+      await tx
+        .update(t.pullRequests)
+        .set({
+          body: detail.body ?? null,
+          // Diff stats aren't on GitHub's PR-list payload — backfill them from
+          // the detail fetch so the Pull Requests list shows real size/files.
+          additions: detail.additions,
+          deletions: detail.deletions,
+          filesCount: detail.files_count,
+        })
+        .where(eq(t.pullRequests.id, prId));
+    });
   }
 
   async loadFilesAndCommits(

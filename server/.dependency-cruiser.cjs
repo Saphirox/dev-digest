@@ -90,7 +90,7 @@ module.exports = {
     },
     {
       name: 'pure-module-files-no-io',
-      severity: 'warn',
+      severity: 'error',
       comment:
         'helpers.ts / constants.ts are domain-level pure code: no Fastify, Drizzle, DB schema, adapters or container.',
       from: { path: '^src/modules/[^/]+/(helpers|constants)\\.ts$' },
@@ -105,7 +105,7 @@ module.exports = {
     },
     {
       name: 'routes-no-persistence',
-      severity: 'warn',
+      severity: 'error',
       comment:
         'Presentation ring: routes validate, call a service, return a DTO. Queries belong in a repository.',
       from: { path: '^src/modules/[^/]+/routes\\.ts$' },

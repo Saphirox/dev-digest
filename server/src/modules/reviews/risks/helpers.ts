@@ -10,7 +10,7 @@ import { MAX_SCAN_LINES } from './constants.js';
 // addedLines — re-scans a raw unified diff for every `+` line, yielding its
 // new-side line number and text. Delegates the file/cursor tracking to the
 // shared `walkDiff` (`src/lib/diff-lines.ts`) — the SAME walk
-// `parseUnifiedDiff` (`adapters/git/diff-parser.ts`) uses to build the
+// `parseUnifiedDiff` (`lib/diff-parser.ts`) uses to build the
 // `UnifiedDiff` that `groundRisks` validates refs against. Two independent
 // copies of this walk used to exist and only agreed by accident (see
 // `docs/plans/0003-intent-card-risk-areas.md` Finding 3) — `walkDiff` is now

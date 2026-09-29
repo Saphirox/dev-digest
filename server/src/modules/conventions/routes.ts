@@ -9,7 +9,6 @@ import type {
 import { ConventionPatch } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
-import { resolveFeatureModel } from '../settings/feature-models.js';
 import { ConventionsRepository } from './repository.js';
 import { ConventionsService } from './service.js';
 import { EXTRACTION_SCHEMA_NAME, ExtractionSchema, buildMessages } from './prompt.js';
@@ -44,16 +43,17 @@ export default async function conventionsRoutes(appBase: FastifyInstance) {
 
   const model: ExtractorModel = {
     extract: async (workspaceId, { repoName, sample }) => {
-      const choice = await resolveFeatureModel(container, workspaceId, 'conventions');
-      const llm = await container.llm(choice.provider);
-      const res = await llm.completeStructured({
-        model: choice.model,
-        schema: ExtractionSchema,
-        schemaName: EXTRACTION_SCHEMA_NAME,
-        messages: buildMessages(repoName, sample),
-        temperature: 0.1,
-      });
-      return { candidates: res.data.candidates, model: res.model, costUsd: res.costUsd };
+      const { result } = await container.featureModels.completeStructured(
+        workspaceId,
+        'conventions',
+        {
+          schema: ExtractionSchema,
+          schemaName: EXTRACTION_SCHEMA_NAME,
+          messages: buildMessages(repoName, sample),
+          temperature: 0.1,
+        },
+      );
+      return { candidates: result.data.candidates, model: result.model, costUsd: result.costUsd };
     },
   };
 
