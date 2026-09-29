@@ -16,6 +16,8 @@ coming back graduates into this module's AGENTS.md as a standing rule.
 
 ## Tool & Library Notes
 
+- 2026-09-29 · `agent-browser` is a GLOBAL install (`npm i -g agent-browser && agent-browser install`, which also downloads Chrome) and is absent on a fresh machine, so `npm run e2e:hermetic` can't run without the user agreeing to that install. The fallback used for plan 0013 (a backend-only refactor): boot the API on a spare port (`API_PORT=3291 WEB_PORT=3290 ./node_modules/.bin/tsx src/server.ts` in `server/`) and curl every endpoint the 7 flows read (`/repos`, `/repos/:id/pulls`, `/pulls/:id{,/runs,/reviews}`, `/agents`, `/settings`, `/settings/secrets-status`). That is an API smoke test, not the flows, and should be reported that way. Stop the API by port (`lsof -nP -iTCP:3291 -sTCP:LISTEN -t`). `scripts/e2e.sh:49`.
+
 ## Recurring Errors & Fixes
 
 ## Session Notes
