@@ -62,6 +62,7 @@ not a separate package.
 | Adapter | `src/adapters/<port>/<impl>.ts`, port name singular | `adapters/llm/openrouter.ts`, `adapters/secrets/local.ts` |
 | DB schema | one file per domain in `src/db/schema/<domain>.ts`; shared columns in `_shared.ts` | `schema/runs.ts` |
 | Migration | `NNNN_<snake_case>.sql`, 4-digit sequential prefix, drizzle-generated name — never renumbered | `0011_petite_molecule_man.sql` |
+| Feature spec | `specs/spec-NNNN-<slug>.md` at the repo root, flat (modules go in the `Modules:` header, not the path), one 4-digit `NNNN` sequence, never renumbered; written by the `spec-creator` agent before planning — see [specs/README.md](specs/README.md) | `specs/spec-0001-blast-radius.md` |
 | Plan | `docs/plans/NNNN-<slug>.md`, 4-digit sequential prefix, never renumbered | `docs/plans/0001-helper-agent-set.md` |
 | Contract | zod schema and its inferred type share one name | `export const PrMeta = z.object({…})` + `export type PrMeta = z.infer<typeof PrMeta>` |
 | Client route | `src/app/**/page.tsx`; pages stay thin | `app/repos/[repoId]/pulls/[number]/page.tsx` |
@@ -90,6 +91,61 @@ not a separate package.
 - `e2e/specs/*.flow.json` and the `devdigest_pgdata` Docker volume — see
   [e2e/AGENTS.md](e2e/AGENTS.md) before touching either.
 
+## Feature pipeline
+
+For a new feature or behaviour change, first **ask the user which
+profile** to run — never pick it yourself:
+
+- **full** — every step below;
+- **lite** — spec → plan → implement → test → verify, without asking
+  about `investigator`/`brainstorm` and without the architecture review;
+- **no spec** — `implementation-planner` straight from the task (small,
+  well-understood changes).
+
+Then run the agents in this order:
+
+1. **Spec phase.** `spec-creator` writes a `draft`
+   `specs/spec-NNNN-<slug>.md`. While it is a draft, **ask the user**
+   whether to run `investigator` (what exists today) and/or `brainstorm`
+   (which behaviour to choose) on its open questions. When its report
+   lists **research requests**, ask the user, then run one `investigator`
+   (inside the repo) or `researcher` (outside world) subagent per request,
+   in parallel. Hand all the output back to `spec-creator`, which updates
+   the draft, and repeat until the user approves it.
+2. **Plan phase.** Once the spec is `approved`, **ask the user** again
+   whether to run `investigator` (the code the ACs touch) and/or
+   `brainstorm` (how to build it). Here they may not change the ACs.
+3. `implementation-planner` plans from the spec, plus any chosen option and
+   brief; the caller saves the plan to `docs/plans/NNNN-<slug>.md`.
+4. **Build and verify** — the user starts this with **`/run-sdd <plan>`**
+   (`.claude/skills/run-sdd/`), which runs every sub-step below
+   automatically from the approved spec and saved plan, fixes
+   critical/warning architecture findings itself (up to 3 rounds), keeps
+   its state in `docs/plans/NNNN-<slug>.state.json`, and stops only where
+   the user must decide. Steps 1–3 stay manual. In order:
+   1. `implementer` builds the plan.
+   2. Stage the implementer's changes (`git add -- <paths>`, never `-A`:
+      the index is shared), then `architecture-reviewer` reviews the
+      **staged** diff only. `implementer` fixes critical and warning
+      findings (suggestions are reported, not fixed), then restage and
+      re-review the changed files — up to 3 rounds before asking the user.
+   3. `test-writer` writes a test per AC, with the AC ID in its title.
+   4. `plan-verifier` checks the code and tests against the spec and the
+      plan.
+   5. **Fix loop.** Re-run `implementer` / `test-writer` on the verifier's
+      *Fix list* rows only, then re-run `plan-verifier`. After 2 rounds with
+      rows still failing, stop and ask the user.
+   6. `security-reviewer` is **required** when the spec's *Untrusted
+      inputs* section has repo/PR text reaching an LLM, or LLM output
+      reaching the page; otherwise ask the user.
+5. After the PR merges, and on the user's word, `spec-creator` sets the
+   spec to `implemented`.
+
+`investigator` and `brainstorm` are optional in both spec and plan phases;
+never run or skip them without asking.
+
+Details: [.claude/agents/README.md](.claude/agents/README.md) · [specs/README.md](specs/README.md).
+
 ## Insights loop — mandatory
 
 Every module (`client`, `server`, `reviewer-core`, `repo-intel`, `e2e`, `mcp`) keeps
@@ -102,20 +158,24 @@ lazily (section map first, then only what the task needs).
    concerns (questions and reviews included, not only code changes); add the
    root one when the task spans modules or touches `scripts/`, Docker, CI, or
    `.claude/`. Say in one line which entries apply, or that none do.
+   Exception: the `spec-creator` agent reads only the `INSIGHTS.md` of
+   the modules the feature touches (not the root one) and never writes
+   any; it uses them only to find corner cases and constraints on
+   observable behaviour.
 2. **End of every task** — re-read the target `INSIGHTS.md`, then append
    only substantive insights it doesn't already contain. Nothing new → write nothing.
 
-## Before a PR
+## Before a commit or PR
 
-A `PreToolUse` hook (`.claude/settings.json`) denies `git push`,
-`gh pr create`, `gh pr merge` and `gh pr ready` until the *current* diff has
-a passing self-review; any unoverridden critical blocks. Only the user may
-override a critical as a false positive.
+Review is done by agents, not a gate: `architecture-reviewer`,
+`security-reviewer` (when required) and `plan-verifier` — see *Feature
+pipeline*. Their findings are advisory; only the user decides a finding is
+a false positive.
 
-A second `PreToolUse` hook fetches `origin/main` and rebases the branch before
-every `git commit`; on conflicts it changes nothing and denies with the
-conflicting `file:line` ranges. It never commits, and a rebase makes earlier
-self-review verdicts stale.
+A `PreToolUse` hook (`.claude/settings.json`) fetches `origin/main` and
+rebases the branch before every `git commit`; on conflicts it changes
+nothing and denies with the conflicting `file:line` ranges. It never
+commits, and a rebase makes earlier review results stale.
 
 ## Harness scripts
 
