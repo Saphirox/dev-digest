@@ -82,7 +82,9 @@ Each rule says why it exists, so you can apply it to cases it does not name.
    (`node .claude/skills/spec-writing/scripts/lint.mjs <spec>`) and one
    write form — `mkdir -p specs/images/spec-NNNN` then `cp <saved
    screenshot> specs/images/spec-NNNN/<frame>.png` — are what the hook
-   allows. Files are written with `Write`. Secrets (`~/.devdigest/**`, a
+   allows. Quote a source path that has spaces (user attachments live under
+   `~/Library/Application Support/…`); you may chain these with `&&` after
+   `cd <repo root>`. Files are written with `Write`. Secrets (`~/.devdigest/**`, a
    non-example `.env`) stay unread; a spec never needs them.
 3. **Leave every product decision to the user.** Each gap, corner case,
    cross-module question and UX idea reaches the user through
@@ -158,6 +160,10 @@ way they see the design.
   dialog unclicked. If the page does not load or needs a login after 2–3
   attempts, ask the user for screenshots.
 - **Image paths** (e.g. `docs/images/<area>/*.png`): read each with `Read`.
+  An image the user attached from outside the repo is design input too: read
+  it, then `cp "<its path>" specs/images/spec-NNNN/<frame-kebab-name>.png`
+  and list the copy in the `Design:` line, so the spec never points at a
+  path only this machine has.
 - **No design** for a feature with UI: ask for one before writing UI
   requirements — a text-only description has been misread in this repo
   more than once. A backend-only change needs none.

@@ -52,6 +52,30 @@ test('bash: the two frame-saving forms are allowed only into specs/images/spec-N
   assert.ok(checkBash('cp /tmp/shot.png specs/images/spec-0001/x.png && rm -rf server', ROOT));
 });
 
+test('bash: quoted paths with spaces and `cd <root> &&` chains are allowed', () => {
+  const src = '"/Users/me/Library/Application Support/emdash/a b/content.png"';
+  assert.equal(checkBash(`cp ${src} specs/images/spec-0001/agent-context.png`, ROOT), null);
+  assert.equal(checkBash(`cp '/tmp/a b.png' "specs/images/spec-0001/x.png"`, ROOT), null);
+  assert.equal(checkBash('cd /repo && mkdir -p specs/images/spec-0001', ROOT), null);
+  assert.equal(
+    checkBash(`mkdir -p /repo/specs/images/spec-0001 && cp ${src} /repo/specs/images/spec-0001/x.png`, ROOT),
+    null,
+  );
+  assert.equal(checkBash('cd /repo && ls specs', ROOT), null);
+});
+
+test('bash: quoting and chaining never widen the write scope', () => {
+  assert.ok(checkBash(`cp "/tmp/a b.png" "server/src/x.png"`, ROOT));
+  assert.ok(checkBash(`cp "/tmp/a b.png" specs/images/spec-0001/x.jpg`, ROOT));
+  assert.ok(checkBash('cd /repo && mkdir -p server/x', ROOT));
+  assert.ok(checkBash('cd /other && cp /tmp/a.png specs/images/spec-0001/x.png && rm -rf server', ROOT));
+  assert.ok(checkBash(`cp "$(rm -rf server)" specs/images/spec-0001/x.png`, ROOT));
+  assert.ok(checkBash('cp /tmp/a.png specs/images/spec-0001/x.png; rm -rf server', ROOT));
+  assert.ok(checkBash('cp /tmp/a.png specs/images/spec-0001/x.png || rm -rf server', ROOT));
+  assert.ok(checkBash('cp -r /tmp specs/images/spec-0001/x.png', ROOT));
+  assert.ok(checkBash(`cp "/tmp/a.png specs/images/spec-0001/x.png`, ROOT));
+});
+
 test('hook process: denies a Write outside scope, stays silent inside', () => {
   const run = (input) =>
     spawnSync('node', [join(HERE, 'spec-creator-scope.mjs')], {
