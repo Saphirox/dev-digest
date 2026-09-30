@@ -46,6 +46,7 @@
     "tabs": {
       "config": "Config",
       "skills": "Skills",
+      "context": "Context",
       "evals": "Evals",
       "stats": "Stats",
       "ci": "CI"
@@ -111,5 +112,9 @@
   "delete": {
     "title": "Delete agent?",
     "done": "Deleted \"{name}\"."
+  },
+  "context": {
+    "title": "Project context",
+    "hint": "Order matters — earlier docs appear earlier in the assembled ## Project context block. Toggle to attach."
   }
 }

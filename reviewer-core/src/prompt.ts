@@ -41,10 +41,27 @@ const INTENT_SCOPE_RULE =
   'data loss) anywhere in the diff: report every one with its true severity, in scope or ' +
   'not. If you are unsure whether something is a SUGGESTION or a WARNING, report it.';
 
+// The label lands inside `source="…"`, so a path containing a quote or angle
+// bracket must not be able to break out of the attribute or forge a tag.
+// Constant labels ('diff', 'intent', …) contain none of these: byte-identical.
+function escapeLabel(label: string): string {
+  return label
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+}
+
 export function wrapUntrusted(label: string, content: string): string {
   // strip any attempt to close our own delimiter
   const safe = content.replaceAll('</untrusted>', '<\\/untrusted>');
-  return `<untrusted source="${label}">\n${safe}\n</untrusted>`;
+  return `<untrusted source="${escapeLabel(label)}">\n${safe}\n</untrusted>`;
+}
+
+/** One project-context document: repo-relative path (the block label) + its text. */
+export interface ProjectDoc {
+  path: string;
+  content: string;
 }
 
 /** Cap the PR description so a huge author body can't blow the token budget. */
@@ -57,8 +74,8 @@ export interface PromptParts {
   skills?: string[];
   /** Relevant memory items (trusted, curated). */
   memory?: string[];
-  /** Project-context spec chunks (untrusted content). */
-  specs?: string[];
+  /** Project-context docs (untrusted content); each is labelled by its path. */
+  specs?: ProjectDoc[];
   /**
    * Repo skeleton / map (T3): top-ranked symbols by signature, token-budgeted.
    * Untrusted (derived from repo code) — delimiter-wrapped. Rendered before
@@ -118,7 +135,7 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
       : undefined;
   const specsBlock =
     parts.specs && parts.specs.length > 0
-      ? parts.specs.map((s, i) => wrapUntrusted(`spec-${i}`, s)).join('\n\n')
+      ? parts.specs.map((d) => wrapUntrusted(d.path, d.content)).join('\n\n')
       : undefined;
 
   const prDescription =

@@ -1,0 +1,306 @@
+{
+  "plan": "docs/plans/0014-project-context.md",
+  "spec": "specs/spec-0001-project-context.md",
+  "phase": "done",
+  "securityRecheck": "2026-09-30: SEC-1, SEC-2, SEC-7 closed; new MEDIUM SEC-9 (BPE tokenize time on long no-whitespace runs up to 1 MB in list(); unverified, timing probe blocked by unavailable permission classifier) -> reported; LOWs: realpath->open parent race, case-sensitive .git check, boundRead U+FFFD mis-cut, MockDocSource char vs byte slicing",
+  "mode": "multi-agent",
+  "changedPaths": [
+    "client/INSIGHTS.md",
+    "client/messages/en/agents.json",
+    "client/messages/en/context.json",
+    "client/messages/en/runs.json",
+    "client/messages/en/skills.json",
+    "client/src/app/agents/_components/AgentEditor/AgentEditor.tsx",
+    "client/src/app/agents/_components/AgentEditor/constants.ts",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/RunTraceDrawer.test.tsx",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceBody/TraceBody.tsx",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/helpers.ts",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/styles.ts",
+    "client/src/app/skills/_components/SkillEditor/SkillEditor.tsx",
+    "client/src/app/skills/_components/SkillEditor/constants.ts",
+    "client/src/lib/hooks/agents.ts",
+    "client/src/lib/hooks/core.ts",
+    "client/src/lib/hooks/skills.ts",
+    "client/src/lib/types.ts",
+    "client/src/vendor/shared/contracts/knowledge.ts",
+    "client/src/vendor/shared/contracts/platform.ts",
+    "client/src/vendor/shared/contracts/trace.ts",
+    "client/src/vendor/ui/nav.ts",
+    "reviewer-core/INSIGHTS.md",
+    "reviewer-core/src/index.ts",
+    "reviewer-core/src/prompt.ts",
+    "reviewer-core/src/review/run.ts",
+    "reviewer-core/test/prompt.test.ts",
+    "server/.env.example",
+    "server/INSIGHTS.md",
+    "server/src/adapters/mocks.ts",
+    "server/src/adapters/tokenizer/index.ts",
+    "server/src/db/migrations/meta/_journal.json",
+    "server/src/db/schema/agents.ts",
+    "server/src/db/schema/skills.ts",
+    "server/src/modules/agents/helpers.ts",
+    "server/src/modules/agents/ports.ts",
+    "server/src/modules/agents/repository.ts",
+    "server/src/modules/agents/routes.ts",
+    "server/src/modules/agents/service.ts",
+    "server/src/modules/index.ts",
+    "server/src/modules/reviews/run-executor.ts",
+    "server/src/modules/skills/helpers.ts",
+    "server/src/modules/skills/ports.ts",
+    "server/src/modules/skills/routes.ts",
+    "server/src/modules/skills/service.ts",
+    "server/src/platform/config.ts",
+    "server/src/platform/container.ts",
+    "server/src/vendor/shared/contracts/knowledge.ts",
+    "server/src/vendor/shared/contracts/platform.ts",
+    "server/src/vendor/shared/contracts/trace.ts",
+    "server/test/prompt-callers.test.ts",
+    "server/test/prompt-structured.test.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/ContextTab/ContextTab.test.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/ContextTab/ContextTab.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/ContextTab/index.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/ContextTab/styles.ts",
+    "client/src/app/repos/[repoId]/context/_components/ProjectContextView/ProjectContextView.test.tsx",
+    "client/src/app/repos/[repoId]/context/_components/ProjectContextView/ProjectContextView.tsx",
+    "client/src/app/repos/[repoId]/context/_components/ProjectContextView/helpers.test.ts",
+    "client/src/app/repos/[repoId]/context/_components/ProjectContextView/helpers.ts",
+    "client/src/app/repos/[repoId]/context/_components/ProjectContextView/index.ts",
+    "client/src/app/repos/[repoId]/context/_components/ProjectContextView/styles.ts",
+    "client/src/app/repos/[repoId]/context/page.tsx",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/helpers.test.ts",
+    "client/src/app/skills/_components/SkillEditor/_components/ContextTab/ContextTab.test.tsx",
+    "client/src/app/skills/_components/SkillEditor/_components/ContextTab/ContextTab.tsx",
+    "client/src/app/skills/_components/SkillEditor/_components/ContextTab/helpers.test.ts",
+    "client/src/app/skills/_components/SkillEditor/_components/ContextTab/helpers.ts",
+    "client/src/app/skills/_components/SkillEditor/_components/ContextTab/index.ts",
+    "client/src/app/skills/_components/SkillEditor/_components/ContextTab/styles.ts",
+    "client/src/components/project-context-picker/ProjectContextPicker.test.tsx",
+    "client/src/components/project-context-picker/ProjectContextPicker.tsx",
+    "client/src/components/project-context-picker/_components/DocPreviewDrawer/DocPreviewDrawer.tsx",
+    "client/src/components/project-context-picker/_components/DocPreviewDrawer/index.ts",
+    "client/src/components/project-context-picker/_components/DocPreviewDrawer/styles.ts",
+    "client/src/components/project-context-picker/constants.ts",
+    "client/src/components/project-context-picker/helpers.test.ts",
+    "client/src/components/project-context-picker/helpers.ts",
+    "client/src/components/project-context-picker/index.ts",
+    "client/src/components/project-context-picker/styles.ts",
+    "server/src/adapters/docs/fs.ts",
+    "server/src/db/migrations/0018_harsh_sersi.sql",
+    "server/src/db/migrations/meta/0018_snapshot.json",
+    "server/src/lib/doc-glob.ts",
+    "server/src/modules/project-context/constants.ts",
+    "server/src/modules/project-context/helpers.ts",
+    "server/src/modules/project-context/ports.ts",
+    "server/src/modules/project-context/routes.ts",
+    "server/src/modules/project-context/service.ts",
+    "server/test/context-paths.it.test.ts",
+    "server/test/doc-glob.test.ts",
+    "server/test/docs-fs.test.ts",
+    "server/test/project-context-helpers.test.ts",
+    "server/test/project-context-run.it.test.ts",
+    "server/test/project-context-service.test.ts",
+    "server/test/tokenizer.test.ts",
+    "server/src/platform/errors.ts"
+  ],
+  "archReview": {
+    "round": 2,
+    "findings": [
+      {
+        "id": "AR-1-1",
+        "severity": "warning",
+        "location": "server/src/modules/agents/service.ts:102-113 + server/src/modules/skills/service.ts:59-70",
+        "claim": "context_paths validation + ad-hoc AppError('invalid_context_path',400) duplicated in two services; no named error class",
+        "status": "fixed",
+        "fixedInRound": 1
+      },
+      {
+        "id": "AR-1-2",
+        "severity": "warning",
+        "location": "server/src/adapters/mocks.ts / server/src/platform/container.ts",
+        "claim": "new DocSource port has container override but no MockDocSource in adapters/mocks.ts",
+        "status": "fixed",
+        "fixedInRound": 1
+      },
+      {
+        "id": "AR-1-3",
+        "severity": "suggestion",
+        "location": "server/src/modules/project-context/constants.ts:8",
+        "claim": "DOC_TYPE_FOLDERS re-declares SpecDocType members; cast in helpers.ts",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-1-4",
+        "severity": "suggestion",
+        "location": "server/src/modules/skills/service.ts:30",
+        "claim": "SkillsService contextGlob param silently defaults to DEFAULT_CONTEXT_GLOB",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-1-5",
+        "severity": "suggestion",
+        "location": "client project-context-picker/helpers.ts + ProjectContextView",
+        "claim": "path split implemented 3 times; promote to client/src/lib/doc-path.ts",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-1-6",
+        "severity": "suggestion",
+        "location": "server/src/modules/skills/ports.ts:56",
+        "claim": "SkillUpdateInput (service input) declared in ports.ts instead of service.ts",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-V-1",
+        "severity": "suggestion",
+        "location": "server/src/modules/reviews/run-executor.ts buildProjectContext",
+        "claim": "injected-doc count re-derived from entries status; use run.specsRead/docs.length as single source",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-V-2",
+        "severity": "suggestion",
+        "location": "server/src/modules/reviews/run-executor.ts",
+        "claim": "docs.length>0 gate redundant with undefined contract except all-missing case; add comment",
+        "status": "deferred"
+      }
+    ]
+  },
+  "verify": {
+    "round": 2,
+    "fixList": [
+      {
+        "id": "S24",
+        "kind": "code",
+        "owner": "implementer",
+        "item": "AC-24 specs_read must list injected docs only (drop missing) \u2014 service.ts loadForRun + run-executor comment",
+        "status": "fixed"
+      },
+      {
+        "id": "S24-tests",
+        "kind": "test",
+        "owner": "test-writer",
+        "item": "update assertions project-context-run.it.test.ts:254, project-context-service.test.ts:137, EC-9 to injected-only specs_read",
+        "status": "fixed"
+      },
+      {
+        "id": "S22",
+        "kind": "test",
+        "owner": "test-writer",
+        "item": "AC-22 assert system message ends with injection guard when specs non-empty",
+        "status": "fixed"
+      },
+      {
+        "id": "S26",
+        "kind": "test",
+        "owner": "test-writer",
+        "item": "AC-26 copy button + expand on project-context PromptBlock",
+        "status": "fixed"
+      },
+      {
+        "id": "S10",
+        "kind": "test",
+        "owner": "test-writer",
+        "item": "AC-10 mouse drag reorder test (dragStart/dragOver/drop)",
+        "status": "fixed"
+      },
+      {
+        "id": "Plan-1",
+        "kind": "deviation",
+        "owner": "orchestrator",
+        "item": "SpecFile.type required + tokens nullable (plan said nullish): kept, AC-1 requires both on every entry; recorded as deviation",
+        "status": "deviation-recorded"
+      }
+    ]
+  },
+  "security": "required",
+  "manualChecks": [
+    "D-9: attach a doc stating 'api/ must not import db/', open a violating PR, run review, confirm a finding cites the doc and the trace lists it",
+    "Compare UI against specs/images/spec-0001/*.png",
+    "AC-3 vs specs/images/spec-0001/project-context-page.png",
+    "AC-6 vs agent-context-tab.png",
+    "AC-13 vs skill-context-tab.png",
+    "AC-26 vs run-trace-prompt-assembly.png",
+    "Mouse drag-and-drop reorder in both Context tabs",
+    "Plan 19: load /repos/:id/context and both Context tabs on ./scripts/dev.sh (runtime import errors)"
+  ],
+  "log": [
+    "2026-09-29 inputs resolved; spec approved, plan ready; state file created",
+    "2026-09-29 wave 1 done: contracts (SpecFile.type required, tokens nullable) + reviewer-core ProjectDoc/label escaping; server full suite 376 pass",
+    "2026-09-29 wave 2 done: server 478 tests/65 files pass, arch 0e/15w; client 270 tests pass; 95 paths staged",
+    "2026-09-29 arch round 1: 0 critical, 2 warning (fixing), 4 suggestion (deferred); arch:check 0e/15w",
+    "2026-09-29 AR-1-1/AR-1-2 fixed by implementer (InvalidContextPathError + assertValidContextPaths; MockDocSource); 478 tests pass, arch 0e/15w; restaged",
+    "2026-09-29 arch round 2: AR-1-1, AR-1-2 confirmed closed; 0 new findings; arch loop done",
+    "2026-09-30 test-writer: all 26 AC / 9 EC / 7 NFR IDs have tests; server 103, reviewer-core 33, client 230 pass; NFR-6 example conflicts with NFR-5 (spec)",
+    "2026-09-30 plan-verifier round 1: must 35/42 met + 3 met-manual; fix list: 1 code (AC-24), 4 test rows; server 479 pass",
+    "2026-09-30 fix round 1: AC-24 specs_read injected-only (service.ts); tests S24/S22/S26/S10 added; suites pass; restaged",
+    "2026-09-30 verify-loop arch check on AC-24 fix: 0 critical/warning, 2 suggestions deferred; arch 0e/15w",
+    "2026-09-30 plan-verifier round 2: must 39/42 met + 3 met-manual; Fix list empty; server 479, reviewer-core 34, client 272 pass; arch 0e/15w",
+    "2026-09-30 security review: 2 HIGH (symlink->.git/config token leak; no size cap DoS), 2 MEDIUM, 4 LOW; HIGH -> implementer",
+    "2026-09-30 security fix round: SEC-1 (no-symlink + .git refusal + O_NOFOLLOW), SEC-2 (MAX_DOC_BYTES 1MB, bounded reads) fixed; server 488 pass, arch 0e/15w; restaged"
+  ],
+  "securityFindings": [
+    {
+      "id": "SEC-1",
+      "severity": "HIGH",
+      "location": "server/src/adapters/docs/fs.ts:58-62 via project-context/service.ts:83",
+      "claim": "run-time read follows in-clone symlink to .git/config -> GitHub token to LLM, DB, UI",
+      "status": "fixing"
+    },
+    {
+      "id": "SEC-2",
+      "severity": "HIGH",
+      "location": "fs.ts:62, service.ts:38-45,63, tokenizer truncate",
+      "claim": "no size cap before whole-file read + sync tokenize -> event-loop DoS",
+      "status": "fixing"
+    },
+    {
+      "id": "SEC-3",
+      "severity": "MEDIUM",
+      "location": "reviewer-core/src/prompt.ts:57",
+      "claim": "wrapUntrusted only neutralises exact lowercase </untrusted>; variants pass (pre-existing, larger surface now)",
+      "status": "reported"
+    },
+    {
+      "id": "SEC-4",
+      "severity": "MEDIUM",
+      "location": "agents/routes.ts, skills/routes.ts",
+      "claim": "context_paths array/entries unbounded",
+      "status": "reported"
+    },
+    {
+      "id": "SEC-5",
+      "severity": "LOW",
+      "location": "fs.ts read",
+      "claim": "no glob re-check at run time",
+      "status": "reported"
+    },
+    {
+      "id": "SEC-6",
+      "severity": "LOW",
+      "location": "Markdown preview",
+      "claim": "remote images load (view beacon)",
+      "status": "reported"
+    },
+    {
+      "id": "SEC-7",
+      "severity": "LOW",
+      "location": "service.ts readFile",
+      "claim": "TOCTOU list->read (same root cause as SEC-1)",
+      "status": "fixing"
+    },
+    {
+      "id": "SEC-8",
+      "severity": "LOW",
+      "location": "run-executor buildProjectContext catch",
+      "claim": "raw err.message in run log",
+      "status": "reported"
+    },
+    {
+      "id": "SEC-PRE",
+      "severity": "pre-existing",
+      "location": "server/src/modules/repos/service.ts runCloneJob",
+      "claim": "GitHub token embedded in clone URL persists in .git/config",
+      "status": "reported"
+    }
+  ]
+}

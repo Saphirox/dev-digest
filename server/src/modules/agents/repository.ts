@@ -40,6 +40,8 @@ export interface UpdateAgent {
   ciFailOn?: CiFailOn;
   repoIntel?: boolean;
   enabled?: boolean;
+  /** Project Context paths — NOT a config change (no version bump, D-13). */
+  contextPaths?: string[];
 }
 
 /** One entry of an agent's ordered skill set, as the Skills tab saves it. */
@@ -156,6 +158,7 @@ export class AgentsRepository {
         ...(patch.ciFailOn !== undefined ? { ciFailOn: patch.ciFailOn } : {}),
         ...(patch.repoIntel !== undefined ? { repoIntel: patch.repoIntel } : {}),
         ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+        ...(patch.contextPaths !== undefined ? { contextPaths: patch.contextPaths } : {}),
         ...(configChanged ? { version: nextVersion } : {}),
       })
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.id, id)))
@@ -284,6 +287,26 @@ export class AgentsRepository {
         ),
       )
       .orderBy(asc(t.agentSkills.order));
+  }
+
+  /**
+   * `context_paths` of the agent's enabled skills (link AND skill enabled), in
+   * link order — the skill half of a run's project context (AC-18/20).
+   */
+  async enabledSkillContextPaths(agentId: string): Promise<string[][]> {
+    const rows = await this.db
+      .select({ contextPaths: t.skills.contextPaths })
+      .from(t.agentSkills)
+      .innerJoin(t.skills, eq(t.agentSkills.skillId, t.skills.id))
+      .where(
+        and(
+          eq(t.agentSkills.agentId, agentId),
+          eq(t.agentSkills.enabled, true),
+          eq(t.skills.enabled, true),
+        ),
+      )
+      .orderBy(asc(t.agentSkills.order));
+    return rows.map((r) => r.contextPaths);
   }
 
   /** Enabled-link count per agent in the workspace (agents list card chip). */

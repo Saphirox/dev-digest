@@ -17,6 +17,8 @@ export interface SkillRecord {
   enabled: boolean;
   version: number;
   evidenceFiles: string[] | null;
+  /** Project Context: ordered repo-relative markdown paths agents inherit. */
+  contextPaths: string[];
 }
 
 export interface SkillSummaryRecord extends SkillRecord {
@@ -46,7 +48,12 @@ export interface SkillPatch {
   type?: SkillType;
   body?: string;
   enabled?: boolean;
+  /** Not a config change (no version bump). */
+  contextPaths?: string[];
 }
+
+/** What `SkillsService.update` accepts: a `SkillPatch` with the wire-format `context_paths`. */
+export type SkillUpdateInput = Omit<SkillPatch, 'contextPaths'> & { context_paths?: string[] };
 
 export interface AgentRef {
   id: string;

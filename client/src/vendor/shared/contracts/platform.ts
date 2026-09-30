@@ -260,13 +260,27 @@ export const PrCommentInput = z.object({
 export type PrCommentInput = z.infer<typeof PrCommentInput>;
 
 // ---- Project Context ----
+/** Which project-doc folder a context file lives under. */
+export const SpecDocType = z.enum(['specs', 'docs', 'insights']);
+export type SpecDocType = z.infer<typeof SpecDocType>;
+
 export const SpecFile = z.object({
   path: z.string(),
+  type: SpecDocType,
   content: z.string().nullish(),
   size: z.number().int().nullish(),
+  /** Tokens the file adds to a prompt (server tokenizer); null when unknown. */
+  tokens: z.number().int().nullable(),
   updated_at: z.string().nullish(),
 });
 export type SpecFile = z.infer<typeof SpecFile>;
+
+/** GET /repos/:id/context — `cloned` false means there is no local clone to list. */
+export const ProjectContextList = z.object({
+  cloned: z.boolean(),
+  files: z.array(SpecFile),
+});
+export type ProjectContextList = z.infer<typeof ProjectContextList>;
 
 export const IndexStatus = z.object({
   status: z.enum(['idle', 'cloning', 'parsing', 'embedding', 'done', 'error']),

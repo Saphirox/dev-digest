@@ -10,6 +10,7 @@ import { taskLine, toSkillPromptBlock } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 import type { IntentService } from './intent/service.js';
 import { renderIntentBlock } from './intent/helpers.js';
+import type { ProjectContextRun } from '../project-context/ports.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -205,6 +206,11 @@ export class ReviewRunExecutor {
       // skill-less agent's.
       const skills = await this.buildSkillBlocks(agent.id, runLog);
 
+      // Project Context — repo docs attached to the agent and its enabled
+      // skills, read from the default-branch clone (never the PR head). Omitted
+      // when nothing is attached, so the prompt stays byte-identical.
+      const projectContext = await this.buildProjectContext(repo, agent, runLog);
+
       // Intent Layer — rendered text for the `## Derived intent` prompt slot,
       // plus its token cost for the trace. `undefined` when no intent was
       // available (never derived, or derivation failed) — assemblePrompt
@@ -240,6 +246,7 @@ export class ReviewRunExecutor {
         // T3 — repo skeleton, same omit-when-empty contract.
         ...(repoMap ? { repoMap } : {}),
         ...(skills ? { skills: skills.blocks } : {}),
+        ...(projectContext && projectContext.docs.length > 0 ? { specs: projectContext.docs } : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
@@ -324,6 +331,7 @@ export class ReviewRunExecutor {
           skills_tokens: skills?.tokens ?? null,
           intent: intentBlock ?? null,
           intent_tokens: intentBlock ? this.container.tokenizer.count(intentBlock) : null,
+          specs_tokens: projectContext ? projectContext.specsTokens : null,
         },
         tool_calls: outcome.chunks.map((c) => ({
           tool: 'review_file',
@@ -333,7 +341,11 @@ export class ReviewRunExecutor {
         })),
         raw_output: outcome.raw,
         memory_pulled: [],
-        specs_read: [],
+        // Injected docs only, in injection order (trace "Specs read"); missing/dropped
+        // ones appear only as `project_context` entries.
+        specs_read: projectContext?.specsRead ?? [],
+        project_context: projectContext?.entries ?? null,
+        project_context_sha: projectContext?.sha ?? null,
         // Persisted log = the run's FULL event buffer (incl. shared pre-work:
         // diff load + intent), not just events recorded inside this method.
         log: runLog.logFor(runId),
@@ -441,6 +453,42 @@ export class ReviewRunExecutor {
       return { blocks, tokens };
     } catch (err) {
       runLog.info(`skills: failed to load — ${(err as Error).message}`);
+      return undefined;
+    }
+  }
+
+  /**
+   * The agent's + its enabled skills' project-context docs, budgeted and ready
+   * for the prompt. Best-effort: a failure is logged and the review runs without
+   * project context. A missing clone or file is a warning line, never a failure.
+   */
+  private async buildProjectContext(
+    repo: typeof schema.repos.$inferSelect,
+    agent: AgentRow,
+    runLog: RunLogger,
+  ): Promise<ProjectContextRun | undefined> {
+    try {
+      const skillPaths = await this.agents.enabledSkillContextPaths(agent.id);
+      const run = await this.container.projectContext.loadForRun({
+        repo,
+        agentPaths: agent.contextPaths,
+        skillPaths,
+      });
+      if (!run) return undefined;
+      if (run.notCloned) {
+        runLog.info('warning: project context: repository not cloned — running without project context');
+      } else {
+        for (const path of run.missing) {
+          runLog.info(`warning: project context: ${path} not found in the clone — skipped`);
+        }
+      }
+      const injected = run.entries.filter((e) => e.status === 'included' || e.status === 'truncated').length;
+      runLog.info(
+        `project context: ${injected} of ${run.entries.length} document(s) injected (~${run.specsTokens} tokens)`,
+      );
+      return run;
+    } catch (err) {
+      runLog.info(`warning: project context: failed to load — ${(err as Error).message}`);
       return undefined;
     }
   }

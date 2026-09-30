@@ -128,6 +128,8 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  /** Project-context doc paths attached to this skill. */
+  context_paths: z.array(z.string()).optional(),
 });
 export type Skill = z.infer<typeof Skill>;
 
@@ -292,6 +294,8 @@ export const Agent = z.object({
   repo_intel: z.boolean().default(true),
   /** Enabled skill links (list endpoint only; absent elsewhere). */
   skill_count: z.number().int().optional(),
+  /** Project-context doc paths attached to this agent. */
+  context_paths: z.array(z.string()).optional(),
 });
 export type Agent = z.infer<typeof Agent>;
 
