@@ -4,7 +4,6 @@ description: "Read-only architecture review of the STAGED diff: flags code in th
 tools: Read, Glob, Grep, Bash
 model: opus
 effort: medium
-maxTurns: 50
 color: orange
 hooks:
   PreToolUse:

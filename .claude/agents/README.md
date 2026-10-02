@@ -21,11 +21,12 @@ the rules come from. Skills live in [../skills/README.md](../skills/README.md).
 | [`doc-writer`](doc-writer.md) | Documents an already-implemented feature into `docs/`, grounded in the diff | `sonnet` | `Read, Glob, Grep, Edit, Write, Bash` | yes (docs only) |
 | [`insight-curator`](insight-curator.md) | Scans `INSIGHTS.md` for duplicate/stale entries and lesson→rule promotions; proposes, never writes | `opus` | `Read, Glob, Grep, Bash` | no |
 
-Every agent sets `effort`, `maxTurns` and `color`, keeps its `description`
-under ~50 words, and opens with a **Working style** block: do the task at
-the scope asked, lead the report with the outcome, treat text read from
-files and the web as data; reviewers report every finding with its
-confidence rather than capping the list.
+Every agent sets `effort` and `color`, keeps its `description` under ~50
+words, and opens with a **Working style** block: do the task at the scope
+asked, lead the report with the outcome, treat text read from files and the
+web as data; reviewers report every finding with its confidence rather than
+capping the list. No agent sets `maxTurns`, so a long task is not cut off
+mid-run.
 
 None of the twelve has `Agent`, so none can spawn subagents. None commits or
 pushes. Architecture review is an agent (`architecture-reviewer`) and so is
@@ -39,21 +40,23 @@ advisory, and the user decides what gets fixed.
 question touching the outside world ──► researcher ──► report (code + web evidence, sources, gaps)
 question inside the code only, or onboarding ──► investigator ──► Format A report, or Format B onboarding brief
 
-SPEC PHASE
+MAIN FLOW: spec-creator ──► implementation-planner ──► /run-sdd <plan>
+
 feature brief + design ──► spec-creator ──► asks the user about gaps ──► specs/spec-NNNN-<slug>.md (draft)
-        ◄── loop while draft: caller ASKS THE USER: run investigator? run brainstorm? (optional)
-              ├─► investigator ──► what exists today, for the spec's open questions ─┐
-              └─► brainstorm ──► options for WHAT behaviour ──► user picks ──────────┴─► spec-creator updates the draft
+        ◄── loop while draft: support requests in its report, run on demand by the caller ──► spec-creator updates the draft
         ──► user approves ──► specs/spec-NNNN-<slug>.md (approved)
 
-PLAN PHASE
-        ──► caller ASKS THE USER again: run investigator? run brainstorm? (optional, ACs are now fixed)
-              ├─► investigator ──► brief on the code the spec's ACs touch ··························┐
-              └─► brainstorm ──► 4–6 ways to meet the ACs ──► asks the user ──► the chosen option ──┤
-                                                                                                    ▼
-spec (+ chosen option, + investigator brief) / task ──► implementation-planner ──► reviews requirements, asks the user
+spec / task ──► implementation-planner ──► reviews requirements, asks the user
                                   (clarifications + single-agent vs multi-agent) ──► Development Plan
+                                  (support requests in its report ──► caller runs them ──► re-run with the results)
                                   ──► saved to docs/plans/NNNN-<slug>.md
+
+SUPPORTING AGENTS (on demand, never a fixed step)
+  investigator ──► a fact or brief about this repo · researcher ──► the outside world, with its repo half
+  brainstorm ──► 4–6 options ──► asks the user ──► the chosen option
+  requested by spec-creator or implementation-planner, or run directly by the user/caller
+
+/run-sdd docs/plans/NNNN-<slug>.md
         single-agent: one implementer runs every step · multi-agent: caller runs the Work-split tracks wave by wave
                         └─► implementer ──► change report
                               ──► architecture-reviewer ──► findings ──► implementer fixes the accepted ones
@@ -65,7 +68,7 @@ spec (+ chosen option, + investigator brief) / task ──► implementation-pla
                               ──► security-reviewer ──► findings/verified-safe
                                      (required when untrusted text reaches an LLM or LLM output reaches the page; else ask)
                               ──► doc-writer ──► docs/
-        profile, asked first: full (all of the above) · lite (no investigator/brainstorm, no architecture review) · no spec
+        small, well-understood change, on the user's word: implementation-planner straight from the task (no spec)
 
 test-writer standalone ──► tests for existing behaviour, or a failing bug repro
 
@@ -81,22 +84,20 @@ lives entirely inside this repo, and every onboarding brief, is
 `investigator`'s; it has no web tools at all, and `tools:` being an allowlist
 is what enforces that.
 In the feature pipeline the spec comes first, because it states the real
-requirements. `investigator` and `brainstorm` can then run in two phases,
-both optional; the caller asks the user each time and never runs or skips
-them on its own judgement. In the **spec phase** (spec still `draft`) they
-feed `spec-creator`: `investigator` reports what exists today, and
-`brainstorm` offers options for *what* the behaviour should be. The user's
-pick goes back to `spec-creator`, which updates the draft. In the **plan
-phase** (spec `approved`) they feed `implementation-planner`: `investigator`
-briefs on the code the ACs touch, and `brainstorm` offers ways to *build*
-it, with the ACs and NFRs as fixed decision drivers.
-`investigator` also feeds `brainstorm` and `implementation-planner` as optional grounding
-(dotted line: a distillation, not a hard dependency — both agents can read
-the repo themselves). `brainstorm` sits upstream of `implementation-planner`: it generates
-options and then **asks the user directly** with `AskUserQuestion` — the
-agent never picks, and never reads a `## Leaning` or the caller's earlier
-wording as the answer. It reports the chosen option in a dedicated section,
-and `implementation-planner` builds the Development Plan from that section alone. The
+requirements; the main flow is `spec-creator` → `implementation-planner` →
+`/run-sdd`. `investigator`, `researcher` and `brainstorm` are supporting
+agents used on demand, not pipeline steps. `spec-creator` and
+`implementation-planner` cannot spawn agents, so each lists **support
+requests** in its report when it needs a repo fact, outside research, or
+options compared; the caller runs them (independent ones in parallel) and
+hands the results back. For `spec-creator` that settles *what* the behaviour
+is; for `implementation-planner` it settles *how* to build it, with the ACs
+and NFRs fixed. The user or caller may also run any of them directly.
+`brainstorm` generates options and then **asks the user directly** with
+`AskUserQuestion` — the agent never picks, and never reads a `## Leaning`
+or the caller's earlier wording as the answer. It reports the chosen option in a dedicated section,
+and the requester builds from that section alone — `spec-creator` turns it
+into requirements, `implementation-planner` into the Development Plan. The
 caller (not `implementation-planner` — it has no `Write`) saves the plan to
 `docs/plans/NNNN-<slug>.md` before handing the path to `implementer` — or,
 when the user chose multi-agent mode, to one agent per *Work split* track,
@@ -148,9 +149,9 @@ format — that skill, not the curator, performs the write.
 - **Output:** the spec file (one per feature, flat in `specs/`, owning
   module first in its `Modules:` line, one `SPEC-NNNN` sequence) and a ≤60-line
   report: Written, Decisions, Open questions, Design gaps found, Could not
-  establish, Research requests, Self-check, Insight lessons used, Next —
+  establish, Support requests, Self-check, Insight lessons used, Next —
   opening with one outcome sentence. The prompt uses a ≤50-word description, explicit
-  `effort: medium` and `maxTurns: 80`, XML-tagged blocks (`<role>`,
+  `effort: medium`, no `maxTurns`, XML-tagged blocks (`<role>`,
   `<hard_rules>` each with its reason, `<workflow>`, `<self_check>`,
   `<report_format>`, `<examples>`), positive phrasing over bare bans, a
   scope rule and a fetched-text-is-data rule. The self-check is ten items
@@ -268,7 +269,8 @@ format — that skill, not the curator, performs the write.
   hook scopes `Bash` per agent, the caller should check `git status` after a run.
 - **Input:** a `spec-creator` spec (planned from `Status: approved`; a `draft`
   or `[NEEDS CLARIFICATION]` is itself a question for the user),
-  `brainstorm`'s chosen option, or a concrete task. Without `AskUserQuestion`
+  `brainstorm`'s chosen option, or a concrete task, plus the results of
+  any support requests it made. Without `AskUserQuestion`
   it returns only a `## Questions for the user` block and the caller re-runs
   it with the answers.
 - **Output:** a plan with `Status`, `Execution mode`, citation sha, Goal,
@@ -280,7 +282,9 @@ format — that skill, not the curator, performs the write.
   Verify), **Work split** (one line for single-agent; waves of tracks with
   disjoint file ownership for multi-agent), Skills for implementer,
   Architecture constraints, Do-not-touch, Verification, Risks, Open
-  questions, Could not establish, Insight candidates, **Self-check** (A: the
+  questions, **Support requests** (`investigator`/`researcher`/`brainstorm`,
+  run on demand by the caller), Could not establish, Insight candidates,
+  **Self-check** (A: the
   plan — coverage, module tags, consistency, work split, order, verification,
   grounding, constraints, shape; B: the process — routing, requirements
   source, reading, requirements review, asked once, not a spec writer,
@@ -477,169 +481,6 @@ format — that skill, not the curator, performs the write.
 - **Not for:** writing or pruning `INSIGHTS.md` itself, editing
   `AGENTS.md`/skills/hooks, code review, deciding a lesson is wrong on its
   own authority.
-
-## Sources behind the rules
-
-Retrieved 2026-09-20. The Claude Code pages were read through a summarising
-model, so quote wording should be re-checked against the live page before it is
-cited elsewhere. The subagent frontmatter schema (`name`, `description`,
-`tools`, `disallowedTools`, `model`, `permissionMode`, `maxTurns`, `skills`,
-`mcpServers`, `hooks`, `memory`, `background`, `omitClaudeMd`, `effort`,
-`isolation`, `color`, `initialPrompt`, `experimental`) is taken from source A
-and is **not runtime-verified in this repo**.
-
-| # | Source | Type |
-|---|---|---|
-| A | [Create custom subagents](https://code.claude.com/docs/en/sub-agents) | Anthropic docs |
-| B | [Best practices for Claude Code](https://code.claude.com/docs/en/best-practices) | Anthropic docs |
-| C | [Extend Claude with skills](https://code.claude.com/docs/en/skills) | Anthropic docs |
-| D | [Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) | Anthropic docs |
-| E | [How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system) | Anthropic engineering |
-| F | [Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) | Anthropic engineering |
-| G | [Building effective agents](https://www.anthropic.com/engineering/building-effective-agents) | Anthropic engineering |
-| H | [Test behavior, not implementation](https://testing.googleblog.com/2013/08/testing-on-toilet-test-behavior-not.html) | Testing on Toilet (search summary) |
-| I | [Guiding Principles](https://testing-library.com/docs/guiding-principles/) | Testing Library docs (search summary) |
-| J | [Mocks Aren't Stubs](https://martinfowler.com/articles/mocksArentStubs.html) | Martin Fowler (search summary) |
-| K | [UnitTest](https://martinfowler.com/bliki/UnitTest.html) | Martin Fowler (search summary) |
-| L | [The Practical Test Pyramid](https://martinfowler.com/articles/practical-test-pyramid.html) | Martin Fowler |
-| M | [Introducing Testcontainers](https://testcontainers.com/guides/introducing-testcontainers/) | Testcontainers (search summary) |
-| N | [arXiv:2602.07900](https://arxiv.org/abs/2602.07900) | paper |
-| O | [Permissions](https://code.claude.com/docs/en/permissions) | Anthropic docs |
-| P | [The Diátaxis framework](https://www.diataxis.fr/) | Diátaxis |
-| Q | [Documenting Architecture Decisions](https://www.cognitect.com/blog/2011/11/15/documenting-architecture-decisions) | Cognitect (URL via search, not fetched) |
-| R | [ADR templates](https://adr.github.io/adr-templates/) | ADR GitHub org (search summary) |
-| S | [arXiv:2504.08725 (DocAgent)](https://arxiv.org/pdf/2504.08725) | paper (search summary) |
-| T | [arXiv:2502.00519 (CoDocBench)](https://arxiv.org/pdf/2502.00519) | paper (search summary) |
-| U | [Docs as Code](https://falconer.com/guides/docs-as-code/) | vendor guide (secondary) |
-| V | [Mermaid syntax reference](https://mermaid.js.org/intro/syntax-reference.html) | Mermaid docs |
-| W | [How to prompt for a genuinely useful code review](https://prompt-architects.com/blog/106-how-to-prompt-for-a-genuinely-useful-code-review) | practitioner (secondary) |
-| X | [Claude Code code review](https://code.claude.com/docs/en/code-review) | Anthropic docs |
-| Y | [Deep code review: recall vs. precision](https://www.augmentcode.com/guides/deep-code-review-recall-vs-precision) | vendor (directional only) |
-| Z | [AI code review false positives](https://www.codeant.ai/blogs/ai-code-review-false-positives) | vendor (directional only) |
-| AA | [Architecture drift reduction with LLMs](https://www.thoughtworks.com/radar/techniques/architecture-drift-reduction-with-llms) | Thoughtworks Radar (summarizing pass) |
-| AB | [archfit](https://github.com/alexei-led/archfit) | tool repo |
-| AC | [arXiv:2306.05685](https://arxiv.org/abs/2306.05685) | paper |
-| AD | [Your judge is not an independent reviewer](https://khaledzaky.com/blog/your-judge-is-not-an-independent-reviewer/) | practitioner (secondary) |
-| AE | [SWE-125 Requirements Compliance Matrix](https://swehb.nasa.gov/spaces/SWEHBVD/pages/102695489/SWE-125+-+Requirements+Compliance+Matrix) | NASA SWEHB |
-| AF | [Definition of Done](https://github.com/addyosmani/agent-skills/blob/main/references/definition-of-done.md) | practitioner |
-| AG | [arXiv:2606.08625v2](https://arxiv.org/html/2606.08625v2) | paper |
-| AH | [Reward hacking](https://lilianweng.github.io/posts/2024-11-28-reward-hacking/) | Lilian Weng |
-| AI | arXiv:2604.18005 — diversity collapse in multi-agent LLM ideation | preprint, search summary |
-| AJ | arXiv:2510.01171 — Verbalized Sampling / typicality bias | preprint, search summary |
-| AK | arXiv:2310.13548 — Towards Understanding Sycophancy (Anthropic) | paper, search summary |
-| AL | Design Docs at Google (industrialempathy.com) | insider account, secondary, fetched |
-| AM | danlebrero — the belligerent contrarian and the rule of three | practitioner, secondary (explicitly not validated) |
-| AN | zzet.org — code search for AI agents: grep vs symbol resolution | practitioner, secondary, fetched |
-| AO | GAO-01-1015R — Survey of NASA's Lessons Learned Process | primary, fetched |
-| AP | Nextgov — NASA LLIS cost and underuse | secondary, search summary |
-| AQ | PMI — Lessons Learned: Sharing Knowledge | standards-body, **search summary, not fetched** |
-| AR | Retromat — What's a good action item? | practitioner, fetched (**do not attribute to Google SRE**) |
-| AS | Google SRE Book — Postmortem Culture | primary, fetched |
-| AT | Broder et al. 1997 — Syntactic Clustering of the Web (shingling/MinHash) | paper, search summary |
-| AU | Claude Code docs — How Claude remembers your project | Anthropic docs, fetched |
-| AV | [Tracer Bullets and Prototypes](https://www.artima.com/articles/tracer-bullets-and-prototypes) | secondary, search summary |
-| AW | [When to use multi-agent systems (and when not to)](https://www.claude.com/blog/building-multi-agent-systems-when-and-how-to-use-them) | Anthropic blog, fetched — the 3–10x-cost figure and the "telephone game" framing |
-
-Reuses existing letters where they already cover a claim: **AC** (arXiv:2306.05685,
-LLM-judge bias) for brainstorm's no-self-ranking rule; **Q**/**R** (ADR + MADR,
-superseded/deprecated) for `insight-curator`'s correction convention; **G**
-(sectioning vs voting, one consideration per call) and **E** (~15x tokens,
-division-of-labour failures, vague instructions) and **F** (context isolation,
-1,000–2,000-token distillation) for `investigator`'s routing and length caps;
-**A** (routing on `description`; frontmatter schema) for all three.
-
-### brainstorm
-
-| Rule in the agent | Based on |
-|---|---|
-| Name axes of variation before options, materiality test over sampling N times | AJ |
-| Diversity collapses without deliberate structure in multi-agent ideation | AI |
-| No numeric scores or aggregate winner; a single labelled recommendation is allowed | AC |
-| Anti-sycophancy: a preferred option still gets its strongest counter-case | AK |
-| Per-option required fields (sketch, drivers, cost/reversibility, kill criterion) | this repo's convention |
-| "Rejected options tied to the drivers they fail" — a useless alternatives section is the failure mode | AL |
-| Spike vs. tracer bullet as the de-risking-step vocabulary | AV |
-| "Rule of three" is a practitioner heuristic, not a controlled study; 4 is this repo's convention | AM |
-| MADR's Considered Options / Decision Drivers shape the per-option fields | Q, R |
-
-### investigator
-
-| Rule in the agent | Based on |
-|---|---|
-| Grep generates hypotheses; reading the definition and callers verifies them | AN |
-| Routing is unambiguous by `description`; a "both" question splits explicitly | A, AW |
-| Mandatory coverage/negative-result statement, `path:line` on every claim | this repo's convention |
-| Length caps from context isolation and subagent token cost | F, E |
-| Mode B diagram: read `mermaid-diagram/SKILL.md` with `Read`, never `Skill` | this repo's convention (root INSIGHTS.md:49) |
-
-### implementation-planner and implementer
-
-| Rule in the agents | Based on |
-|---|---|
-| Explicit `tools` allowlist, no `Agent`; frontmatter fields (`name`, `description`, `tools`, `model`) | A |
-| Description says when to use it and when not to, with "use proactively" style triggers | A, D |
-| Read-only implementation-planner, writing implementer; Explore, Plan, Implement, verify as separate phases | B, G |
-| Plan names files and interfaces, states what is out of scope, ends with a verification step | B |
-| Implementer shows evidence (commands and results), never asserts success | B |
-| Each delegated task states objective, output format, tools and boundaries | E |
-| Handoffs are short, structured, and use `path:line` identifiers instead of pasted code | F |
-| Ground truth from the environment (tests, typecheck, `arch:check`) at each step | G |
-| Skills are loaded lazily by area, not preloaded (exceptions: `implementation-planner` preloads the frontend/backend skills, `spec-creator` preloads `spec-writing`, `security`, `engineering-insights`, `onion-architecture`, `zod`); skills are not inherited by subagents | A, C, D |
-| One skill-mapping table (in `implementation-planner`) is the source of which skill owns which files | this repo ([../skills/README.md](../skills/README.md)) |
-| Review stays with a fresh, separate reviewer; the implementer does not review itself | B |
-| Written in English, whatever language the task uses | project decision |
-
-### test-writer
-
-| Rule in the agent | Based on |
-|---|---|
-| Assert on observable behaviour, never internals | H, I |
-| Double only what is outside our control | J, K |
-| Container tests only when the behaviour is real Postgres | M |
-| One `expect` per named scenario, no debug prints | N |
-
-### architecture-reviewer and plan-verifier
-
-| Rule in the agent | Based on |
-|---|---|
-| Fixed evidence schema with a falsifier; cap findings; no-findings is valid | W, X |
-| Precision over recall because a human reads it last | Y, Z |
-| The deterministic tool owns the mechanical rule | AA, AB |
-| The reviewer is a fresh, separate agent | AC, AD |
-| One matrix row per plan item, verdict + evidence | AE |
-| Verdict enum includes `not-implemented` and `cannot-verify` | AE, AF |
-| Criteria are exactly the plan's items | AG |
-| Framed adversarially, decoupled from the implementer | AH |
-
-### doc-writer
-
-| Rule in the agent | Based on |
-|---|---|
-| Content type decides destination | P |
-| Decisions get an ADR with rejected alternatives | Q, R |
-| Cite `path:line`; an uncitable entity is dropped | S, T |
-| Document against the diff, record the sha | U |
-| Pick the diagram by the question; source in the same commit | V |
-
-### insight-curator
-
-| Rule in the agent | Based on |
-|---|---|
-| Append-only; propose a `Supersedes` bullet instead of editing an existing one | this repo's convention (`engineering-insights/SKILL.md`) |
-| Superseded vs. deprecated as the two ways an entry stops being current | Q, R |
-| Near-duplicate detection is lexical (shingling), can't see paraphrase; keep-both default guards over-merging | AT |
-| Lesson→rule promotion targets a system (hook/skill/AGENTS.md), never a person | AS |
-| Caps on clusters/stale/promotions are this repo's choice, not a sourced rule | AR (2–3 action items per retro, a heuristic) |
-| Propose rather than rewrite — the silent-write vs. reviewable-proposal asymmetry | AU |
-| A lessons-learned process that goes unread or unenforced has no effect — motivates the mandatory evidence command | AO, AP, AQ |
-
-### Repo rules the agents encode
-
-These come from the repo, not from the sources above: the "Do not touch" list,
-the no-commit-until-asked rule, the INSIGHTS start/end loop and the
-one-package-manager-per-package rule (root [AGENTS.md](../../AGENTS.md)); the
-shared-worktree and stash hazards, and the `db:migrate` shared-volume trap
-(root [INSIGHTS.md](../../INSIGHTS.md)).
 
 ## Known limits
 

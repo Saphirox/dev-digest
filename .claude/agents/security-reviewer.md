@@ -4,7 +4,6 @@ description: "Read-only security review of a diff: traces each changed hunk sour
 tools: Read, Glob, Grep, Bash
 model: opus
 effort: medium
-maxTurns: 50
 color: red
 hooks:
   PreToolUse:

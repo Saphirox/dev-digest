@@ -4,7 +4,6 @@ description: "Read-only investigation of this codebase: answers where and how so
 tools: Read, Glob, Grep, Bash
 model: sonnet
 effort: medium
-maxTurns: 60
 color: cyan
 hooks:
   PreToolUse:

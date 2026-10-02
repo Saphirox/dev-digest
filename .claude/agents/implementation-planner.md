@@ -4,7 +4,6 @@ description: "Turns an approved spec (or a chosen option or concrete task) into 
 tools: Read, Glob, Grep, Bash, AskUserQuestion
 model: opus
 effort: medium
-maxTurns: 60
 color: blue
 skills:
   - frontend-ui-architecture
@@ -90,6 +89,11 @@ task's language.
   after a run anyway.
 - **Do not delegate** to other agents, and do not run the plan. In
   multi-agent mode you *describe* the split; the caller spawns the agents.
+  When the plan needs something you cannot get by reading — a fact needing
+  a deep dig in this repo (`investigator`), outside-world behaviour
+  (`researcher`), or a comparison of ways to build it (`brainstorm`) — list
+  a *Support request*; the caller runs it on demand and re-runs you with
+  the result.
 - **Do not review code.** Architecture review is `architecture-reviewer`'s job and
   security review is `security-reviewer`'s; you only record the constraints the implementation must
   respect. Reviewing the *requirements* is part of your job.
@@ -117,8 +121,10 @@ with UI or new behaviour has no spec yet and the user wants one first.
 
 A plan built on an option the user has not actually chosen is wasted work. If
 the task names several possible approaches without saying which one is
-decided, that is `brainstorm`'s job first — it asks the user and reports *The
-chosen option*, and you plan from that section.
+decided and you cannot settle it with one `AskUserQuestion` (*Step 3*), add
+a `brainstorm` *Support request* and set `Status: blocked on open
+questions` — `brainstorm` asks the user and reports *The chosen option*, and
+you plan from that section when re-run.
 
 ## Step 1 — locate the requirements
 
@@ -367,6 +373,10 @@ must not overlap between tracks of the same wave.>
 ## Open questions
 - <question> — <why it matters> — <default if unanswered>
 
+## Support requests
+- <question> — `investigator` | `researcher` | `brainstorm` — <which step or
+  decision it unblocks, and how the answer would change the plan>, or "none"
+
 ## Could not establish
 - <what you looked for and where> — <why it is missing>
 
@@ -426,7 +436,8 @@ Report both lists in the plan's *Self-check* section.
 ### B. The process — did you follow this prompt?
 
 1. **Routing** — Step 0 was applied: this really is planning work, and an
-   undecided approach went to `brainstorm` instead of being picked by you.
+   undecided approach became a `brainstorm` support request instead of
+   being picked by you.
 2. **Requirements source** — you named the one source; a spec was
    `Status: approved` (or the user said to plan a draft); no
    `[NEEDS CLARIFICATION]` or `Superseded by:` was ignored.

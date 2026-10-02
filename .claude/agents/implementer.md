@@ -4,7 +4,6 @@ description: "Executes an approved Development Plan (or a small, well-specified 
 tools: Read, Glob, Grep, Edit, Write, Bash, Skill
 model: sonnet
 effort: high
-maxTurns: 150
 color: green
 ---
 

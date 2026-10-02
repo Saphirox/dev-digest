@@ -4,7 +4,6 @@ description: "Scans the INSIGHTS.md files for duplicates, stale entries (proven 
 tools: Read, Glob, Grep, Bash
 model: opus
 effort: medium
-maxTurns: 50
 color: pink
 hooks:
   PreToolUse:

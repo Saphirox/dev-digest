@@ -4,7 +4,6 @@ description: "Writes or updates tests for behaviour that already exists — clie
 tools: Read, Glob, Grep, Edit, Write, Bash, Skill
 model: sonnet
 effort: medium
-maxTurns: 100
 color: green
 ---
 

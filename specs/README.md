@@ -11,16 +11,15 @@ several modules. The full rules live in
 ```
 brief + design ──► spec-creator ──► specs/spec-NNNN-<slug>.md (draft)
                         ▲                         │
-                        └── updates the draft ◄── ask the user: investigator? brainstorm?  (optional: WHAT to build)
-                                                  │
+                        └── updates the draft ◄── support requests, on demand
+                                                  │ (investigator · researcher · brainstorm)
                                             user approves
-                                                  │
-                         ask the user: investigator? brainstorm?  (optional: HOW to build; ACs are fixed)
                                                   │
                                                   ▼
                               implementation-planner ──► docs/plans/NNNN-<slug>.md
+                                  (support requests, on demand)
                                                   │
-                                                  ▼
+                                                  ▼  /run-sdd docs/plans/NNNN-<slug>.md
              implementer ──► architecture-reviewer ──► fixes ──► test-writer
                                                   │
                                                   ▼
@@ -30,11 +29,14 @@ brief + design ──► spec-creator ──► specs/spec-NNNN-<slug>.md (draft
              security-reviewer (required when untrusted text reaches an LLM or the page)
 ```
 
-The spec and plan phases are run by hand. Everything from `implementer` on
+The main flow is `spec-creator` → `implementation-planner` → `/run-sdd`.
+The spec and plan steps are run by hand; everything from `implementer` on
 runs automatically with `/run-sdd docs/plans/NNNN-<slug>.md`.
 
-Before the spec phase, the user picks a profile: **full**, **lite** (no
-investigator, brainstorm or architecture review) or **no spec**.
+`investigator`, `researcher` and `brainstorm` are supporting agents, not
+steps: `spec-creator` or `implementation-planner` lists a support request
+when it needs a repo fact, outside research or options compared, and the
+caller runs it and hands the result back.
 
 ## Modules
 

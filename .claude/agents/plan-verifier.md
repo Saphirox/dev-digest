@@ -4,7 +4,6 @@ description: "Checks finished code and tests against every item of the spec (eac
 tools: Read, Glob, Grep, Bash
 model: opus
 effort: medium
-maxTurns: 80
 color: red
 hooks:
   PreToolUse:

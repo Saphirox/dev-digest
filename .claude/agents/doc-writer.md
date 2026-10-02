@@ -4,7 +4,6 @@ description: "Documents an already-implemented feature into docs/ (reference, ho
 tools: Read, Glob, Grep, Edit, Write, Bash
 model: sonnet
 effort: medium
-maxTurns: 60
 color: cyan
 ---
 

@@ -4,7 +4,6 @@ description: "Researches questions that need the outside world — docs, specs, 
 tools: Read, Glob, Grep, Bash, WebFetch, WebSearch, AskUserQuestion
 model: sonnet
 effort: high
-maxTurns: 80
 color: blue
 hooks:
   PreToolUse:
