@@ -17,9 +17,11 @@ interface DiffTabProps {
   files: PrFile[];
   /** Inline commenting is offered only on open PRs (GitHub rejects otherwise). */
   canComment?: boolean;
+  /** Path of the file to open and scroll to (the page's `?file=` param). */
+  focusPath?: string | null;
 }
 
-export function DiffTab({ prId, files, canComment }: DiffTabProps) {
+export function DiffTab({ prId, files, canComment, focusPath = null }: DiffTabProps) {
   const t = useTranslations("prReview");
   const { data: comments } = usePrComments(prId);
   // Shares its cache with SmartDiffViewer (same `usePrSmartDiff` query key) —
@@ -80,7 +82,7 @@ export function DiffTab({ prId, files, canComment }: DiffTabProps) {
           </Button>
         </div>
       )}
-      <SmartDiffViewer prId={prId} files={files} commenting={commenting} />
+      <SmartDiffViewer prId={prId} files={files} commenting={commenting} focusPath={focusPath} />
     </section>
   );
 }

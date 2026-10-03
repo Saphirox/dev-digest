@@ -1,1 +1,0 @@
-export { RiskAreas } from "./RiskAreas";

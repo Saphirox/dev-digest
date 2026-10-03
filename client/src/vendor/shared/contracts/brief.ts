@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 /**
- * PR Brief building blocks: Intent, Blast radius, Risks, PR History,
- * Smart Diff. Composed into PrBrief.
+ * PR Brief contracts: the generated PrBrief (summary, risks, review focus),
+ * plus the Intent, Blast radius, PR History and Smart Diff shapes used by the
+ * neighbouring Overview blocks.
  */
 
 // ---- Intent ----
@@ -111,47 +112,26 @@ export type BlastRadius = z.infer<typeof BlastRadius>;
 export const RiskSeverity = z.enum(['high', 'medium', 'low']);
 export type RiskSeverity = z.infer<typeof RiskSeverity>;
 
-/** The 3 deterministic detector families a risk can come from (Risk Areas). */
-export const RiskKind = z.enum(['auth_surface', 'new_dependency', 'performance']);
-export type RiskKind = z.infer<typeof RiskKind>;
-
-/** A grounded `path:start-end` reference into the new side of the diff — a
- *  structured location, not a display string, so the client can build a
- *  GitHub blob link without re-parsing a `"path:12-18"` string. */
-export const RiskRef = z.object({
+/** A grounded reference to a file (and optionally a line range) the PR Brief
+ *  model cited — a structured location, not a display string, so the client can
+ *  build a link without re-parsing a `"path:12-18"` string. The server drops a
+ *  ref whose file is not part of the PR or its blast map. */
+export const RiskFileRef = z.object({
   file: z.string(),
-  start_line: z.number().int(),
-  end_line: z.number().int(),
+  start_line: z.number().int().positive().optional(),
+  end_line: z.number().int().positive().optional(),
 });
-export type RiskRef = z.infer<typeof RiskRef>;
+export type RiskFileRef = z.infer<typeof RiskFileRef>;
 
+/** One model-identified risk in the PR Brief. `kind` is free text. */
 export const Risk = z.object({
-  kind: RiskKind,
+  kind: z.string(),
   title: z.string(),
   explanation: z.string(),
   severity: RiskSeverity,
-  refs: z.array(RiskRef),
+  file_refs: z.array(RiskFileRef),
 });
 export type Risk = z.infer<typeof Risk>;
-
-export const Risks = z.object({
-  risks: z.array(Risk),
-});
-export type Risks = z.infer<typeof Risks>;
-
-/** Result of one deterministic risk scan (`GET /pulls/:id/risks`) — no model
- *  call, recomputed from the diff on every read (see the risk-source ADR in
- *  `docs/plans/0003-intent-card-risk-areas.md`). */
-export const PrRisks = z.object({
-  pr_id: z.string(),
-  derived_for_sha: z.string(),
-  risks: z.array(Risk),
-  scanned: z.object({
-    files: z.number().int(),
-    added_lines: z.number().int(),
-  }),
-});
-export type PrRisks = z.infer<typeof PrRisks>;
 
 // ---- PR History ----
 export const PrHistoryItem = z.object({
@@ -204,11 +184,39 @@ export const SmartDiff = z.object({
 });
 export type SmartDiff = z.infer<typeof SmartDiff>;
 
-// ---- Composed PR Brief (pr_brief.json) ----
+// ---- PR Brief (pr_brief.json) ----
+/** A file + line the reviewer should read first, with the reason. */
+export const ReviewFocusItem = z.object({
+  file: z.string(),
+  line: z.number().int().positive(),
+  reason: z.string(),
+});
+export type ReviewFocusItem = z.infer<typeof ReviewFocusItem>;
+
+/** One changed PR file's one-line "what this does", written by the brief's
+ *  model call from facts only (path, role, counts, changed symbol names). */
+export const FileSummary = z.object({
+  file: z.string(),
+  summary: z.string(),
+});
+export type FileSummary = z.infer<typeof FileSummary>;
+
+/** The generated PR Brief: one `risk_brief` model call over PR facts (no diff
+ *  hunks), stored per PR with the head SHA it was generated for. Intent and
+ *  Blast radius are separate blocks, not part of this record. */
 export const PrBrief = z.object({
-  intent: Intent,
-  blast: BlastRadius,
-  risks: Risks,
-  history: PrHistory,
+  summary: z.string(),
+  risks: z.array(Risk),
+  review_focus: z.array(ReviewFocusItem),
+  /** Per-file summaries for Files changed. Defaults to [] for briefs stored
+   *  before the field existed. */
+  file_summaries: z.array(FileSummary).default([]),
+  generated_for_sha: z.string(),
+  generated_at: z.string(),
+  /** Fixed labels of inputs that were unavailable when generating. */
+  missing_inputs: z.array(z.string()),
+  cost_usd: z.number().nullable(),
+  tokens_in: z.number().int().nullable(),
+  tokens_out: z.number().int().nullable(),
 });
 export type PrBrief = z.infer<typeof PrBrief>;

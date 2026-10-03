@@ -9,8 +9,8 @@ into the reviewer prompt behind a trusted, narrow scope rule: the reviewer
 model — not code — may leave out minor off-topic SUGGESTIONs, and must always
 report every CRITICAL or WARNING with its true severity, in scope or not.
 There is no code-side scope filter (`docs/plans/0008-reviewer-side-scope-filtering.md`).
-See also [Risk Areas](risk-areas.md) — a second, deterministic (no-model)
-section that now lives on the same card.
+See also [PR Brief](pr-brief.md) — the Overview block that replaced the
+deterministic Risk Areas section this card used to carry.
 
 ## What it derives
 
@@ -284,7 +284,7 @@ yet) shows a "Derive intent" call to action
 Once derived, the card shows: an `Intent` chip, a stale badge when the
 stored `derived_for_sha` no longer matches the PR's head, a re-derive
 button, the quoted intent sentence, `IN SCOPE` / `OUT OF SCOPE` bullet
-columns, the [Risk Areas](risk-areas.md) section, and a `Missing context`
+columns, and a `Missing context`
 block when non-empty
 (`client/src/app/repos/[repoId]/pulls/[number]/_components/IntentCard/IntentCard.tsx:61-144`).
 

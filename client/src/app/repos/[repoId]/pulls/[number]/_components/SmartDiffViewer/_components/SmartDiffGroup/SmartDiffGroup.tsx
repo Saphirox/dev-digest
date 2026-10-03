@@ -10,6 +10,7 @@ import { Icon } from "@devdigest/ui";
 import type { SmartDiffFile, SmartDiffRole } from "@devdigest/shared";
 import { GROUP_META } from "../../constants";
 import { filesWithFindings } from "../../helpers";
+import { useOpenOnFocus } from "../../useOpenOnFocus";
 import { FindingsDot } from "../FindingsDot";
 import { s, chevronFor } from "./styles";
 
@@ -18,6 +19,7 @@ export function SmartDiffGroup({
   files,
   reviewsLoading,
   hasReviewRun,
+  focusPath,
   children,
 }: {
   role: SmartDiffRole;
@@ -26,11 +28,18 @@ export function SmartDiffGroup({
    *  still loading, so the header never flashes a wrong empty state. */
   reviewsLoading: boolean;
   hasReviewRun: boolean;
+  /** The focused file (`?file=`), if any: a group holding it expands. */
+  focusPath: string | null;
   children: React.ReactNode;
 }) {
   const t = useTranslations("prReview");
   const meta = GROUP_META[role];
   const [expanded, setExpanded] = React.useState(true);
+  useOpenOnFocus(
+    focusPath != null && files.some((f) => f.path === focusPath),
+    focusPath,
+    () => setExpanded(true),
+  );
   const withFindings = filesWithFindings(files);
 
   return (

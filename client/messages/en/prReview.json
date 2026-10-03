@@ -77,7 +77,10 @@
     "toggleShow": "Show comments & findings ({count})",
     "toggleHide": "Hide comments & findings ({count})",
     "findingLines": "{count} finding-lines",
-    "groupedByRole": "Smart Diff · grouped by role"
+    "groupedByRole": "Smart Diff · grouped by role",
+    "whatThisDoes": "What this does:",
+    "summaryChip": "summary",
+    "summaryChipLabel": "This file has a summary from the PR Brief"
   },
   "list": {
     "breadcrumb": "Pull Requests",

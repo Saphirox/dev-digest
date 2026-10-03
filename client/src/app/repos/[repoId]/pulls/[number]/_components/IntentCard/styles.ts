@@ -55,9 +55,9 @@ export const s = {
     fontSize: 13,
     color: "var(--text-muted)",
   } satisfies CSSProperties,
-  risksWrap: {
-    marginTop: 4,
-    paddingTop: 14,
+  footer: {
+    marginTop: 16,
+    paddingTop: 16,
     borderTop: "1px solid var(--border)",
   } satisfies CSSProperties,
   missing: {
