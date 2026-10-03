@@ -283,8 +283,15 @@ export class RepoIntelRepository {
     // Clamp the indexed `name` so a pathological multi-KB identifier can't blow
     // the btree row-size limit and crash the indexer (see clampIndexedName).
     const safe = rows.map((r) => ({ ...r, name: clampIndexedName(r.name) }));
+    // The parser can emit one declaration twice (e.g. `const f = () => …` as
+    // both the binding and the arrow function), which hit the
+    // (repo_id, path, name, kind, line) unique index and crashed indexing.
+    // The duplicate carries no extra information, so keep the first row.
     for (let i = 0; i < safe.length; i += INSERT_CHUNK_SIZE) {
-      await ex.insert(t.symbols).values(safe.slice(i, i + INSERT_CHUNK_SIZE));
+      await ex
+        .insert(t.symbols)
+        .values(safe.slice(i, i + INSERT_CHUNK_SIZE))
+        .onConflictDoNothing();
     }
   }
 

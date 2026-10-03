@@ -62,6 +62,29 @@ d('symbols/references: oversized indexed names are clamped, never crash the inse
     expect(row!.name).toHaveLength(MAX_INDEXED_NAME_LEN);
   });
 
+  it('insertSymbols keeps one row when the parser emits the same symbol twice', async () => {
+    // `const RULE = (…) => …` came out as two identical rows and crashed the API.
+    const row = {
+      repoId,
+      path: 'src/dup.mjs',
+      name: 'RULE',
+      kind: 'function',
+      line: 38,
+      endLine: 38,
+      exported: false,
+      signature: null,
+      contentHash: 'h3',
+    };
+    await expect(repo.insertSymbols([row, { ...row }])).resolves.toBeUndefined();
+    await expect(repo.insertSymbols([{ ...row }])).resolves.toBeUndefined();
+
+    const rows = await pg.handle.db
+      .select({ name: t.symbols.name })
+      .from(t.symbols)
+      .where(eq(t.symbols.path, 'src/dup.mjs'));
+    expect(rows).toHaveLength(1);
+  });
+
   it('insertReferences clamps a 5 KB to_symbol', async () => {
     const hugeRef = 'y'.repeat(5000);
     await expect(
