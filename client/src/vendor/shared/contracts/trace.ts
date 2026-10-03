@@ -44,6 +44,10 @@ export const PromptAssembly = z.object({
   skills_tokens: z.number().int().nullish(),
   memory: z.string().nullish(),
   specs: z.string().nullish(),
+  /** Tokens the project-context (specs) block added to the prompt (server
+      tokenizer); null when no doc was attached. Nullish so traces saved before
+      it still parse. */
+  specs_tokens: z.number().int().nullish(),
   /** Callers-of-changed-symbols digest (repo-intel); null when absent. */
   callers: z.string().nullish(),
   /** Repo skeleton / map (repo-intel); null when absent. */
@@ -81,6 +85,14 @@ export const RunStats = z.object({
 });
 export type RunStats = z.infer<typeof RunStats>;
 
+/** One attached project-context doc as the run saw it. */
+export const ProjectContextEntry = z.object({
+  path: z.string(),
+  tokens: z.number().int().nullable(),
+  status: z.enum(['included', 'truncated', 'dropped', 'missing']),
+});
+export type ProjectContextEntry = z.infer<typeof ProjectContextEntry>;
+
 /** The single-document trace stored in `run_traces.trace`. */
 export const RunTrace = z.object({
   config: z.object({
@@ -97,6 +109,11 @@ export const RunTrace = z.object({
   raw_output: z.string(),
   memory_pulled: z.array(MemoryPulled),
   specs_read: z.array(z.string()),
+  /** Every attached project-context doc with its outcome; nullish so traces
+      saved before it still parse. */
+  project_context: z.array(ProjectContextEntry).nullish(),
+  /** Clone HEAD sha the project context was read at; null when unknown. */
+  project_context_sha: z.string().nullish(),
   log: z.array(RunLogLine),
 });
 export type RunTrace = z.infer<typeof RunTrace>;

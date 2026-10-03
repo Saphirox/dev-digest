@@ -26,7 +26,9 @@ vi.mock("@/lib/hooks/smart-diff", () => ({
 }));
 
 vi.mock("../SmartDiffViewer", () => ({
-  SmartDiffViewer: () => <div data-testid="smart-diff-viewer-stub" />,
+  SmartDiffViewer: ({ focusPath }: { focusPath?: string | null }) => (
+    <div data-testid="smart-diff-viewer-stub" data-focus-path={focusPath ?? ""} />
+  ),
 }));
 
 import { DiffTab } from "./DiffTab";
@@ -80,10 +82,13 @@ function smartDiffWithFindingLines(...findingLinesPerFile: number[][]) {
   };
 }
 
-function renderTab(files: { path: string; additions: number; deletions: number; patch: string | null }[] = []) {
+function renderTab(
+  files: { path: string; additions: number; deletions: number; patch: string | null }[] = [],
+  focusPath?: string | null,
+) {
   return render(
     <NextIntlClientProvider locale="en" messages={{ prReview }}>
-      <DiffTab prId="pr-1" files={files} />
+      <DiffTab prId="pr-1" files={files} focusPath={focusPath} />
     </NextIntlClientProvider>,
   );
 }
@@ -123,5 +128,19 @@ describe("DiffTab — comments & findings toggle", () => {
     const toggle = screen.getByRole("button", { name: "Hide comments & findings (4)" });
     fireEvent.click(toggle);
     expect(screen.getByRole("button", { name: "Show comments & findings (4)" })).toBeInTheDocument();
+  });
+});
+
+describe("DiffTab — focusPath", () => {
+  it("AC-17: forwards the focused path to the smart diff viewer", () => {
+    usePrComments.mockReturnValue({ data: [] });
+    usePrSmartDiff.mockReturnValue({ data: smartDiffWithFindingLines([]) });
+
+    renderTab([], "docs/notes.md");
+    expect(screen.getByTestId("smart-diff-viewer-stub")).toHaveAttribute("data-focus-path", "docs/notes.md");
+
+    cleanup();
+    renderTab([]);
+    expect(screen.getByTestId("smart-diff-viewer-stub")).toHaveAttribute("data-focus-path", "");
   });
 });

@@ -53,6 +53,8 @@ const UpdateAgentBody = z.object({
   ci_fail_on: CiFailOn.optional(),
   repo_intel: z.boolean().optional(),
   enabled: z.boolean().optional(),
+  /** Ordered repo-relative markdown paths (Project Context); validated in the service (EC-3). */
+  context_paths: z.array(z.string()).optional(),
 });
 
 /**

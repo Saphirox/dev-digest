@@ -93,7 +93,7 @@ function conflictReport({ target, files, read, base }) {
 
 function main(input) {
   const command = input.tool_input?.command ?? '';
-  // Quoted text is data, not a command (same rule as the pr-self-review gate).
+  // Quoted text is data, not a command (same rule as readonly-bash.mjs).
   if (!COMMIT.test(command.replace(/'[^']*'|"(?:\\.|[^"\\])*"/g, "''"))) return;
   if (input.cwd) cwd = input.cwd;
 
@@ -167,7 +167,7 @@ function main(input) {
     null,
     null,
     `rebase-before-commit: rebased ${ahead} commit(s) of ${branch} onto ${target} (${before.slice(0, 7)} -> ${after.slice(0, 7)}; ` +
-      `pre-rebase HEAD stays in \`git reflog\`). Earlier pr-self-review verdicts are stale: the diff changed.` +
+      `pre-rebase HEAD stays in \`git reflog\`). Earlier review results are stale: the diff changed.` +
       (pushed ? ` ${branch} exists on origin, so the next push needs --force-with-lease.` : ''),
   );
 }

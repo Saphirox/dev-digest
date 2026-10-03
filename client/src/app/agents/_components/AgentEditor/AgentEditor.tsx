@@ -1,5 +1,6 @@
 /* AgentEditor — one agent: header (name + Run Review) and tabs. Config edits
-   the agent; Skills attaches, enables and orders its skills. Evals / Stats / CI
+   the agent; Skills attaches, enables and orders its skills; Context attaches
+   project documents. Evals / Stats / CI
    arrive with later lessons. Tab state lives in ?tab=. */
 "use client";
 
@@ -8,6 +9,7 @@ import { useTranslations } from "next-intl";
 import { Icon, Tabs } from "@devdigest/ui";
 import type { Agent } from "@devdigest/shared";
 import { ConfigTab } from "./_components/ConfigTab";
+import { ContextTab } from "./_components/ContextTab";
 import { RunReviewMenu } from "./_components/RunReviewMenu";
 import { SkillsTab } from "./_components/SkillsTab";
 import { TABS } from "./constants";
@@ -39,7 +41,9 @@ export function AgentEditor({
         <Tabs tabs={tabs} value={tab} onChange={onTab} pad="0 24px" />
       </div>
       <div style={s.body}>
-        {tab === "skills" ? <SkillsTab agent={agent} /> : <ConfigTab key={agent.id} agent={agent} onDeleted={onDeleted} />}
+        {tab === "skills" && <SkillsTab agent={agent} />}
+        {tab === "context" && <ContextTab key={agent.id} agent={agent} />}
+        {tab !== "skills" && tab !== "context" && <ConfigTab key={agent.id} agent={agent} onDeleted={onDeleted} />}
       </div>
     </div>
   );

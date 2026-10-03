@@ -14,6 +14,7 @@ export function toSkillDto(r: SkillRecord): Skill {
     enabled: r.enabled,
     version: r.version,
     evidence_files: r.evidenceFiles ?? null,
+    context_paths: r.contextPaths,
   };
 }
 

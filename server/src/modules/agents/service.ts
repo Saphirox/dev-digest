@@ -8,6 +8,7 @@ import type {
   Provider,
   ReviewStrategy,
 } from '@devdigest/shared';
+import { assertValidContextPaths } from '../../lib/doc-glob.js';
 import { ValidationError } from '../../platform/errors.js';
 import { AgentsRepository, type SkillLinkInput } from './repository.js';
 import { toAgentDto, toAgentSkillDetail, toAgentVersionDto } from './helpers.js';
@@ -47,6 +48,7 @@ export interface UpdateAgentInput {
   ci_fail_on?: CiFailOn;
   repo_intel?: boolean;
   enabled?: boolean;
+  context_paths?: string[];
 }
 
 export class AgentsService {
@@ -97,6 +99,10 @@ export class AgentsService {
     id: string,
     patch: UpdateAgentInput,
   ): Promise<Agent | undefined> {
+    if (patch.context_paths !== undefined) {
+      // EC-3: reject BEFORE any write so a bad path stores nothing.
+      assertValidContextPaths(patch.context_paths, this.container.config.contextGlob);
+    }
     const row = await this.repo.update(workspaceId, id, {
       ...(patch.name !== undefined ? { name: patch.name } : {}),
       ...(patch.description !== undefined ? { description: patch.description } : {}),
@@ -108,6 +114,7 @@ export class AgentsService {
       ...(patch.ci_fail_on !== undefined ? { ciFailOn: patch.ci_fail_on } : {}),
       ...(patch.repo_intel !== undefined ? { repoIntel: patch.repo_intel } : {}),
       ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+      ...(patch.context_paths !== undefined ? { contextPaths: patch.context_paths } : {}),
     });
     return row ? toAgentDto(row) : undefined;
   }

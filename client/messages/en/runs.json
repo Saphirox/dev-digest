@@ -34,7 +34,11 @@
       "memoryPulled": "Memory pulled",
       "specsRead": "Specs read",
       "items": "{count, plural, one {# item} other {# items}}",
-      "none": "none"
+      "none": "none",
+      "specTokens": "≈ {count} tok",
+      "specTokensUnknown": "—",
+      "specMissing": "missing",
+      "specTruncated": "truncated"
     },
     "stat": {
       "duration": "DURATION",
@@ -47,14 +51,15 @@
       "skills": "Skills (dynamic)",
       "memory": "Memory (dynamic)",
       "repoMap": "Repo skeleton — repo-intel (dynamic)",
-      "specs": "Project context (dynamic)",
+      "specs": "Project context — attached specs (untrusted)",
       "callers": "Callers of changed symbols — repo-intel (dynamic)",
       "user": "User / diff (dynamic)",
       "copy": "Copy",
       "fullscreen": "Open fullscreen",
       "search": "Search in this block…",
       "noMatches": "No matches for “{q}”.",
-      "skillsWithTokens": "Skills (dynamic) · +~{count} tokens"
+      "skillsWithTokens": "Skills (dynamic) · +~{count} tokens",
+      "specsWithTokens": "Project context — attached specs (untrusted) · ≈ {count} tokens"
     },
     "tools": {
       "args": "args",

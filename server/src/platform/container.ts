@@ -32,6 +32,9 @@ import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import { FsDocSource } from '../adapters/docs/fs.js';
+import type { DocSource } from '../modules/project-context/ports.js';
+import { ProjectContextService } from '../modules/project-context/service.js';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -54,6 +57,8 @@ export interface ContainerOverrides {
   /** repo-intel T3 adapters — only the indexer pipeline reads these. */
   depgraph?: DepGraph;
   tokenizer?: Tokenizer;
+  /** Project Context document reader (fs walk + realpath-guarded read). */
+  docSource?: DocSource;
 }
 
 export class Container {
@@ -79,6 +84,8 @@ export class Container {
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
+  private _docSource?: DocSource;
+  private _projectContext?: ProjectContextService;
   private _priceBook?: PriceBook;
   private _featureModels?: FeatureModels;
 
@@ -146,6 +153,31 @@ export class Container {
     if (this.overrides.tokenizer) return this.overrides.tokenizer;
     this._tokenizer ??= new TiktokenTokenizer();
     return this._tokenizer;
+  }
+
+  /** Project Context document source — lists/reads markdown from a clone. */
+  get docSource(): DocSource {
+    if (this.overrides.docSource) return this.overrides.docSource;
+    this._docSource ??= new FsDocSource();
+    return this._docSource;
+  }
+
+  /**
+   * Project Context service — lists/reads a repo's markdown docs from its clone
+   * and assembles the docs a review run injects. Shared by the route plugin and
+   * the run executor.
+   */
+  get projectContext(): ProjectContextService {
+    return (this._projectContext ??= new ProjectContextService({
+      docs: this.docSource,
+      tokens: this.tokenizer,
+      clones: {
+        rootFor: (repo) => this.git.clonePathFor(repo),
+        head: (repo) => this.git.currentHead(repo),
+      },
+      repos: { find: (workspaceId, repoId) => this.reposRepo.getById(workspaceId, repoId) },
+      glob: this.config.contextGlob,
+    }));
   }
 
   /**

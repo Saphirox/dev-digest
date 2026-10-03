@@ -17,11 +17,13 @@ import shell from "../../../../../../../../messages/en/shell.json";
 
 const usePrSmartDiff = vi.fn();
 const usePrReviews = vi.fn();
+const usePrBrief = vi.fn();
 const useFindingActionMutate = vi.fn();
 vi.mock("@/lib/hooks", () => ({
   usePrSmartDiff: (prId: string | null) => usePrSmartDiff(prId),
   usePrReviews: (prId: string | null) => usePrReviews(prId),
   useFindingAction: () => ({ mutate: useFindingActionMutate, isPending: false }),
+  usePrBrief: (prId: string | null) => usePrBrief(prId),
 }));
 
 import { SmartDiffViewer } from "./SmartDiffViewer";
@@ -31,14 +33,20 @@ beforeEach(() => {
   usePrSmartDiff.mockReset();
   usePrReviews.mockReset();
   useFindingActionMutate.mockReset();
+  usePrBrief.mockReset();
+  usePrBrief.mockReturnValue({ data: null });
 });
 
-function renderViewer(files: PrFile[] = []) {
-  return render(
+function viewerTree(files: PrFile[], focusPath: string | null) {
+  return (
     <NextIntlClientProvider locale="en" messages={{ prReview, shell }}>
-      <SmartDiffViewer prId="pr-1" files={files} />
-    </NextIntlClientProvider>,
+      <SmartDiffViewer prId="pr-1" files={files} focusPath={focusPath} />
+    </NextIntlClientProvider>
   );
+}
+
+function renderViewer(files: PrFile[] = [], focusPath: string | null = null) {
+  return render(viewerTree(files, focusPath));
 }
 
 function emptyGroups(overrides: Partial<Record<string, unknown>> = {}) {
@@ -238,5 +246,100 @@ describe("SmartDiffViewer — inline finding cards", () => {
 
     expect(screen.getByText("Findings outside the diff")).toBeInTheDocument();
     expect(screen.getByText("Stale finding")).toBeInTheDocument();
+  });
+});
+
+describe("SmartDiffViewer — focusPath (deep link from the PR Brief)", () => {
+  const DOCS_PATCH = "@@ -0,0 +1,2 @@\n+docs claim line\n+second line";
+  const DOCS_FILES: PrFile[] = [{ path: "docs/notes.md", additions: 2, deletions: 0, patch: DOCS_PATCH }];
+
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+    usePrSmartDiff.mockReturnValue({
+      data: emptyGroups({
+        groups: [
+          { role: "core", files: [] },
+          { role: "tests", files: [] },
+          { role: "wiring", files: [] },
+          {
+            role: "docs",
+            files: [{ path: "docs/notes.md", pseudocode_summary: null, additions: 2, deletions: 0, finding_lines: [] }],
+          },
+          { role: "boilerplate", files: [] },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    usePrReviews.mockReturnValue({ data: [], isLoading: false });
+  });
+
+  it("AC-17: a docs-role card that starts collapsed stays closed without focus", () => {
+    renderViewer(DOCS_FILES, null);
+    expect(screen.queryByText("docs claim line")).not.toBeInTheDocument();
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("AC-17: focusing a docs-role file opens its collapsed card and scrolls it into view", () => {
+    renderViewer(DOCS_FILES, "docs/notes.md");
+    expect(screen.getByText("docs claim line")).toBeInTheDocument();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+  });
+
+  it("AC-17/AC-27: a new focus re-expands a collapsed group and opens the file; a manual collapse then sticks", () => {
+    const { rerender } = renderViewer(DOCS_FILES, null);
+    const group = screen.getByRole("button", { name: /Docs/ });
+    fireEvent.click(group);
+    expect(group).toHaveAttribute("aria-expanded", "false");
+
+    rerender(viewerTree(DOCS_FILES, "docs/notes.md"));
+    expect(screen.getByRole("button", { name: /Docs/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("docs claim line")).toBeInTheDocument();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+
+    // Same focus, user collapses the group again: it is not forced back open.
+    fireEvent.click(screen.getByRole("button", { name: /Docs/ }));
+    expect(screen.getByRole("button", { name: /Docs/ })).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+describe("SmartDiffViewer — per-file summary from the PR Brief", () => {
+  const FILES: PrFile[] = [
+    { path: "src/rate-limit.ts", additions: 3, deletions: 0, patch: "@@ -0,0 +1,3 @@\n+a\n+b\n+c" },
+    { path: "src/other.ts", additions: 1, deletions: 0, patch: "@@ -0,0 +1 @@\n+x" },
+  ];
+  const smart = () =>
+    emptyGroups({
+      groups: [
+        {
+          role: "core",
+          files: FILES.map((f) => ({ path: f.path, additions: f.additions, deletions: f.deletions, finding_lines: [] })),
+        },
+        { role: "tests", files: [] },
+        { role: "wiring", files: [] },
+        { role: "docs", files: [] },
+        { role: "boilerplate", files: [] },
+      ],
+    });
+
+  it('shows "What this does" and the summary chip on a file the brief summarised, and nothing on the others', () => {
+    usePrSmartDiff.mockReturnValue({ data: smart(), isLoading: false, isError: false });
+    usePrReviews.mockReturnValue({ data: [], isLoading: false });
+    usePrBrief.mockReturnValue({
+      data: { file_summaries: [{ file: "src/rate-limit.ts", summary: "Adds a per-IP token bucket." }] },
+    });
+    renderViewer(FILES);
+
+    expect(screen.getByText("What this does:")).toBeInTheDocument();
+    expect(screen.getByText(/Adds a per-IP token bucket\./)).toBeInTheDocument();
+    expect(screen.getAllByRole("img", { name: "This file has a summary from the PR Brief" })).toHaveLength(1);
+  });
+
+  it("renders no summary line when no brief exists", () => {
+    usePrSmartDiff.mockReturnValue({ data: smart(), isLoading: false, isError: false });
+    usePrReviews.mockReturnValue({ data: [], isLoading: false });
+    renderViewer(FILES);
+    expect(screen.queryByText("What this does:")).not.toBeInTheDocument();
   });
 });

@@ -16,7 +16,7 @@ import type {
   PrMeta,
   PrDetail,
   SpecFile,
-  IndexStatus,
+  ProjectContextList,
 } from "../types";
 
 // ---- Settings (F1: GET/PUT /settings, POST /settings/test-connection) ----
@@ -119,19 +119,23 @@ export function usePullDetail(prId: string | number | null | undefined) {
   });
 }
 
-// ---- Project Context (A3 contract; safe to call once API exposes it) ----
+// ---- Project Context (GET /repos/:id/context, GET /repos/:id/context/file) ----
+/** The repo's project docs; `cloned: false` means there is no local clone to list. */
 export function useContextFiles(repoId: string | null | undefined) {
   return useQuery({
     queryKey: ["context", repoId],
-    queryFn: () => api.get<SpecFile[]>(`/repos/${repoId}/context`),
+    queryFn: () => api.get<ProjectContextList>(`/repos/${repoId}/context`),
     enabled: !!repoId,
   });
 }
 
-export function useReindexContext() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (repoId: string) => api.post<IndexStatus>(`/repos/${repoId}/context/reindex`),
-    onSuccess: (_d, repoId) => qc.invalidateQueries({ queryKey: ["context", repoId] }),
+/** One project doc with its content (preview); a 404 surfaces as a query error. */
+export function useContextFile(repoId: string | null | undefined, path: string | null | undefined) {
+  return useQuery({
+    queryKey: ["context-file", repoId, path],
+    queryFn: () =>
+      api.get<SpecFile>(`/repos/${repoId}/context/file?path=${encodeURIComponent(path ?? "")}`),
+    enabled: !!repoId && !!path,
+    retry: false,
   });
 }

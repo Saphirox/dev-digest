@@ -54,6 +54,7 @@ export interface UpdateAgentInput {
       | "ci_fail_on"
       | "repo_intel"
       | "enabled"
+      | "context_paths"
     >
   >;
 }

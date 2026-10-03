@@ -1,6 +1,7 @@
 /* SkillEditor — one skill: header (name, type, version) and tabs. Config edits
-   it; Preview renders it as the agent receives it; Stats says who uses it;
-   Versions lists its body history. Tab state lives in ?tab=. */
+   it; Context attaches project documents; Preview renders it as the agent
+   receives it; Stats says who uses it; Versions lists its body history. Tab
+   state lives in ?tab=. */
 "use client";
 
 import React from "react";
@@ -9,6 +10,7 @@ import { Badge, Icon, Tabs } from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
 import { SkillTypeBadge, TYPE_COLORS } from "../../../../components/skill-type-badge";
 import { ConfigTab } from "./_components/ConfigTab";
+import { ContextTab } from "./_components/ContextTab";
 import { PreviewTab } from "./_components/PreviewTab";
 import { StatsTab } from "./_components/StatsTab";
 import { VersionsTab } from "./_components/VersionsTab";
@@ -49,6 +51,7 @@ export function SkillEditor({
       </div>
       <div style={s.body}>
         <div style={s.inner}>
+          {tab === "context" && <ContextTab key={skill.id} skill={skill} />}
           {tab === "preview" && <PreviewTab skill={skill} />}
           {tab === "stats" && <StatsTab skill={skill} />}
           {tab === "versions" && <VersionsTab skill={skill} />}

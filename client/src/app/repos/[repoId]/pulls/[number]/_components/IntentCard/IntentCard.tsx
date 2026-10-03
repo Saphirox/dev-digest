@@ -4,7 +4,6 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Button, Card, EmptyState, Icon, SectionLabel } from "@devdigest/ui";
 import { usePrIntent, useDeriveIntent } from "@/lib/hooks";
-import { RiskAreas } from "./_components/RiskAreas";
 import { s } from "./styles";
 
 interface IntentCardProps {
@@ -14,19 +13,18 @@ interface IntentCardProps {
       against its own read of `head_sha`; this just avoids a one-beat lag if
       the intent record was cached before a newer commit landed). */
   headSha: string;
-  /** `owner/repo` — used to build the Risk Areas GitHub blob links. Required
-      (pass `null` explicitly when unknown) so a caller can't silently forget
-      it; `null` renders refs as plain mono text instead of a broken link. */
-  repoFullName: string | null;
+  /** Rendered at the bottom of the card, under a divider — the PR Brief's
+      Risk areas live here. */
+  footer?: React.ReactNode;
 }
 
 /**
- * Intent card (Overview tab, above the PR description). Shows the derived
- * `{intent, in_scope, out_of_scope}`, the Risk Areas section, missing-context
- * refs when any, and a re-derive action — a hybrid of "auto-derive when a
+ * Intent card (Overview tab, inside the PR Brief block). Shows the derived
+ * `{intent, in_scope, out_of_scope}`, missing-context refs when any, and a
+ * re-derive action — a hybrid of "auto-derive when a
  * review runs" (server-side, run-executor) and this explicit button.
  */
-export function IntentCard({ prId, headSha, repoFullName }: IntentCardProps) {
+export function IntentCard({ prId, headSha, footer }: IntentCardProps) {
   const t = useTranslations("intent");
   const { data: intent, isLoading } = usePrIntent(prId);
   const derive = useDeriveIntent(prId);
@@ -46,6 +44,7 @@ export function IntentCard({ prId, headSha, repoFullName }: IntentCardProps) {
             onCta={() => derive.mutate()}
             ctaLoading={derive.isPending}
           />
+          {footer && <div style={s.footer}>{footer}</div>}
         </Card>
       </section>
     );
@@ -120,10 +119,6 @@ export function IntentCard({ prId, headSha, repoFullName }: IntentCardProps) {
           </div>
         </div>
 
-        <div style={s.risksWrap}>
-          <RiskAreas prId={prId} repoFullName={repoFullName} />
-        </div>
-
         {intent.missing_context.length > 0 && (
           <div style={s.missing}>
             <div style={s.columnLabel(false)}>{t("missingContext")}</div>
@@ -134,6 +129,8 @@ export function IntentCard({ prId, headSha, repoFullName }: IntentCardProps) {
             </ul>
           </div>
         )}
+
+        {footer && <div style={s.footer}>{footer}</div>}
       </Card>
     </section>
   );

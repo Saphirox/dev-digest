@@ -6,7 +6,7 @@
   "resync": "Resync",
   "resyncing": "Resyncing…",
   "indexStatus": "Index status: {status}",
-  "loadError": "Couldn’t load specs",
+  "loadError": "Couldn’t load project documents",
   "kb": "{kb}kb",
   "empty": {
     "title": "No spec files yet",
@@ -20,5 +20,36 @@
     "loadError": "Couldn’t load spec",
     "save": "Save",
     "saving": "Saving…"
+  },
+  "notCloned": {
+    "title": "Repository not cloned",
+    "body": "Clone this repository to list its project documents."
+  },
+  "attachedOf": "{attached} of {total} attached",
+  "missing": "missing",
+  "missingHint": "This file is no longer in the repository. Untick it to detach it.",
+  "tokens": "≈ {count} tokens",
+  "tokensUnknown": "—",
+  "filterPlaceholder": "Filter documents…",
+  "noMatch": "No documents match the filter.",
+  "preview": "Preview",
+  "previewLabel": "Preview {name}",
+  "refresh": "Refresh",
+  "moveHint": "{name}: drag, or press ↑ / ↓ to reorder",
+  "dragHandle": "Drag to reorder",
+  "dragDisabled": "Tick the document to reorder it",
+  "footerNote": "Injected as an untrusted block (## Project context) into every run.",
+  "type": {
+    "specs": "specs",
+    "docs": "docs",
+    "insights": "insights"
+  },
+  "previewDrawer": {
+    "loadError": "Couldn’t load this document",
+    "loading": "Loading…",
+    "close": "Close"
+  },
+  "page": {
+    "tree": "Project documents"
   }
 }

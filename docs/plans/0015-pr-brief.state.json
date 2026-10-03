@@ -1,0 +1,216 @@
+{
+  "plan": "docs/plans/0015-pr-brief.md",
+  "spec": "specs/spec-0002-pr-brief.md",
+  "phase": "done",
+  "mode": "multi-agent",
+  "docs": true,
+  "changedPaths": [
+    "reviewer-core/src/prompt.ts",
+    "reviewer-core/src/index.ts",
+    "server/src/vendor/shared/contracts/brief.ts",
+    "client/src/vendor/shared/contracts/brief.ts",
+    "client/messages/en/brief.json",
+    "client/messages/en/intent.json",
+    "client/INSIGHTS.md",
+    "client/src/lib/hooks/index.ts",
+    "client/src/lib/hooks/smart-diff.ts",
+    "client/src/lib/hooks/risks.ts",
+    "client/src/lib/hooks/brief.ts",
+    "client/src/app/repos/[repoId]/pulls/[number]/page.tsx",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/DiffTab",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/IntentCard",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/SmartDiffViewer",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/PrBriefBlock",
+    "server/src/modules/index.ts",
+    "server/src/modules/reviews/routes.ts",
+    "server/src/modules/reviews/service.ts",
+    "server/src/modules/reviews/risks",
+    "server/src/modules/brief",
+    "server/test/contracts.test.ts",
+    "server/test/brief-helpers.test.ts",
+    "server/test/brief-prompt.test.ts",
+    "server/test/brief-service.test.ts",
+    "server/test/brief.it.test.ts",
+    "server/test/risks-detectors.test.ts",
+    "server/test/risks.it.test.ts",
+    "server/INSIGHTS.md",
+    "client/src/lib/severity.ts",
+    "client/src/lib/severity.test.ts",
+    "client/src/lib/latest-review.ts",
+    "client/src/lib/latest-review.test.ts",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/ReviewRunAccordion/ReviewRunAccordion.tsx",
+    "client/src/app/repos/[repoId]/pulls/[number]/page.test.tsx",
+    "client/src/lib/hooks/brief.test.ts",
+    "docs/specs/pr-brief.md",
+    "docs/specs/risk-areas.md",
+    "docs/specs/intent-layer.md"
+  ],
+  "archReview": {
+    "round": 2,
+    "findings": [
+      {
+        "id": "AR-1-1",
+        "severity": "warning",
+        "location": "server/src/modules/brief/service.ts:3-4, helpers.ts:6",
+        "claim": "brief/ imports other modules' pure helpers (toBlastRadius, extractIssueRef, classifyFile)",
+        "status": "declined"
+      },
+      {
+        "id": "AR-1-2",
+        "severity": "warning",
+        "location": "server/src/modules/brief/routes.ts:31-44",
+        "claim": "SpecDocsSource orchestration (agents+skills path merge) lives in route plugin, untested",
+        "status": "fixed",
+        "fixedInRound": 1
+      },
+      {
+        "id": "AR-1-3",
+        "severity": "suggestion",
+        "location": "server/src/modules/brief/routes.ts:8, prompt.ts:5",
+        "claim": "BriefModelOutput imported via prompt.ts re-export as well as output.ts",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-1-4",
+        "severity": "suggestion",
+        "location": "server/src/modules/brief/service.ts:10-13",
+        "claim": "Logger interface duplicated from blast/service.ts",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-1-5",
+        "severity": "warning",
+        "location": "client/.../PrBriefBlock/_components/BriefBanner/BriefBanner.tsx:21-23",
+        "claim": "blocker count rule duplicated from ReviewRunAccordion.tsx:59",
+        "status": "fixed",
+        "fixedInRound": 1
+      },
+      {
+        "id": "AR-1-6",
+        "severity": "warning",
+        "location": "client/.../PrBriefBlock/helpers.ts:24-28",
+        "claim": "latestReview uses a different 'which review' rule than the Agent runs tab (AC-12/D-19)",
+        "status": "fixed",
+        "fixedInRound": 1
+      },
+      {
+        "id": "AR-1-7",
+        "severity": "warning",
+        "location": "client/.../SmartDiffGroup.tsx:39-45, SmartDiffFileRow.tsx:59-65",
+        "claim": "open-on-focus state machine duplicated; redundant prop pairs",
+        "status": "fixed",
+        "fixedInRound": 1
+      },
+      {
+        "id": "AR-1-8",
+        "severity": "suggestion",
+        "location": "client/.../PrBriefBlock/PrBriefBlock.tsx:139",
+        "claim": "missing_inputs English strings bypass i18n (plan chose fixed strings)",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-2-1",
+        "severity": "suggestion",
+        "location": "PrBriefBlock.tsx:20, BriefBanner.tsx:13",
+        "claim": "comments say 'completed' review but latestReview returns reviews[0]",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-2-2",
+        "severity": "suggestion",
+        "location": "Agent runs tab",
+        "claim": "tab still indexes runs[0] inline instead of latestReview",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-3-1",
+        "severity": "suggestion",
+        "location": "PrBriefBlock/helpers.ts:25-28",
+        "claim": "second token formatter in route; promote to src/lib on a third consumer",
+        "status": "deferred"
+      }
+    ]
+  },
+  "verify": {
+    "round": 1,
+    "fixList": [
+      {
+        "id": "S14",
+        "ac": "AC-14",
+        "kind": "code",
+        "agent": "implementer",
+        "status": "fixed"
+      },
+      {
+        "id": "S15",
+        "ac": "AC-15",
+        "kind": "test",
+        "agent": "test-writer",
+        "status": "fixed"
+      },
+      {
+        "id": "S22",
+        "ac": "AC-22",
+        "kind": "test",
+        "agent": "test-writer",
+        "status": "fixed"
+      }
+    ]
+  },
+  "security": "required",
+  "manualChecks": [
+    "AC-1 visual match vs specs/images/spec-0002/overview-pr-brief.png",
+    "AC-15 severity icon colour",
+    "AC-17 click docs-role focus item in real browser opens card on Files changed (files-changed-target.png)",
+    "NFR-8 Tab through Generate, refresh, focus/risk refs on a running page",
+    "NFR-8 visible focus ring / keyboard tabbing through the block"
+  ],
+  "log": [
+    "2026-10-02 inputs resolved; spec approved, plan ready; state created",
+    "2026-10-02 wave 1 done (step 1 reviewer-core, steps 2-3 contracts); follow-up: vendor/shared/index.ts header comments mention Risks",
+    "2026-10-02 client track (8-12) done: pnpm test 288 pass, typecheck pass. Not verified: manual page load; focus only in Smart order. Follow-ups: double error toast (providers.tsx), stale DegradedNotice comment",
+    "2026-10-02 server track (4-7) done: pnpm test 511 pass, typecheck ok, arch:check 0 err/15 warn. Deviations: BriefModelOutput nullable lines, brief/output.ts, intent+files also untrusted. Follow-ups: stale comments naming risks/helpers.ts",
+    "2026-10-02 arch review r1 (split server/client after 2 stalls): 4 warnings fixing, AR-1-1 declined by user, 3 suggestions deferred",
+    "2026-10-02 r1 fixes done: server 44 brief tests pass; client 291 tests pass. Staged. Starting arch review r2",
+    "2026-10-02 arch review r2: AR-1-2/5/6/7 fixed; 2 new suggestions deferred; depcruise 0/15",
+    "2026-10-02 test-writer: +5 tests (AC-3, AC-9, AC-7/8 x4 contract, AC-17/27 page). server 520 pass, client 292 pass",
+    "2026-10-02 plan-verifier r1: 41/46 met, AC-1 met-manual, NFR-8 cannot-verify, not-met AC-14 (code), AC-15, AC-22 (tests). Obs: AC-17 fallback ignores focusPath on smart-diff error; double error toast",
+    "2026-10-02 verify fix r1: AC-14 code fixed (BriefBanner tokens in\u2192out), AC-15 + AC-22/EC-6 tests added; client 295 pass",
+    "2026-10-02 arch check on verify-fix files: no critical/warning; 1 suggestion deferred",
+    "2026-10-02 plan-verifier r2: AC-14/15/22 met; fix list empty. Totals 44/46 met, AC-1 met-manual, NFR-8 cannot-verify",
+    "2026-10-02 security review: 0 HIGH, 1 MEDIUM, 5 LOW -> final report",
+    "2026-10-02 doc-writer: added docs/specs/pr-brief.md, removed risk-areas.md, fixed intent-layer.md links. Run complete."
+  ],
+  "securityFindings": [
+    {
+      "sev": "MEDIUM",
+      "loc": "BriefBanner.tsx:40-47",
+      "claim": "injected PR text can steer brief.summary shown in verdict banner slot; no brief-specific guard line"
+    },
+    {
+      "sev": "LOW",
+      "loc": "brief/service.ts:121-126",
+      "claim": "provider error text (300 chars) returned to client"
+    },
+    {
+      "sev": "LOW",
+      "loc": "brief/service.ts:123 + adapters/llm/openai.ts:131",
+      "claim": "AppError details.raw (raw model output) reaches client; pre-existing pattern"
+    },
+    {
+      "sev": "LOW",
+      "loc": "reviewer-core/src/prompt.ts:57",
+      "claim": "wrapUntrusted only neutralises exact </untrusted>; pre-existing"
+    },
+    {
+      "sev": "LOW",
+      "loc": "brief/output.ts:20-37",
+      "claim": "no length cap on model text fields"
+    },
+    {
+      "sev": "LOW",
+      "loc": "brief/routes.ts:73-74",
+      "claim": "10/min looser than 3/min skill guidance; matches POST /review"
+    }
+  ]
+}

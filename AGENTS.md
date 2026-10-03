@@ -62,6 +62,7 @@ not a separate package.
 | Adapter | `src/adapters/<port>/<impl>.ts`, port name singular | `adapters/llm/openrouter.ts`, `adapters/secrets/local.ts` |
 | DB schema | one file per domain in `src/db/schema/<domain>.ts`; shared columns in `_shared.ts` | `schema/runs.ts` |
 | Migration | `NNNN_<snake_case>.sql`, 4-digit sequential prefix, drizzle-generated name — never renumbered | `0011_petite_molecule_man.sql` |
+| Feature spec | `specs/spec-NNNN-<slug>.md` at the repo root, flat (modules go in the `Modules:` header, not the path), one 4-digit `NNNN` sequence, never renumbered; written by the `spec-creator` agent before planning — see [specs/README.md](specs/README.md) | `specs/spec-0001-blast-radius.md` |
 | Plan | `docs/plans/NNNN-<slug>.md`, 4-digit sequential prefix, never renumbered | `docs/plans/0001-helper-agent-set.md` |
 | Contract | zod schema and its inferred type share one name | `export const PrMeta = z.object({…})` + `export type PrMeta = z.infer<typeof PrMeta>` |
 | Client route | `src/app/**/page.tsx`; pages stay thin | `app/repos/[repoId]/pulls/[number]/page.tsx` |
@@ -102,20 +103,25 @@ lazily (section map first, then only what the task needs).
    concerns (questions and reviews included, not only code changes); add the
    root one when the task spans modules or touches `scripts/`, Docker, CI, or
    `.claude/`. Say in one line which entries apply, or that none do.
+   Exception: the `spec-creator` agent reads only the `INSIGHTS.md` of
+   the modules the feature touches (not the root one) and never writes
+   any; it uses them only to find corner cases and constraints on
+   observable behaviour.
 2. **End of every task** — re-read the target `INSIGHTS.md`, then append
    only substantive insights it doesn't already contain. Nothing new → write nothing.
 
-## Before a PR
+## Before a commit or PR
 
-A `PreToolUse` hook (`.claude/settings.json`) denies `git push`,
-`gh pr create`, `gh pr merge` and `gh pr ready` until the *current* diff has
-a passing self-review; any unoverridden critical blocks. Only the user may
-override a critical as a false positive.
+Review is done by agents, not a gate: `architecture-reviewer`,
+`security-reviewer` (when required) and `plan-verifier` — see
+[.claude/agents/README.md](.claude/agents/README.md). Their findings are
+advisory; only the user decides a finding is
+a false positive.
 
-A second `PreToolUse` hook fetches `origin/main` and rebases the branch before
-every `git commit`; on conflicts it changes nothing and denies with the
-conflicting `file:line` ranges. It never commits, and a rebase makes earlier
-self-review verdicts stale.
+A `PreToolUse` hook (`.claude/settings.json`) fetches `origin/main` and
+rebases the branch before every `git commit`; on conflicts it changes
+nothing and denies with the conflicting `file:line` ranges. It never
+commits, and a rebase makes earlier review results stale.
 
 ## Harness scripts
 

@@ -13,15 +13,10 @@ import messages from "../../../../../../../../messages/en/intent.json";
 const usePrIntent = vi.fn();
 const deriveMutate = vi.fn();
 const useDeriveIntent = vi.fn((_prId: string | null) => ({ mutate: deriveMutate, isPending: false }));
-// <IntentCard> mounts <RiskAreas>, which calls usePrRisks — mocked here too
-// (maintenance of this existing mock, not new coverage; RiskAreas itself is
-// untested this iteration per the plan's USER OVERRIDE).
-const usePrRisks = vi.fn();
 
 vi.mock("@/lib/hooks", () => ({
   usePrIntent: (prId: string | null) => usePrIntent(prId),
   useDeriveIntent: (prId: string | null) => useDeriveIntent(prId),
-  usePrRisks: (prId: string | null) => usePrRisks(prId),
 }));
 
 import { IntentCard } from "./IntentCard";
@@ -31,8 +26,6 @@ beforeEach(() => {
   usePrIntent.mockReset();
   deriveMutate.mockReset();
   useDeriveIntent.mockReturnValue({ mutate: deriveMutate, isPending: false });
-  usePrRisks.mockReset();
-  usePrRisks.mockReturnValue({ data: { risks: [] }, isLoading: false, isError: false });
 });
 
 function record(o: Partial<PrIntentRecord> = {}): PrIntentRecord {
@@ -55,7 +48,7 @@ function record(o: Partial<PrIntentRecord> = {}): PrIntentRecord {
 function renderCard(prId: string | null = "pr-1", headSha = "abc1234") {
   return render(
     <NextIntlClientProvider locale="en" messages={{ intent: messages }}>
-      <IntentCard prId={prId} headSha={headSha} repoFullName={null} />
+      <IntentCard prId={prId} headSha={headSha} />
     </NextIntlClientProvider>,
   );
 }
@@ -70,6 +63,36 @@ describe("IntentCard", () => {
     expect(screen.getByText("scope filter")).toBeInTheDocument();
     expect(screen.getByText("unrelated refactors")).toBeInTheDocument();
     expect(screen.queryByText("Missing context")).not.toBeInTheDocument();
+  });
+
+  it("AC-25: does not render a Risk areas list inside the Intent block", () => {
+    usePrIntent.mockReturnValue({ data: record(), isLoading: false });
+    renderCard();
+
+    expect(screen.queryByText("Risk areas")).not.toBeInTheDocument();
+  });
+
+  it("renders the footer (the PR Brief's Risk areas) under the scope lists, with or without an intent", () => {
+    usePrIntent.mockReturnValue({ data: record(), isLoading: false });
+    const footer = <div data-testid="footer">brief risks</div>;
+    const { unmount } = render(
+      <NextIntlClientProvider locale="en" messages={{ intent: messages }}>
+        <IntentCard prId="pr-1" headSha="abc1234" footer={footer} />
+      </NextIntlClientProvider>,
+    );
+    expect(
+      screen.getByText("scope filter").compareDocumentPosition(screen.getByTestId("footer")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    unmount();
+
+    usePrIntent.mockReturnValue({ data: null, isLoading: false });
+    render(
+      <NextIntlClientProvider locale="en" messages={{ intent: messages }}>
+        <IntentCard prId="pr-1" headSha="abc1234" footer={footer} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByTestId("footer")).toBeInTheDocument();
   });
 
   it("renders the missing-context block only when non-empty", () => {

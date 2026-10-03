@@ -33,6 +33,7 @@ import type {
   SecretKey,
 } from '@devdigest/shared';
 import { parseUnifiedDiff } from '../lib/diff-parser.js';
+import { matchesGlob } from '../lib/doc-glob.js';
 
 /**
  * Deterministic MOCK adapters for tests/dev — NO real network. Each mirrors the
@@ -271,6 +272,8 @@ export interface MockGitOptions {
   head?: string;
   /** Head `currentHead()` returns AFTER `sync()` runs — simulates fetch+reset advancing HEAD. */
   syncedHead?: string;
+  /** Directory `clonePathFor` returns for every repo (a fixture dir); default is a non-existent mock path. */
+  cloneDir?: string;
 }
 
 export class MockGitClient implements GitClient {
@@ -281,6 +284,7 @@ export class MockGitClient implements GitClient {
   constructor(private opts: MockGitOptions = {}) {}
 
   clonePathFor(repo: RepoRef): string {
+    if (this.opts.cloneDir) return this.opts.cloneDir;
     return `/mock/clones/${repo.owner}/${repo.name}`;
   }
   async clone(repo: RepoRef, url: string, _opts?: CloneOptions): Promise<{ path: string }> {
@@ -327,6 +331,36 @@ export class MockCodeIndex implements CodeIndex {
   }
   async references(_repo: RepoRef, symbol: string): Promise<CodeReference[]> {
     return [{ fromPath: 'src/api/public/index.ts', toSymbol: symbol, line: 23 }];
+  }
+}
+
+// ---------- Mock DocSource ----------
+/**
+ * In-memory `DocSource` (port: `modules/project-context/ports.ts`). Structural,
+ * not `implements` — an adapters -> modules import would add an arch:check
+ * warning; the container's `docSource` override type-checks the shape instead.
+ * `files: null` = no clone (`list` returns `null`). A file value of `null` is
+ * listed but unreadable (`read` returns `null`).
+ */
+export class MockDocSource {
+  constructor(public files: Record<string, string | null> | null = {}) {}
+  /** Relative paths passed to `read`, in call order. */
+  readonly reads: string[] = [];
+
+  async list(_root: string, glob: string): Promise<Array<{ path: string; size: number }> | null> {
+    if (this.files === null) return null;
+    return Object.entries(this.files)
+      .filter(([path]) => matchesGlob(path, glob))
+      .map(([path, text]) => ({ path, size: text?.length ?? 0 }))
+      .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  }
+  /** `maxBytes` passed to each `read`, in call order (undefined = unbounded). */
+  readonly readLimits: Array<number | undefined> = [];
+  async read(_root: string, relPath: string, maxBytes?: number): Promise<string | null> {
+    this.reads.push(relPath);
+    this.readLimits.push(maxBytes);
+    const text = this.files?.[relPath] ?? null;
+    return text !== null && maxBytes !== undefined ? text.slice(0, maxBytes) : text;
   }
 }
 

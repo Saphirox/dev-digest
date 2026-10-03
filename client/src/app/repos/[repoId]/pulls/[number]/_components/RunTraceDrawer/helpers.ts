@@ -1,5 +1,5 @@
 import type { LogLine } from "@devdigest/ui";
-import type { RunTrace } from "@devdigest/shared";
+import type { ProjectContextEntry, RunTrace } from "@devdigest/shared";
 
 interface RawEvent {
   t: string;
@@ -25,4 +25,34 @@ export function formatSeconds(ms: number): string {
 /** Token in→out summary (e.g. "12k→1.5k"). */
 export function formatTokens(tokensIn: number, tokensOut: number): string {
   return `${(tokensIn / 1000).toFixed(0)}k→${(tokensOut / 1000).toFixed(1)}k`;
+}
+
+export interface SpecReadRow {
+  path: string;
+  /** `null` when unknown (shown as "—", never 0). */
+  tokens: number | null;
+  status: "included" | "truncated" | "missing";
+}
+
+/**
+ * The "Specs read" rows: the injected documents in injection order, each with
+ * the tokens and status `project_context` recorded for it, then the attached
+ * documents that were `missing`. `dropped` documents are not listed here (they
+ * stay in `project_context`).
+ */
+export function specsReadRows(
+  specsRead: string[],
+  projectContext: ProjectContextEntry[] | null | undefined,
+): SpecReadRow[] {
+  const entries = projectContext ?? [];
+  const byPath = new Map(entries.map((e) => [e.path, e]));
+  const injected = specsRead.map((path): SpecReadRow => {
+    const entry = byPath.get(path);
+    const status = entry?.status === "truncated" ? "truncated" : "included";
+    return { path, tokens: entry?.tokens ?? null, status };
+  });
+  const missing = entries
+    .filter((e) => e.status === "missing" && !specsRead.includes(e.path))
+    .map((e): SpecReadRow => ({ path: e.path, tokens: e.tokens, status: "missing" }));
+  return [...injected, ...missing];
 }

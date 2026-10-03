@@ -15,20 +15,22 @@ changes what belongs where, update this table.
 | Feature explanation + reference | `docs/specs/<feature>.md` | `<feature-kebab-name>.md` | [`docs/specs/conventions.md`](specs/conventions.md) |
 | Dated investigation with a `Status:` line | `docs/research/<topic>.md` | `<topic-kebab-name>.md`, starts with a `Status: … · Date: … · Scope: …` line | [`docs/research/rebase-before-commit-hook.md`](research/rebase-before-commit-hook.md) |
 | Development Plan for a change that is about to be built | `docs/plans/NNNN-<slug>.md` | 4-digit sequential prefix + kebab slug | [`docs/plans/0001-helper-agent-set.md`](plans/0001-helper-agent-set.md) |
+| State of a `/run-sdd` build run (phase, review findings and their status, fix lists) — written by the main session, never by hand | `docs/plans/NNNN-<slug>.state.json`, next to its plan | same stem as the plan | created by the first `/run-sdd` run |
 | Reproducible experiment + kit | `docs/experiments/<name>.md` (the write-up) + `docs/experiments/<name>/` (patches, fixtures, anything the experiment replays) | `<name>.md` / `<name>/` share a stem | [`docs/experiments/skills-control.md`](experiments/skills-control.md) + `docs/experiments/skills-control/` |
 | Sample skill artifacts for the import flow (NOT documentation *about* skills — that is [`.claude/skills/README.md`](../.claude/skills/README.md)) | `docs/skills/` | whatever the sample skill needs to look like (a `SKILL.md`-bearing `.md`, a `.zip`, a helper script) | [`docs/skills/README.md`](skills/README.md) |
 | Decision with rejected alternatives | `docs/decisions/NNNN-<slug>.md`, MADR/Nygard shape (context, decision, rejected alternatives with why) | 4-digit sequential prefix + kebab slug | `docs/decisions/0001-<slug>.md` — **created lazily on first use**; the directory does not exist yet, do not create an empty one now |
+| Retrospective of a multi-agent workflow run (numbers, timeline, per-agent findings, candidate module insights, proposals) — written only when the user runs `/workflow-retro` | `docs/retro/ledger/NNNN-<workflow>-<slug>.md`, plus one row in [`docs/retro/ledger/README.md`](retro/ledger/README.md) | 4-digit sequential prefix, never renumbered | template: [`.claude/skills/workflow-retro/template.md`](../.claude/skills/workflow-retro/template.md) |
 | Committed screenshots | `docs/images/<area>/` | `<area>/` groups screenshots by the feature or page they show; filenames free | `docs/images/<area>/` — convention only, recorded at root [`INSIGHTS.md`](../INSIGHTS.md) (2026-09-19, capturing images to commit); the directory does not exist in this tree yet |
 
 ## Plans — the rule
 
 **Every Development Plan is written to `docs/plans/NNNN-<slug>.md` before any
 code is written against it.** Not to a scratch file, not to a chat message
-that scrolls away: the plan is the contract between `planner` and
+that scrolls away: the plan is the contract between `implementation-planner` and
 `implementer`, and `plan-verifier` checks the finished code against it item by
 item. All three need one stable path to point at.
 
-- **Who writes it:** the caller, not `planner` — `planner` is read-only and has
+- **Who writes it:** the caller, not `implementation-planner` — `implementation-planner` is read-only and has
   no `Write`. It returns the plan; whoever invoked it saves it here and hands
   `implementer` the path.
 - **The number** is the next unused 4-digit prefix in `docs/plans/`, never
@@ -49,6 +51,7 @@ item. All three need one stable path to point at.
 | Module or repo rules an agent must follow | `AGENTS.md` (root or module) |
 | A lesson learned — gotcha, root cause, dead end, tool quirk | `INSIGHTS.md` (root or module), owned by the `engineering-insights` skill |
 | Suite/CI strategy | [`TESTING.md`](../TESTING.md) |
+| Pre-implementation feature spec (Spec-Driven Development: EARS acceptance criteria, written *before* the plan) — not the post-implementation `docs/specs/` reference | root [`specs/`](../specs/README.md) `spec-NNNN-<slug>.md`, written by the `spec-creator` agent |
 | Module-internal notes | `<module>/README.md` (e.g. [`server/README.md`](../server/README.md)) |
 
 ## Adding a new subdirectory

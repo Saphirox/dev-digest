@@ -153,6 +153,5 @@ Dependency-cruiser does not scan `mcp/`. The rules above are enforced by:
   type ...` or an inline `type` named specifier) to support the type-only
   container check.
 - `.github/workflows/mcp.yml`: typecheck + tests on `mcp/**` and `server/src/vendor/shared/**`.
-- `pr-self-review`'s `mcpCheck` in `checks.mjs`, and `routing.json`, which routes `mcp/src/**/*.ts` here.
 
 Test placement matches the server: tests live in `mcp/test/`, not beside the source. Services are tested with a fake `<Feature>Store`, repositories with a stubbed HTTP client, and the composed app (`tools.test.ts`) over `InMemoryTransport` with a fake `DevDigestApiClient` injected via `Container`'s `overrides.client` — the same seam production code uses, exercising each module's real `tools.ts`-built repository + service, not a per-module fake store.

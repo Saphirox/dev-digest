@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import type { Skill, SkillImportPreview, SkillSummary, SkillVersion } from '@devdigest/shared';
+import { z } from 'zod';
 import { SkillImportRequest, SkillInput } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
@@ -19,12 +20,15 @@ import type { AgentRef } from './ports.js';
  *   GET    /skills/:id/versions  → body history, newest first
  *   POST   /skills/import        → parse an upload into a preview; persists nothing
  */
-const SkillPatchBody = SkillInput.omit({ source: true }).partial();
+const SkillPatchBody = SkillInput.omit({ source: true })
+  .partial()
+  // Project Context paths; validated against the configured glob in the service (EC-3).
+  .extend({ context_paths: z.array(z.string()).optional() });
 
 export default async function skillsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const { container } = app;
-  const service = new SkillsService(new SkillsRepository(container.db));
+  const service = new SkillsService(new SkillsRepository(container.db), container.config.contextGlob);
 
   app.get('/skills', async (req): Promise<SkillSummary[]> => {
     const { workspaceId } = await getContext(container, req);

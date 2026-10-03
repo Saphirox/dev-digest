@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { RunRequest, SmartDiff } from '@devdigest/shared';
-import type { IntentDeriveResult, PrIntentRecord, PrRisks, RunEvent } from '@devdigest/shared';
+import type { IntentDeriveResult, PrIntentRecord, RunEvent } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { NotFoundError } from '../../platform/errors.js';
@@ -26,7 +26,6 @@ const RunRequestBody = z.preprocess((val) => val ?? {}, RunRequest);
  *   POST   /findings/:id/(accept|dismiss)              → finding actions
  *   GET    /pulls/:id/intent                            → stored intent (or null); `stale` vs head_sha
  *   POST   /pulls/:id/intent/derive                     → always re-derive intent (spends money)
- *   GET    /pulls/:id/risks                              → deterministic diff-grounded risk scan (no model call)
  *   GET    /pulls/:id/smart-diff                          → reviewer-ordered diff (core/tests/wiring/docs/boilerplate; no model call)
  */
 const FINDING_ACTIONS = ['accept', 'dismiss'] as const;
@@ -188,21 +187,9 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
     },
   );
 
-  // ---- Risk Areas -------------------------------------------------------
-  // Deterministic, recomputed on every read — no model call, so no rate limit
-  // (unlike /intent/derive, this endpoint spends no money).
-  app.get(
-    '/pulls/:id/risks',
-    { schema: { params: IdParams } },
-    async (req): Promise<PrRisks> => {
-      const { workspaceId } = await getContext(container, req);
-      return service.getRisks(workspaceId, req.params.id, req.log);
-    },
-  );
-
   // ---- Smart Diff ---------------------------------------------------------
   // Deterministic, recomputed on every read — no model call, so no rate limit
-  // (like /risks, this endpoint spends no money).
+  // (this endpoint spends no money).
   app.get(
     '/pulls/:id/smart-diff',
     { schema: { params: IdParams, response: { 200: SmartDiff } } },

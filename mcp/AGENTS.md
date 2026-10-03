@@ -175,10 +175,8 @@ for the authoritative folder → ring map and import matrix. Summary:
   resolver construction outside `platform/container.ts` or a module's
   `tools.ts`" check) in `test/architecture.test.ts`; both that and
   `npm run typecheck`/`npm test` run in CI on every push/PR touching `mcp/**` or
-  `server/src/vendor/shared/**` (`.github/workflows/mcp.yml`); and the
-  `pr-self-review` gate (`.claude/skills/pr-self-review/scripts/checks.mjs`)
-  runs the same typecheck + test pair whenever a diff touches
-  `mcp/src/**`/`mcp/test/**`, so a push cannot bypass either.
+  `server/src/vendor/shared/**` (`.github/workflows/mcp.yml`), so a push
+  cannot bypass either.
 
 ## Do not touch
 

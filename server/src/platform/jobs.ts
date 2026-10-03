@@ -96,6 +96,11 @@ export class JobRunner {
         throw err;
       }
     }) as Promise<void>;
+    // Fire-and-forget callers never await `done`; without a handler a failed
+    // job is an unhandled rejection that exits the whole API process. The
+    // failure is already recorded on the `jobs` row, and callers that do
+    // await `done` still see the rejection.
+    done.catch(() => {});
 
     return { id: jobId, done };
   }
