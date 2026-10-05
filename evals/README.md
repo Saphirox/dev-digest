@@ -126,9 +126,9 @@ inside `evals/` and needs no code changes to use.
 
 | File | Role |
 |------|------|
-| `proxy/litellm.config.yaml` | LiteLLM config: a wildcard route forwarding any `EVAL_MODEL` slug to OpenRouter, in no-auth mode |
+| `proxy/litellm.config.yaml` | LiteLLM config: a wildcard route forwarding any `EVAL_MODEL` slug to OpenRouter |
 | `proxy/docker-compose.yml` | Runs `ghcr.io/berriai/litellm` on `:4000`, both wire formats on one port |
-| `scripts/litellm-proxy.sh` | `up` / `down` / `wait` wrapper (reads `OPENROUTER_API_KEY` from env, else `~/.devdigest/secrets.json`) |
+| `scripts/litellm-proxy.sh` | `up` / `down` / `wait` wrapper (reads `OPENROUTER_API_KEY` from env, else `~/.devdigest/secrets.json`; generates `EVAL_PROXY_KEY` if unset) |
 | `src/runtime/env.ts` | Points the SDK's `ANTHROPIC_BASE_URL` at `OPENROUTER_BASE_URL` (the proxy) under `EVAL_BACKEND=openrouter` |
 | `src/runtime/run-openrouter.ts` | Content tier's direct OpenAI-format call — also honours `OPENROUTER_BASE_URL` |
 
@@ -145,6 +145,7 @@ pnpm proxy:up                                  # → http://localhost:4000
 EVAL_BACKEND=openrouter \
 OPENROUTER_BASE_URL=http://localhost:4000 \
 OPENROUTER_API_KEY=sk-or-... \
+EVAL_PROXY_KEY=<printed by proxy:up> \
 EVAL_MODEL=google/gemini-2.5-flash \
 EVAL_JUDGE_MODEL=google/gemini-2.5-flash \
 pnpm eval:workflow
@@ -154,8 +155,9 @@ pnpm proxy:down
 ```
 
 `EVAL_MODEL` is forwarded verbatim to OpenRouter (the wildcard route in `proxy/litellm.config.yaml`),
-so you never edit config to try a new model. The proxy runs in **no-auth** mode — do not expose the
-port publicly.
+so you never edit config to try a new model. LiteLLM refuses to boot without a master key, so the
+proxy takes one from `EVAL_PROXY_KEY` (any `sk-…` value, ephemeral per run) and both tiers send it
+as their bearer instead of the OpenRouter key. Do not expose the port publicly.
 
 #### Which cheap model — verified
 
@@ -186,62 +188,35 @@ workflow cases:
 > checkout is disposable); locally, prefer the Anthropic path or a throwaway clone for the workflow
 > tier.
 
-### Wiring it into GitHub Actions (per-PR)
+### GitHub Actions (per-PR) — `.github/workflows/evals.yml`
 
-The engine is CI-ready: bring the proxy up as a step, wait for it, run the tier, tear it down. Put
-the OpenRouter key in the repo's **Actions secrets** as `OPENROUTER_API_KEY` (Settings → Secrets and
-variables → Actions). Create `.github/workflows/<name>.yml` in your repo:
+Runs on PRs that touch `.claude/skills/**`, `.claude/agents/**`, `.claude/settings.json`, the root
+`CLAUDE.md`/`AGENTS.md` or `evals/**`, and manually (Actions → evals → Run workflow).
+`scripts/ci-detect.mjs` maps the diff onto suites:
 
-```yaml
-name: evals
-on:
-  pull_request:
-    paths: ['evals/**', '.claude/**', 'CLAUDE.md']   # only when the harness/artifacts change
+| Changed | Runs |
+|---|---|
+| `.claude/skills/<s>/**` or `evals/skills/<s>/**` | `skills/<s>/` — or a "no evals" notice if it has none |
+| `.claude/agents/<a>.md` or `evals/agents/<a>/**` | `agents/<a>/` + the workflow tier |
+| root `CLAUDE.md` / `AGENTS.md` (CLAUDE.md is a symlink — the diff shows `AGENTS.md`), `.claude/settings.json`, `evals/workflow/**` | the workflow tier |
+| the engine: `evals/src`, deps, `proxy/`, `scripts/`, the workflow file | everything that has evals |
 
-permissions:
-  contents: read
+Jobs: `detect` → `static` (no model: typecheck, unit tests, `eval:quality`) → one matrix job per
+skill (direct OpenRouter, no proxy) and per agent (via the LiteLLM proxy), `max-parallel: 2` → the
+workflow tier. Skill and agent jobs block the PR; the workflow tier is **advisory**
+(`continue-on-error`) because cheap models dispatch subagents unreliably. Each job uploads
+`results/` as an artifact.
 
-jobs:
-  workflow-evals:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: evals
-    env:
-      EVAL_BACKEND: openrouter
-      OPENROUTER_BASE_URL: http://localhost:4000
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}   # repo Actions secret
-      EVAL_MODEL: google/gemini-2.5-flash
-      EVAL_JUDGE_MODEL: google/gemini-2.5-flash
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 10 }
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: evals/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
+**Setup:** add the repo secret `OPENROUTER_API_KEY` (Settings → Secrets and variables → Actions).
+Without it — e.g. a PR from a fork, which gets no secrets — the model jobs are skipped with a
+notice and only `static` runs.
 
-      # --- the engine ---
-      - run: docker compose -f proxy/docker-compose.yml up -d   # OPENROUTER_API_KEY from job env
-      - run: pnpm proxy:wait                                     # block until the proxy answers
-      - run: pnpm eval:workflow                                  # or eval:agents / eval:skills / eval
-      - if: failure()
-        run: docker compose -f proxy/docker-compose.yml logs --tail 100
-      - if: always()
-        run: docker compose -f proxy/docker-compose.yml down
-```
+**Choosing the model** — first non-empty wins, no commit needed:
 
-Notes:
-- ubuntu runners ship Docker + `docker compose`, so no extra setup is needed.
-- The proxy container reads `OPENROUTER_API_KEY` straight from the job `env` (which is fed by the
-  secret) — you don't pass it to `docker compose` explicitly.
-- Because tool tiers cost real tokens, gate on `paths:` (only when the harness/artifacts change) and
-  keep the case count small. For a stricter gate, split into a required `eval:agents`/`eval:skills`
-  job and a non-blocking `eval:workflow` job (activation flakiness, above).
+1. `workflow_dispatch` inputs `model`, `judge_model`, `workflow_model` (+ `target`: `auto` · `all`
+   · `skills` · `agents` · `workflow` · `skills/<name>` · `agents/<name>`);
+2. repo Variables `EVAL_MODEL`, `EVAL_JUDGE_MODEL`, `EVAL_WORKFLOW_MODEL`;
+3. the default `deepseek/deepseek-v4-flash` (judge and workflow fall back to the test model).
 
 ## Module layout — `src/` (the engine)
 

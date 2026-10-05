@@ -12,6 +12,18 @@
 const BACKEND = process.env.EVAL_BACKEND ?? "subscription";
 
 /**
+ * Bearer for an OpenRouter-compatible base URL. Through the LiteLLM proxy the bearer is the
+ * proxy's master key (EVAL_PROXY_KEY); to openrouter.ai itself it is always OPENROUTER_API_KEY —
+ * a leftover EVAL_PROXY_KEY sent there would 401 every call.
+ */
+export function openRouterBearer(baseUrl: string, openRouterKey: string): string {
+  const proxyKey = process.env.EVAL_PROXY_KEY;
+  if (!proxyKey) return openRouterKey;
+  const host = new URL(baseUrl).hostname;
+  return host === "openrouter.ai" || host.endsWith(".openrouter.ai") ? openRouterKey : proxyKey;
+}
+
+/**
  * Copy the current env, configured for the selected inference backend.
  *
  * subscription: an API key in the environment takes priority over the Claude Code subscription,
@@ -21,7 +33,7 @@ const BACKEND = process.env.EVAL_BACKEND ?? "subscription";
  *   SDK speaks the Anthropic wire protocol to OpenRouter instead of api.anthropic.com. The base
  *   URL must have NO trailing slash. Override OPENROUTER_BASE_URL to point at a local LiteLLM
  *   proxy (e.g. http://localhost:4000) when routing to models that need Anthropic<->OpenAI
- *   translation.
+ *   translation; the proxy requires its master key, passed as EVAL_PROXY_KEY.
  */
 export function subscriptionEnv(): Record<string, string> {
   const env = { ...process.env } as Record<string, string>;
@@ -30,7 +42,7 @@ export function subscriptionEnv(): Record<string, string> {
     const key = process.env.OPENROUTER_API_KEY;
     if (!key) throw new Error("EVAL_BACKEND=openrouter but OPENROUTER_API_KEY is not set");
     env.ANTHROPIC_BASE_URL = (process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api").replace(/\/$/, "");
-    env.ANTHROPIC_AUTH_TOKEN = key;
+    env.ANTHROPIC_AUTH_TOKEN = openRouterBearer(env.ANTHROPIC_BASE_URL, key);
     env.ANTHROPIC_API_KEY = ""; // blank, not deleted — stops the SDK falling back to Anthropic auth
     return env;
   }

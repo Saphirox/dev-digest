@@ -9,7 +9,8 @@
 #   - POST /v1/messages          (Anthropic format)  ← the Agent SDK, via ANTHROPIC_BASE_URL
 #   - POST /chat/completions      (OpenAI format)     ← the content tier's direct OpenAI client
 # and translates each to the target model on OpenRouter. Point OPENROUTER_BASE_URL at this proxy
-# (http://localhost:4000) and every eval tier can run on any OpenRouter model, cheaply, on CI.
+# (http://localhost:4000), set EVAL_PROXY_KEY, and every eval tier can run on any OpenRouter
+# model, cheaply, on CI.
 #
 # The wildcard route forwards whatever EVAL_MODEL / EVAL_JUDGE_MODEL you pass straight through to
 # OpenRouter, so you never edit this file to try a new model — e.g. EVAL_MODEL=deepseek/deepseek-chat
@@ -26,7 +27,7 @@ litellm_settings:
   drop_params: true
 
 general_settings:
-  # No master_key on purpose: this is an ephemeral local/CI gateway. It runs in "no-auth" mode,
-  # so the bearer token the SDK forwards (ANTHROPIC_AUTH_TOKEN=OPENROUTER_API_KEY) is ignored and
-  # the proxy authenticates to OpenRouter with OPENROUTER_API_KEY from its own environment.
+  # Auth: the master key comes from LITELLM_MASTER_KEY (= EVAL_PROXY_KEY, see docker-compose.yml);
+  # recent images refuse to boot without one. Clients send it as their bearer; the proxy itself
+  # authenticates to OpenRouter with OPENROUTER_API_KEY from its own environment.
   # Do NOT expose this port publicly.
