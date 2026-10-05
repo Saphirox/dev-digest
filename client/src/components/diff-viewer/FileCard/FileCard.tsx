@@ -58,6 +58,7 @@ export function FileCard({
   pathAdornment,
   onLineSeverityClick,
   lineExtras,
+  bodyHeader,
   footer,
 }: {
   file: PrFile;
@@ -82,6 +83,9 @@ export function FileCard({
    *  map, not a render callback — see `react-best-practices` "Render
    *  Factories". */
   lineExtras?: ReadonlyMap<string, React.ReactNode>;
+  /** Rendered first inside the open body, above the diff lines (e.g. a
+   *  per-file "what this does" line). Optional. */
+  bodyHeader?: React.ReactNode;
   /** Rendered after `OutdatedComments`, inside the open body — even when
    *  `lines.length === 0` (e.g. an off-patch findings block). */
   footer?: React.ReactNode;
@@ -139,6 +143,7 @@ export function FileCard({
       </div>
       {isOpen && (
         <div style={s.fileBody}>
+          {bodyHeader}
           {lines.length === 0 ? (
             <div style={s.noDiff}>{t("diffViewer.noDiffText")}</div>
           ) : (

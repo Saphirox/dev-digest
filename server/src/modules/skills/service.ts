@@ -6,11 +6,12 @@ import type {
   SkillSummary,
   SkillVersion,
 } from '@devdigest/shared';
+import { assertValidContextPaths, DEFAULT_CONTEXT_GLOB } from '../../lib/doc-glob.js';
 import { NotFoundError, ValidationError } from '../../platform/errors.js';
 import { IMPORT_MAX_FILE_BYTES } from './constants.js';
 import { isSkillConfigChange, toSkillDto, toSkillSummaryDto, toSkillVersionDto } from './helpers.js';
 import { parseSkillUpload } from './import-parser.js';
-import type { AgentRef, SkillPatch, SkillsStore } from './ports.js';
+import type { AgentRef, SkillPatch, SkillUpdateInput, SkillsStore } from './ports.js';
 
 /**
  * Skills service. A skill is reusable review guidance (text + configuration
@@ -23,7 +24,11 @@ import type { AgentRef, SkillPatch, SkillsStore } from './ports.js';
  * prompt, so a person should read it first.
  */
 export class SkillsService {
-  constructor(private store: SkillsStore) {}
+  constructor(
+    private store: SkillsStore,
+    /** Search glob a stored `context_paths` entry must match (`CONTEXT_GLOB`). */
+    private contextGlob: string = DEFAULT_CONTEXT_GLOB,
+  ) {}
 
   async list(workspaceId: string): Promise<SkillSummary[]> {
     const rows = await this.store.list(workspaceId);
@@ -49,11 +54,17 @@ export class SkillsService {
     return toSkillDto(row);
   }
 
-  async update(workspaceId: string, id: string, patch: SkillPatch): Promise<Skill> {
+  async update(workspaceId: string, id: string, input: SkillUpdateInput): Promise<Skill> {
+    const { context_paths, ...patch } = input;
+    if (context_paths !== undefined) {
+      // EC-3: reject BEFORE any write so a bad path stores nothing.
+      assertValidContextPaths(context_paths, this.contextGlob);
+    }
     const existing = await this.store.get(workspaceId, id);
     if (!existing) throw new NotFoundError('Skill not found');
     const clean: SkillPatch = {
       ...patch,
+      ...(context_paths !== undefined ? { contextPaths: context_paths } : {}),
       ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
       ...(patch.description !== undefined ? { description: patch.description.trim() } : {}),
     };

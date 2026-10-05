@@ -5,6 +5,31 @@
     "risks": "Risks",
     "history": "PR history"
   },
+  "title": "PR Brief",
+  "generate": "Generate brief",
+  "generating": "Generating…",
+  "refresh": "Regenerate brief",
+  "stale": "Stale — regenerate",
+  "emptyTitle": "No brief generated yet",
+  "emptyBody": "Generate a short summary of this PR with its risks and the files to read first. This makes one model call.",
+  "error": "Couldn't generate the brief: {message}",
+  "risks": {
+    "title": "Risk areas",
+    "severity": {
+      "high": "High risk",
+      "medium": "Medium risk",
+      "low": "Low risk"
+    }
+  },
+  "focus": {
+    "title": "Review focus — read these first",
+    "none": "Nothing to read first — no file stands out."
+  },
+  "tokens": {
+    "inOnly": "{count} in",
+    "outOnly": "{count} out"
+  },
+  "missingInputs": "Not available when this brief was generated: {items}",
   "noRisks": "No notable risks flagged.",
   "noHistory": "No prior PRs overlap these files.",
   "overlap": "{count} overlap",
@@ -15,5 +40,6 @@
     "blame": "blame",
     "noHistory": "No history available for this line.",
     "noCommits": "No commits found for this line."
-  }
+  },
+  "newFile": "new file"
 }

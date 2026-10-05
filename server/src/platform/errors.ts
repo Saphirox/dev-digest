@@ -39,3 +39,15 @@ export class ConfigError extends AppError {
     super('config_error', message, 500, details);
   }
 }
+
+/** EC-3: a stored `context_paths` entry is unsafe or outside the configured search glob. */
+export class InvalidContextPathError extends AppError {
+  constructor(invalid: string[]) {
+    super(
+      'invalid_context_path',
+      'context_paths must be repo-relative .md paths matching the configured search glob',
+      400,
+      { context_paths: invalid },
+    );
+  }
+}

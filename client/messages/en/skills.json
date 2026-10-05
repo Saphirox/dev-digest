@@ -142,6 +142,7 @@
   "editor": {
     "tabs": {
       "config": "Config",
+      "context": "Context",
       "preview": "Preview",
       "stats": "Stats",
       "versions": "Versioning"
@@ -184,5 +185,11 @@
   },
   "delete": {
     "title": "Delete skill?"
+  },
+  "context": {
+    "title": "Project context to use",
+    "attachedCount": "{count} attached",
+    "inherit": "Any agent using this skill inherits these documents.",
+    "serializesAs": "SERIALIZES AS"
   }
 }

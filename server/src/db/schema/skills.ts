@@ -18,6 +18,9 @@ export const skills = pgTable('skills', {
   enabled: boolean('enabled').notNull().default(true),
   version: integer('version').notNull().default(1),
   evidenceFiles: jsonb('evidence_files').$type<string[]>(),
+  // Project Context: ordered repo-relative markdown paths agents using this
+  // skill inherit. Outside `skill_versions` snapshots (no version bump).
+  contextPaths: jsonb('context_paths').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   createdAt: now(),
 }, (t) => ({
   wsIdx: index('skills_workspace_idx').on(t.workspaceId),

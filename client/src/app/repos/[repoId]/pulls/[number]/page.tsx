@@ -14,6 +14,7 @@ import { PrDetailHeader } from "./_components/PrDetailHeader";
 import { OverviewTab } from "./_components/OverviewTab";
 import { IntentCard } from "./_components/IntentCard";
 import { BlastRadiusCard } from "./_components/BlastRadiusCard";
+import { PrBriefBlock } from "./_components/PrBriefBlock";
 import { FindingsTab } from "./_components/FindingsTab";
 import { DiffTab } from "./_components/DiffTab";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
@@ -86,9 +87,12 @@ export default function PRDetailPage() {
     router.replace(`/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`);
   };
   const setParam = (key: string, val: string | null) => setParams({ [key]: val });
-  // Switching tabs clears a stale finding highlight.
-  const setTab = (t: string) => setParams({ tab: t, finding: null });
+  // Switching tabs clears a stale finding highlight and a Files-changed focus.
+  const setTab = (t: string) => setParams({ tab: t, finding: null, file: null });
+  // The PR Brief opens a file of the PR on Files changed (one router.replace).
+  const onOpenFile = (path: string) => setParams({ tab: "diff", file: path, finding: null });
   const focusFindingId = search.get("finding");
+  const focusFilePath = search.get("file");
 
   // Reviews come newest-first; each is its own run (grouped into accordions).
   const runs = reviews ?? [];
@@ -165,10 +169,21 @@ export default function PRDetailPage() {
       <div style={{ padding: "24px 32px 44px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1080, margin: "0 auto" }}>
         {tab === "overview" && (
           <>
-            <div className="overview-grid">
-              <IntentCard prId={prId} headSha={pr.head_sha} repoFullName={repoFullName} />
-              <BlastRadiusCard prId={prId} repoId={repoId} headSha={pr.head_sha} repoFullName={repoFullName} />
-            </div>
+            <PrBriefBlock
+              prId={prId}
+              headSha={pr.head_sha}
+              prFiles={pr.files}
+              reviews={runs}
+              repoFullName={repoFullName}
+              onOpenFile={onOpenFile}
+            >
+              {({ risks }) => (
+                <div className="overview-grid">
+                  <IntentCard prId={prId} headSha={pr.head_sha} footer={risks} />
+                  <BlastRadiusCard prId={prId} repoId={repoId} headSha={pr.head_sha} repoFullName={repoFullName} />
+                </div>
+              )}
+            </PrBriefBlock>
             <OverviewTab prBody={pr.body} />
           </>
         )}
@@ -201,7 +216,13 @@ export default function PRDetailPage() {
         )}
 
         {tab === "diff" && (
-          <DiffTab prId={prId} filesCount={pr.files_count} files={pr.files} canComment={pr.status === "open"} />
+          <DiffTab
+            prId={prId}
+            filesCount={pr.files_count}
+            files={pr.files}
+            canComment={pr.status === "open"}
+            focusPath={focusFilePath}
+          />
         )}
       </div>
 

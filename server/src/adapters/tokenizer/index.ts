@@ -15,6 +15,11 @@ import { getEncoding, type Tiktoken } from 'js-tiktoken';
 
 export interface Tokenizer {
   count(text: string): number;
+  /**
+   * First `max` tokens of `text` plus the full token count. `text` comes back
+   * untouched when `total <= max`. Same fallback heuristic as `count`.
+   */
+  truncate(text: string, max: number): { text: string; total: number };
 }
 
 /** Heuristic fallback used before/instead of a real encoder. */
@@ -36,5 +41,21 @@ export class TiktokenTokenizer implements Tokenizer {
       this.broken = true;
       return approxTokens(text);
     }
+  }
+
+  truncate(text: string, max: number): { text: string; total: number } {
+    const limit = Math.max(0, Math.floor(max));
+    if (!this.broken) {
+      try {
+        this.enc ??= getEncoding('cl100k_base');
+        const ids = this.enc.encode(text);
+        if (ids.length <= limit) return { text, total: ids.length };
+        return { text: this.enc.decode(ids.slice(0, limit)), total: ids.length };
+      } catch {
+        this.broken = true;
+      }
+    }
+    const total = approxTokens(text);
+    return total <= limit ? { text, total } : { text: text.slice(0, limit * 4), total };
   }
 }

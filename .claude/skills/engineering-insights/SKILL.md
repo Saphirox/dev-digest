@@ -1,6 +1,6 @@
 ---
 name: engineering-insights
-description: Reads and maintains the per-module INSIGHTS.md files (client, server, reviewer-core, repo-intel, e2e, repo root). Use at the start of every task — right after the user's prompt, before exploring, editing, or answering — to read the INSIGHTS.md of the module(s) the prompt concerns, questions and reviews included. Use again at the end of every task to append only substantive insights not already recorded (a gotcha, root cause, dead end, tool quirk, recurring error and its fix, or a decision and its reason); if nothing new was learned, write nothing. Also use when the user asks to wrap up, run a retro, or capture learnings.
+description: Reads and maintains the per-module INSIGHTS.md files (client, server, reviewer-core, repo-intel, e2e, repo root). Use at the start of every task — right after the user's prompt, before exploring, editing, or answering — to read the INSIGHTS.md of the module(s) the prompt concerns, questions and reviews included. Use again at the end of every task to append only substantive insights not already recorded (a gotcha, root cause, dead end, tool quirk, recurring error and its fix, or a decision and its reason); if nothing new was learned, write nothing. Also use when the user asks to wrap up or capture learnings. Not for a multi-agent workflow retrospective — that is the manual /workflow-retro skill, which writes to docs/retro/ledger/.
 allowed-tools:
   - Read
   - Grep

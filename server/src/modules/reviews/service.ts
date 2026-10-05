@@ -3,7 +3,6 @@ import type {
   FindingActionKind,
   IntentDeriveResult,
   PrIntentRecord,
-  PrRisks,
   RunEventKind,
   RunTrace,
   SmartDiff,
@@ -20,7 +19,6 @@ import { INTENT_SCHEMA_NAME, IntentSchema } from './intent/prompt.js';
 import type { IntentModel, IntentSources, IntentStore } from './intent/ports.js';
 import { RunLogger } from '../../platform/run-logger.js';
 import { loadDiff } from './diff-loader.js';
-import { deriveRisks } from './risks/index.js';
 import { buildSmartDiff, ROLE_ORDER } from './smart-diff/index.js';
 
 // Re-export DTO types + converters for backward-compatible imports from
@@ -263,45 +261,6 @@ export class ReviewService {
       diff,
       runLog,
     );
-  }
-
-  // ===========================================================================
-  // Risk Areas
-  // ===========================================================================
-
-  /** Deterministic diff-grounded risk scan — no model call, recomputed on
-   *  every read (see the risk-source ADR in
-   *  `docs/plans/0003-intent-card-risk-areas.md`). */
-  async getRisks(workspaceId: string, prId: string, logger?: Logger): Promise<PrRisks> {
-    const pull = await this.repo.getPull(workspaceId, prId);
-    if (!pull) throw new NotFoundError('Pull request not found');
-    const repoRow = await this.repo.getRepo(pull.repoId);
-    if (!repoRow) throw new NotFoundError('Repo not found');
-    const diff = await loadDiff(this.container, this.repo, workspaceId, pull, repoRow);
-
-    const risks = deriveRisks(diff);
-    const addedLinesCount = diff.files.reduce((n, f) => n + f.additions, 0);
-
-    // Counts, file counts and detector names only — never a matched line's
-    // text, never a secret, never a token.
-    const byKind = risks.reduce<Record<string, number>>((acc, r) => {
-      acc[r.kind] = (acc[r.kind] ?? 0) + 1;
-      return acc;
-    }, {});
-    const kindsDesc = Object.entries(byKind)
-      .map(([kind, n]) => `${kind}×${n}`)
-      .join(', ');
-    logger?.info(
-      { prId, files: diff.files.length, addedLines: addedLinesCount, risks: risks.length, byKind },
-      `risks: scanned ${diff.files.length} files / ${addedLinesCount} added lines → ${risks.length} risk(s)${kindsDesc ? ` [${kindsDesc}]` : ''}`,
-    );
-
-    return {
-      pr_id: pull.id,
-      derived_for_sha: pull.headSha,
-      risks,
-      scanned: { files: diff.files.length, added_lines: addedLinesCount },
-    };
   }
 
   // ===========================================================================

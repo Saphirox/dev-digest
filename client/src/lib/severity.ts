@@ -32,3 +32,9 @@ export function countBySeverity(items: readonly { severity: string }[]): Record<
   }
   return counts;
 }
+
+/** Open blockers: CRITICAL findings that have not been dismissed. The one
+ *  definition behind every verdict banner's blocker count. */
+export function countBlockers(findings: readonly { severity: string; dismissed_at?: string | null }[]): number {
+  return findings.filter((f) => f.severity === "CRITICAL" && !f.dismissed_at).length;
+}

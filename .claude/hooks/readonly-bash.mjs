@@ -3,12 +3,12 @@
 // plan-verifier, brainstorm, investigator, insight-curator): denies anything
 // that writes, installs, migrates, fetches the network, reads secrets, or
 // commits/pushes. Everything not matched is allowed by default — this is the
-// same shape as gate.mjs, scoped to "is this command read-only", not to a
+// same shape as rebase-before-commit.mjs, scoped to "is this command read-only", not to a
 // specific git ref or diff.
 //
 //   stdin = Claude Code PreToolUse JSON; prints a deny decision or nothing.
 //
-// Quoted text is data, not a command (same rule as gate.mjs and
+// Quoted text is data, not a command (same rule as
 // rebase-before-commit.mjs): a command like `rg "git push" docs/` or a commit
 // message that mentions `rm -rf` must not trip the gate.
 //

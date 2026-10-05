@@ -7,9 +7,10 @@ export interface SkillEditorTab {
   icon: IconName;
 }
 
-/** Only tabs backed by data; Evals and Context arrive with later lessons. */
+/** Only tabs backed by data; Evals arrives with later lessons. */
 export const TABS: readonly SkillEditorTab[] = [
   { key: "config", labelKey: "editor.tabs.config", icon: "Settings" },
+  { key: "context", labelKey: "editor.tabs.context", icon: "Folder" },
   { key: "preview", labelKey: "editor.tabs.preview", icon: "Eye" },
   { key: "stats", labelKey: "editor.tabs.stats", icon: "BarChart" },
   { key: "versions", labelKey: "editor.tabs.versions", icon: "History" },

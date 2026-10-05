@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import * as shared from '@devdigest/shared';
 import {
   Review,
   Finding,
   Intent,
   BlastRadius,
-  Risks,
+  Risk,
+  PrBrief,
   PrHistory,
   SmartDiff,
   Conformance,
@@ -111,10 +114,29 @@ describe('AI contracts parse fixtures', () => {
       }),
     ).toThrow();
     expect(() =>
-      Risks.parse({
-        risks: [{ kind: 'auth_surface', title: 't', explanation: 'e', severity: 'high', refs: [] }],
+      Risk.parse({
+        kind: 'auth surface (free text)',
+        title: 't',
+        explanation: 'e',
+        severity: 'high',
+        file_refs: [{ file: 'src/a.ts' }, { file: 'src/b.ts', start_line: 3, end_line: 9 }],
       }),
     ).not.toThrow();
+    const brief = {
+      summary: 's',
+      risks: [],
+      review_focus: [{ file: 'src/a.ts', line: 4, reason: 'r' }],
+      generated_for_sha: 'abc',
+      generated_at: '2026-10-02T00:00:00.000Z',
+      missing_inputs: [],
+      cost_usd: null,
+      tokens_in: null,
+      tokens_out: null,
+    };
+    expect(() => PrBrief.parse(brief)).not.toThrow();
+    expect(() =>
+      PrBrief.parse({ ...brief, review_focus: [{ file: 'src/a.ts', line: 0, reason: 'r' }] }),
+    ).toThrow();
     expect(() =>
       PrHistory.parse({
         history: [
@@ -233,5 +255,58 @@ describe('platform DTOs', () => {
         commits: [],
       }),
     ).not.toThrow();
+  });
+});
+
+describe('PR Brief contract (SPEC-0002)', () => {
+  const brief = {
+    summary: 's',
+    risks: [],
+    review_focus: [{ file: 'src/a.ts', line: 4, reason: 'r' }],
+    file_summaries: [{ file: 'src/a.ts', summary: 'adds a' }],
+    generated_for_sha: 'abc',
+    generated_at: '2026-10-02T00:00:00.000Z',
+    missing_inputs: [],
+    cost_usd: null,
+    tokens_in: null,
+    tokens_out: null,
+  };
+
+  it('AC-7: PrBrief has the stored fields, nullable cost/tokens, positive-integer lines, and no intent/blast/history', () => {
+    expect(Object.keys(PrBrief.shape).sort()).toEqual(
+      [
+        'summary', 'risks', 'review_focus', 'file_summaries', 'generated_for_sha', 'generated_at',
+        'missing_inputs', 'cost_usd', 'tokens_in', 'tokens_out',
+      ].sort(),
+    );
+    const parsed = PrBrief.parse({ ...brief, intent: {}, blast: {}, history: [] });
+    expect(parsed).toEqual(brief);
+    expect(() => PrBrief.parse({ ...brief, review_focus: [{ file: 'a', line: 1.5, reason: 'r' }] })).toThrow();
+    expect(() => PrBrief.parse({ ...brief, review_focus: [{ file: 'a', line: -2, reason: 'r' }] })).toThrow();
+    expect(() => PrBrief.parse({ ...brief, cost_usd: 0.01, tokens_in: 10, tokens_out: 5 })).not.toThrow();
+    // A brief stored before file_summaries existed parses with an empty list.
+    const { file_summaries: _old, ...legacy } = brief;
+    expect(PrBrief.parse(legacy).file_summaries).toEqual([]);
+  });
+
+  it('AC-7/AC-8: the server and client vendored brief contracts are byte-identical', () => {
+    const server = readFileSync(new URL('../src/vendor/shared/contracts/brief.ts', import.meta.url), 'utf8');
+    const client = readFileSync(new URL('../../client/src/vendor/shared/contracts/brief.ts', import.meta.url), 'utf8');
+    expect(client).toBe(server);
+  });
+
+  it('AC-8: Risk is { kind free text, title, explanation, severity high|medium|low, file_refs[] }', () => {
+    expect(Object.keys(Risk.shape).sort()).toEqual(['explanation', 'file_refs', 'kind', 'severity', 'title']);
+    const base = { kind: 'anything goes', title: 't', explanation: 'e', severity: 'low', file_refs: [] };
+    expect(() => Risk.parse(base)).not.toThrow();
+    for (const severity of ['high', 'medium', 'low']) expect(() => Risk.parse({ ...base, severity })).not.toThrow();
+    expect(() => Risk.parse({ ...base, severity: 'critical' })).toThrow();
+    expect(() => Risk.parse({ ...base, file_refs: [{ file: 'a', start_line: 0 }] })).toThrow();
+    expect(() => Risk.parse({ ...base, file_refs: [{ file: 'a', start_line: 2, end_line: 1.5 }] })).toThrow();
+    expect(() => Risk.parse({ ...base, file_refs: [{ file: 'a', start_line: 2, end_line: 5 }, { file: 'b' }] })).not.toThrow();
+  });
+
+  it('AC-8: RiskKind, RiskRef and PrRisks are no longer exported', () => {
+    for (const name of ['RiskKind', 'RiskRef', 'PrRisks']) expect(name in shared).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 ---
 name: git-rebase-sync
-description: "Rebasing the current branch onto the freshest origin/main before a commit, and handling what goes wrong: rebase conflicts, a denied `git commit` from the rebase-before-commit hook, stale pr-self-review verdicts after a rebase, force-push after a rebase, lock-file / migration / vendor-shared conflicts, recovering a bad rebase. Use whenever the user mentions rebase, sync with main, freshest master/main, merge conflict, or force push, and whenever the rebase-before-commit hook reports conflicts."
+description: "Rebasing the current branch onto the freshest origin/main before a commit, and handling what goes wrong: rebase conflicts, a denied `git commit` from the rebase-before-commit hook, stale review results after a rebase, force-push after a rebase, lock-file / migration / vendor-shared conflicts, recovering a bad rebase. Use whenever the user mentions rebase, sync with main, freshest master/main, merge conflict, or force push, and whenever the rebase-before-commit hook reports conflicts."
 ---
 
 # Git rebase sync
@@ -48,8 +48,8 @@ implementations and ask which one they want. Examples:
 
 ## After a rebase
 
-- The diff hash changed, so earlier `/pr-self-review` verdicts are stale;
-  the user must re-run it before push.
+- The diff changed, so earlier review results (`architecture-reviewer`,
+  `plan-verifier`) are stale; re-run them before push.
 - If the branch exists on `origin`, the next push needs `--force-with-lease`.
 - Sanity check: `git range-diff origin/main ORIG_HEAD HEAD`.
 

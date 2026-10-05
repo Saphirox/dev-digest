@@ -11,9 +11,11 @@ import type { FindingActionKind, FindingRecord, Severity, SmartDiffFile } from "
 import { FileCard, lineKey, lineKeysForPatch, AUTO_EXPAND_MAX_LINES, type DiffCommentApi } from "@/components/diff-viewer";
 import type { PrFile } from "@/lib/types";
 import { partitionFileFindings, severityForFlaggedLines } from "../../helpers";
+import { useOpenOnFocus } from "../../useOpenOnFocus";
 import { InlineFindings } from "../InlineFindings";
 import { OffPatchFindings } from "../OffPatchFindings";
 import { FindingsDot } from "../FindingsDot";
+import { SummaryChip, SummaryLine } from "../FileSummary";
 
 export function SmartDiffFileRow({
   file,
@@ -25,6 +27,8 @@ export function SmartDiffFileRow({
   showFindings,
   onAction,
   pending,
+  focusPath,
+  summary = null,
 }: {
   file: SmartDiffFile;
   prFile: PrFile | null;
@@ -40,6 +44,11 @@ export function SmartDiffFileRow({
   showFindings: boolean;
   onAction?: (id: string, action: FindingActionKind) => void;
   pending?: boolean;
+  /** The file the page deep-linked (`?file=`), if any: the row for it opens
+   *  and scrolls into view. */
+  focusPath: string | null;
+  /** The PR Brief's one-line "what this does" for this file, if any. */
+  summary?: string | null;
 }) {
   const t = useTranslations("prReview");
   const displayFile: PrFile = prFile ?? {
@@ -51,6 +60,14 @@ export function SmartDiffFileRow({
   const [open, setOpen] = React.useState(
     filesCollapsed ? false : displayFile.additions + displayFile.deletions <= AUTO_EXPAND_MAX_LINES,
   );
+  const focused = focusPath != null && file.path === focusPath;
+  useOpenOnFocus(focused, focusPath, () => setOpen(true));
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  // The DOM scroll is the legitimate effect. Runs on mount too, which covers a
+  // row mounted by its group expanding.
+  React.useEffect(() => {
+    if (focused) rootRef.current?.scrollIntoView({ block: "start" });
+  }, [focused, focusPath]);
   // Which inline card to force-expand + scroll to, and a nonce that remounts
   // it (defaultExpanded is only read on mount) even if the reader collapsed
   // it since the last click.
@@ -91,20 +108,30 @@ export function SmartDiffFileRow({
   }, [showFindings, inlineByKey, reveal, onAction, pending]);
 
   return (
-    <FileCard
-      file={displayFile}
-      commenting={commenting}
-      open={open}
-      onOpenChange={setOpen}
-      severityByLine={markers}
-      pathAdornment={flaggedLines.length > 0 ? <FindingsDot label={t("smartDiff.hasFindings")} /> : undefined}
-      onLineSeverityClick={handleLineSeverityClick}
-      lineExtras={lineExtras}
-      footer={
-        showFindings && offPatch.length > 0 ? (
-          <OffPatchFindings findings={offPatch} onAction={onAction} pending={pending} />
-        ) : undefined
-      }
-    />
+    <div ref={rootRef} style={{ scrollMarginTop: 16 }}>
+      <FileCard
+        file={displayFile}
+        commenting={commenting}
+        open={open}
+        onOpenChange={setOpen}
+        severityByLine={markers}
+        pathAdornment={
+          flaggedLines.length > 0 || summary ? (
+            <>
+              {flaggedLines.length > 0 && <FindingsDot label={t("smartDiff.hasFindings")} />}
+              {summary && <SummaryChip />}
+            </>
+          ) : undefined
+        }
+        bodyHeader={summary ? <SummaryLine summary={summary} /> : undefined}
+        onLineSeverityClick={handleLineSeverityClick}
+        lineExtras={lineExtras}
+        footer={
+          showFindings && offPatch.length > 0 ? (
+            <OffPatchFindings findings={offPatch} onAction={onAction} pending={pending} />
+          ) : undefined
+        }
+      />
+    </div>
   );
 }

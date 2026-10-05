@@ -3,7 +3,7 @@
  * the chips/pills display.
  */
 import { describe, it, expect } from "vitest";
-import { SEVERITIES, countBySeverity, sortBySeverity } from "./severity";
+import { SEVERITIES, countBlockers, countBySeverity, sortBySeverity } from "./severity";
 
 const f = (id: string, severity: string) => ({ id, severity });
 
@@ -46,5 +46,19 @@ describe("countBySeverity", () => {
       WARNING: 1,
       SUGGESTION: 0,
     });
+  });
+});
+
+describe("countBlockers", () => {
+  it("counts CRITICAL findings that are not dismissed", () => {
+    expect(
+      countBlockers([
+        { severity: "CRITICAL", dismissed_at: null },
+        { severity: "CRITICAL" },
+        { severity: "CRITICAL", dismissed_at: "2026-01-01T00:00:00Z" },
+        { severity: "WARNING", dismissed_at: null },
+      ]),
+    ).toBe(2);
+    expect(countBlockers([])).toBe(0);
   });
 });

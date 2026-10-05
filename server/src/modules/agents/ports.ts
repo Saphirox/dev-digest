@@ -19,6 +19,8 @@ export interface AgentRecord {
   strategy: string;
   ciFailOn: string;
   repoIntel: boolean;
+  /** Project Context: ordered repo-relative markdown paths. */
+  contextPaths: string[];
 }
 
 export interface AgentVersionRecord {

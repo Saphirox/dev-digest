@@ -4,7 +4,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import type { FindingActionKind } from "@devdigest/shared";
 import { DiffViewer, type DiffCommentApi } from "@/components/diff-viewer";
-import { usePrSmartDiff, usePrReviews, useFindingAction } from "@/lib/hooks";
+import { usePrSmartDiff, usePrReviews, useFindingAction, usePrBrief } from "@/lib/hooks";
 import type { PrFile } from "@/lib/types";
 import { GROUP_ORDER, GROUP_META } from "./constants";
 import { buildSeverityByFile, findingsByFile, hasReviewRun } from "./helpers";
@@ -16,6 +16,9 @@ interface SmartDiffViewerProps {
   prId: string | null;
   files: PrFile[];
   commenting?: DiffCommentApi;
+  /** A file to open expanded and scroll into view — including one in a
+   *  collapsed group or a docs/boilerplate card that starts closed. */
+  focusPath?: string | null;
 }
 
 /**
@@ -25,12 +28,19 @@ interface SmartDiffViewerProps {
  * and offers a Smart/Original toggle. Falls back to the plain `DiffViewer`
  * while loading, on error, or when `prId` is null — the tab never regresses.
  */
-export function SmartDiffViewer({ prId, files, commenting }: SmartDiffViewerProps) {
+export function SmartDiffViewer({ prId, files, commenting, focusPath = null }: SmartDiffViewerProps) {
   const t = useTranslations("prReview");
   const { data: smartDiff, isLoading, isError } = usePrSmartDiff(prId);
   const { data: reviews, isLoading: reviewsLoading } = usePrReviews(prId);
   const [order, setOrder] = React.useState<"smart" | "original">("smart");
   const findingAction = useFindingAction();
+  // Per-file "what this does" lines come from the cached PR Brief (no extra
+  // model call); absent until a brief has been generated.
+  const { data: brief } = usePrBrief(prId);
+  const summaryByFile = React.useMemo(
+    () => new Map((brief?.file_summaries ?? []).map((f) => [f.file, f.summary])),
+    [brief],
+  );
 
   const severityByFile = React.useMemo(() => buildSeverityByFile(reviews ?? []), [reviews]);
   const findingsByFileMap = React.useMemo(() => findingsByFile(reviews ?? []), [reviews]);
@@ -96,6 +106,7 @@ export function SmartDiffViewer({ prId, files, commenting }: SmartDiffViewerProp
                 files={groupFiles}
                 reviewsLoading={reviewsLoading}
                 hasReviewRun={reviewHasRun}
+                focusPath={focusPath}
               >
                 {groupFiles.map((file) => (
                   <SmartDiffFileRow
@@ -109,6 +120,8 @@ export function SmartDiffViewer({ prId, files, commenting }: SmartDiffViewerProp
                     showFindings={showFindings}
                     onAction={onAction}
                     pending={findingAction.isPending}
+                    focusPath={focusPath}
+                    summary={summaryByFile.get(file.path) ?? null}
                   />
                 ))}
               </SmartDiffGroup>
