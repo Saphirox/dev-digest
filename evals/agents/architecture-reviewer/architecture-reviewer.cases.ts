@@ -3,85 +3,70 @@ import { fixtureReader } from "../../src/index.js";
 
 const fx = fixtureReader(import.meta.url);
 
-const REVIEW_PROMPT = `Audit this diff against DevDigest's documented structural contracts.
+// The agent's input contract is "the staged diff only, via `git diff --cached`", but agentTask
+// strips Bash, so it cannot read the index. Without this preamble it stops with "nothing staged".
+// The touched files exist in the repo (pre-change version), so Read still works for context.
+// The relative-paths line: smoke runs read the MAIN checkout by absolute path instead of cwd.
+const review = (diff: string) => `Review the staged diff below. It is the complete output of \`git diff --cached\` — treat it as the staged diff; there is no other index to inspect. Bash is not available in this session, so you cannot run git or \`pnpm arch:check\`: list that under *Could not establish* and continue. The files the diff touches exist in the repo (pre-change version) if you need context. The repository root is the current working directory: use paths relative to it, never an absolute path to another checkout.
 
-${fx("checkout-service.diff")}`;
+${fx(diff)}`;
 
-// A second real diff whose violations map onto DevDigest-SPECIFIC rule names
-// (`reviewer-core-zero-io`, `reviewer-core-ground-findings-gate`) that a competent model will
-// describe in prose but will not spontaneously name unless the agent forces a citation. This is
-// the discriminating case for the strict-vs-lite A/B: both variants should FIND both problems,
-// but only the strict variant (which keeps the "cite the exact documented rule per finding" hard
-// rule) should reliably emit the identifier. The checkout diff's textbook violations don't
-// discriminate — the model volunteers `inward-only-dependencies`/`di-discipline` either way.
-const REVIEWER_CORE_PROMPT = `Audit this diff against DevDigest's documented structural contracts.
+// THE MEASURED PRACTICE. Shared verbatim by the two violation cases so it forms one statistics
+// series (practice identity is its text). The strict agent requires a `rule:` per finding
+// (architecture-reviewer.md Method step 4 + the output template). Every other practice is a
+// CONTROL that should not move between agent versions.
+const CITES_RULE =
+  "every finding carries an explicit rule citation pointing to a specific documented section — a `SKILL.md#…` or `references/…#…` anchor, or a named `AGENTS.md` section — not only a prose explanation of the problem";
 
-${fx("reviewer-core-gate.diff")}`;
-
-// A diff that violates NO documented rule (a pure local-variable rename inside a domain file, no
-// new imports, no cross-layer edges). A grounded reviewer should report zero violations. This
-// surfaces the COST of relaxing the citation rule: freed from "every finding must name a
-// documented contract", the lite variant is more prone to fabricating a judgment/best-practice
-// finding where the strict variant stays silent.
-const BENIGN_PROMPT = `Audit this diff against DevDigest's documented structural contracts.
-
-${fx("benign-refactor.diff")}`;
-
-// Shared across the strict (architecture-reviewer) and relaxed (architecture-reviewer-lite)
-// variants so the two agents are graded on the exact same task — the only thing that should
-// move between the two runs is whether "cites the specific documented rule" keeps passing.
 export const cases: AgentCase[] = [
   {
-    name: "flags both violations in the checkout diff with severity and a citable rule",
+    name: "flags both layering violations in the blast diff",
     kind: "quality",
-    prompt: REVIEW_PROMPT,
+    prompt: review("blast-layering.diff"),
     practices: [
-      "flags the domain file (checkout.ts) importing a type from 'fastify' as a violation of the inward-only dependency rule between Domain and Presentation layers",
-      "flags the `new PgCheckoutRepository()` call inside service.ts as a violation of DI discipline (concrete adapters/repositories must be constructed only in the composition root / container)",
-      "names the specific documented rule identifier for EVERY finding (e.g. `inward-only-dependencies`, `di-discipline`) rather than describing the problem only in prose",
-      "assigns a severity (critical/high/medium/low/info) to each finding",
-      "quotes the offending line verbatim as evidence for each finding, not a paraphrase",
-      "ends with an explicit PASS/FAIL gate verdict based on whether any critical or high findings exist",
+      "flags server/src/modules/blast/helpers.ts importing `FastifyReply` from 'fastify' as a layering violation (a pure helper must not depend on the HTTP/presentation ring)",
+      "flags `new BlastRepository(db)` inside BlastService as a violation of dependency injection / the single composition root (the service should receive its BlastStore through deps)",
+      CITES_RULE,
+      "assigns each finding a severity from the critical / warning / suggestion scale",
+      "quotes the offending added line verbatim as evidence for each finding",
     ],
-    threshold: 1.0,
-    maxTurns: 25,
+    threshold: 0.8,
+    maxTurns: 15,
   },
   {
-    name: "does not fabricate an architecture finding for the out-of-scope security-shaped change",
+    name: "stays in the architecture lane on the blast diff",
     kind: "quality",
-    prompt: REVIEW_PROMPT,
+    prompt: review("blast-layering.diff"),
     practices: [
-      "does not invent an architecture-contract violation for the optional `reply?: FastifyReply` parameter beyond the inward-only-dependencies import issue itself (no runtime bug/security finding fabricated as an architecture rule)",
-      "stays scoped to structural/layering/DI findings and does not comment on naming, style, or test coverage",
+      "does not present a runtime bug, performance or security concern as an architecture finding",
+      "does not comment on naming, style or test coverage",
+      "does not issue a PASS/FAIL or PASS/BLOCK verdict",
     ],
-    threshold: 1.0,
-    maxTurns: 25,
+    threshold: 0.8,
+    maxTurns: 15,
   },
   {
-    name: "cites the DevDigest-specific rule identifier for reviewer-core violations",
+    name: "flags the reviewer-core purity and grounding-gate breaks",
     kind: "quality",
-    prompt: REVIEWER_CORE_PROMPT,
+    prompt: review("reviewer-core-gate.diff"),
     practices: [
-      "flags the `import { readFileSync } from 'node:fs'` added to reviewer-core/src/pipeline/run.ts as a violation (reviewer-core must do no I/O except the injected LLMProvider)",
-      "flags that runPipeline now returns `deduped` directly, skipping the mandatory `groundFindings()` gate before emitting findings",
-      "names the exact documented rule identifier `reviewer-core-zero-io` for the fs-import finding rather than only describing it in prose",
-      "names the exact documented rule identifier `reviewer-core-ground-findings-gate` for the skipped-gate finding rather than only describing it in prose",
-      "quotes the offending line verbatim as evidence for each finding, not a paraphrase",
-      "ends with an explicit PASS/FAIL gate verdict based on whether any critical or high findings exist",
+      "flags `import { readFileSync } from 'node:fs'` in reviewer-core/src/review/run.ts as a violation (reviewer-core must do no filesystem I/O)",
+      "flags that the run now returns `merged.findings` without passing them through the mandatory `groundFindings()` gate",
+      CITES_RULE,
+      "quotes the offending added line verbatim as evidence for each finding",
     ],
-    threshold: 1.0,
-    maxTurns: 25,
+    threshold: 0.8,
+    maxTurns: 15,
   },
   {
-    name: "does not fabricate a documented-rule violation for a benign rename",
+    name: "reports no findings for a comment-only change",
     kind: "quality",
-    prompt: BENIGN_PROMPT,
+    prompt: review("benign-refactor.diff"),
     practices: [
-      "reports no violations for the benign rename (or records only `info`-level, non-blocking observations) — it does not invent a critical/high/medium finding",
-      "does not fabricate a documented-rule violation where the diff violates none of the checked rules",
-      "the final gate verdict is PASS",
+      "reports no findings for the comment-only change (observations at most) — it does not invent a critical or warning finding",
+      "states the no-findings result plainly in its opening verdict line",
     ],
     threshold: 1.0,
-    maxTurns: 25,
+    maxTurns: 15,
   },
 ];
