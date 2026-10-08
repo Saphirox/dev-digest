@@ -1,4 +1,4 @@
-# evals suite — the Claude Code harness evals (@devdigest/evals), on OpenRouter.
+# evals suite — the Claude Code harness evals (@devdigest/evals), on the Anthropic API.
 #
 # On a PR, scripts/ci-detect.mjs maps the changed files onto suites:
 #   .claude/skills/<s>/**          → evals/skills/<s>    (if it has evals; else a "no evals" notice)
@@ -10,14 +10,16 @@
 #   1. workflow_dispatch inputs (Actions → evals → Run workflow)
 #   2. repo Variables: EVAL_MODEL, EVAL_JUDGE_MODEL, EVAL_WORKFLOW_MODEL
 #      (Settings → Secrets and variables → Actions → Variables)
-#   3. the default below (DeepSeek V4 Flash)
+#   3. the defaults below (Haiku under test, Sonnet as judge)
 #
-# Needs the repo secret OPENROUTER_API_KEY. Without it (e.g. a PR from a fork, which gets no
-# secrets) the model-backed jobs are skipped with a notice; the static job still runs.
+# Needs the repo secret ANTHROPIC_API_KEY — every tier runs in the Claude Agent SDK against
+# api.anthropic.com, no proxy. Without it (e.g. a PR from a fork, which gets no secrets) the
+# model-backed jobs are skipped with a notice; the static job still runs. OpenRouter + the
+# LiteLLM proxy (evals/proxy/) are local-only.
 #
 # Blocking: static + skills + agents fail the check. The workflow tier is advisory
-# (continue-on-error): it asserts subagent dispatch / skill activation, which cheap
-# non-Anthropic models do unreliably — see evals/README.md "Which cheap model".
+# (continue-on-error): it asserts subagent dispatch / skill activation, which is less
+# deterministic than the content tiers.
 name: evals
 
 on:
@@ -37,13 +39,13 @@ on:
         description: 'auto (from diff vs main) | all | skills | agents | workflow | skills/<name> | agents/<name>'
         default: all
       model:
-        description: 'OpenRouter slug for the model under test (blank = repo var / default)'
+        description: 'Anthropic model ID for the model under test (blank = repo var / default)'
         required: false
       judge_model:
-        description: 'OpenRouter slug for the LLM judge (blank = repo var / model)'
+        description: 'Anthropic model ID for the LLM judge (blank = repo var / default)'
         required: false
       workflow_model:
-        description: 'OpenRouter slug for the workflow tier only (blank = repo var / model)'
+        description: 'Anthropic model ID for the workflow tier only (blank = repo var / model)'
         required: false
 
 permissions:
@@ -54,10 +56,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  EVAL_BACKEND: openrouter
-  EVAL_MODEL: ${{ inputs.model || vars.EVAL_MODEL || 'deepseek/deepseek-v4-flash' }}
-  EVAL_JUDGE_MODEL: ${{ inputs.judge_model || vars.EVAL_JUDGE_MODEL || inputs.model || vars.EVAL_MODEL || 'deepseek/deepseek-v4-flash' }}
-  EVAL_WORKFLOW_MODEL: ${{ inputs.workflow_model || vars.EVAL_WORKFLOW_MODEL || inputs.model || vars.EVAL_MODEL || 'deepseek/deepseek-v4-flash' }}
+  EVAL_BACKEND: anthropic
+  EVAL_MODEL: ${{ inputs.model || vars.EVAL_MODEL || 'claude-haiku-5-5' }}
+  # Judge defaults to a stronger family than the model under test, not to the test model.
+  EVAL_JUDGE_MODEL: ${{ inputs.judge_model || vars.EVAL_JUDGE_MODEL || 'claude-sonnet-5-5' }}
+  EVAL_WORKFLOW_MODEL: ${{ inputs.workflow_model || vars.EVAL_WORKFLOW_MODEL || inputs.model || vars.EVAL_MODEL || 'claude-haiku-5-5' }}
 
 jobs:
   detect:
@@ -79,12 +82,12 @@ jobs:
 
       - id: key
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          if [ -n "$OPENROUTER_API_KEY" ]; then echo "has_key=true" >> "$GITHUB_OUTPUT"
+          if [ -n "$ANTHROPIC_API_KEY" ]; then echo "has_key=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_key=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Evals skipped::OPENROUTER_API_KEY secret is not available (fork PR or not configured) — only the static job runs"
+            echo "::notice title=Evals skipped::ANTHROPIC_API_KEY secret is not available (fork PR or not configured) — only the static job runs"
           fi
 
       - id: detect
@@ -141,14 +144,14 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      max-parallel: 2 # OpenRouter throttles bursts; throttled runs degrade to one turn
+      max-parallel: 2 # stay under API rate limits; throttled runs degrade to one turn
       matrix:
         name: ${{ fromJSON(needs.detect.outputs.skills) }}
     defaults:
       run:
         working-directory: evals
     env:
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -160,7 +163,6 @@ jobs:
           cache: pnpm
           cache-dependency-path: evals/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      # Content tier: a direct OpenAI-format call to OpenRouter — no proxy needed.
       # Trailing slash: vitest filters by substring, so `skills/x` would also match `skills/x-y/`.
       - run: pnpm vitest run "skills/${{ matrix.name }}/"
       - if: always()
@@ -185,11 +187,7 @@ jobs:
       run:
         working-directory: evals
     env:
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      # Tool tier runs inside the Claude Agent SDK (Anthropic wire format); the LiteLLM proxy
-      # translates it for non-Anthropic models. Both tiers honour this base URL, and send
-      # EVAL_PROXY_KEY (set below) as their bearer — the proxy won't boot without a master key.
-      OPENROUTER_BASE_URL: http://localhost:4000
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -201,18 +199,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: evals/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - name: Ephemeral proxy key
-        run: |
-          k="sk-$(openssl rand -hex 32)"
-          echo "::add-mask::$k"
-          echo "EVAL_PROXY_KEY=$k" >> "$GITHUB_ENV"
-      - run: docker compose -f proxy/docker-compose.yml up -d
-      - run: pnpm proxy:wait
       - run: pnpm vitest run "agents/${{ matrix.name }}/"
-      - if: failure()
-        run: docker compose -f proxy/docker-compose.yml logs --tail 100
-      - if: always()
-        run: docker compose -f proxy/docker-compose.yml down
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -231,8 +218,7 @@ jobs:
       run:
         working-directory: evals
     env:
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      OPENROUTER_BASE_URL: http://localhost:4000
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -244,21 +230,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: evals/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - name: Ephemeral proxy key
-        run: |
-          k="sk-$(openssl rand -hex 32)"
-          echo "::add-mask::$k"
-          echo "EVAL_PROXY_KEY=$k" >> "$GITHUB_ENV"
-      - run: docker compose -f proxy/docker-compose.yml up -d
-      - run: pnpm proxy:wait
       # The workflow tier may need a stronger model than the content tiers (subagent dispatch).
       - run: pnpm vitest run workflow/ --no-file-parallelism
         env:
           EVAL_MODEL: ${{ env.EVAL_WORKFLOW_MODEL }}
-      - if: failure()
-        run: docker compose -f proxy/docker-compose.yml logs --tail 100
-      - if: always()
-        run: docker compose -f proxy/docker-compose.yml down
       - if: always()
         uses: actions/upload-artifact@v4
         with:

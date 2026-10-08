@@ -1,12 +1,13 @@
 /**
- * Child-process environment for the SDK. Two supported backends:
+ * Child-process environment for the SDK. Three supported backends:
  *
  *   subscription (default) — strip any API key so the SDK uses the Claude Code subscription.
+ *   anthropic              — bill ANTHROPIC_API_KEY directly against api.anthropic.com (CI).
  *   openrouter             — point the SDK at OpenRouter's Anthropic-compatible endpoint
  *                            (or a local translating proxy like LiteLLM) via ANTHROPIC_BASE_URL.
  *
  * The whole harness (subagents, skills, tool use, CLAUDE.md) still runs inside the Agent SDK;
- * only the model inference is redirected. Select with EVAL_BACKEND=openrouter.
+ * only the model inference is redirected. Select with EVAL_BACKEND=anthropic|openrouter.
  */
 
 const BACKEND = process.env.EVAL_BACKEND ?? "subscription";
@@ -34,9 +35,19 @@ export function openRouterBearer(baseUrl: string, openRouterKey: string): string
  *   URL must have NO trailing slash. Override OPENROUTER_BASE_URL to point at a local LiteLLM
  *   proxy (e.g. http://localhost:4000) when routing to models that need Anthropic<->OpenAI
  *   translation; the proxy requires its master key, passed as EVAL_PROXY_KEY.
+ *
+ * anthropic: keep ANTHROPIC_API_KEY and drop any base URL / auth token, so a leftover OpenRouter
+ *   setting can't redirect the calls. Opt-in only — never inferred from a key being present.
  */
 export function subscriptionEnv(): Record<string, string> {
   const env = { ...process.env } as Record<string, string>;
+
+  if (BACKEND === "anthropic") {
+    if (!process.env.ANTHROPIC_API_KEY) throw new Error("EVAL_BACKEND=anthropic but ANTHROPIC_API_KEY is not set");
+    delete env.ANTHROPIC_BASE_URL;
+    delete env.ANTHROPIC_AUTH_TOKEN;
+    return env;
+  }
 
   if (BACKEND === "openrouter") {
     const key = process.env.OPENROUTER_API_KEY;
