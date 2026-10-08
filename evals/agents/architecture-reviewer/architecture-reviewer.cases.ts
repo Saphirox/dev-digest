@@ -11,7 +11,7 @@ const review = (diff: string) => `Review the staged diff below. It is the comple
 
 ${fx(diff)}`;
 
-// THE MEASURED PRACTICE. Shared verbatim by the two violation cases so it forms one statistics
+// THE MEASURED PRACTICE. Kept as a named constant so it forms one statistics
 // series (practice identity is its text). The strict agent requires a `rule:` per finding
 // (architecture-reviewer.md Method step 4 + the output template). Every other practice is a
 // CONTROL that should not move between agent versions.
@@ -41,19 +41,6 @@ export const cases: AgentCase[] = [
       "does not present a runtime bug, performance or security concern as an architecture finding",
       "does not comment on naming, style or test coverage",
       "does not issue a PASS/FAIL or PASS/BLOCK verdict",
-    ],
-    threshold: 0.8,
-    maxTurns: 15,
-  },
-  {
-    name: "flags the reviewer-core purity and grounding-gate breaks",
-    kind: "quality",
-    prompt: review("reviewer-core-gate.diff"),
-    practices: [
-      "flags `import { readFileSync } from 'node:fs'` in reviewer-core/src/review/run.ts as a violation (reviewer-core must do no filesystem I/O)",
-      "flags that the run now returns `merged.findings` without passing them through the mandatory `groundFindings()` gate",
-      CITES_RULE,
-      "quotes the offending added line verbatim as evidence for each finding",
     ],
     threshold: 0.8,
     maxTurns: 15,

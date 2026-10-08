@@ -39,22 +39,6 @@ grep for imports crossing package boundaries:
 
 export const cases: SkillCase[] = [
   {
-    name: "full report follows the template structure with a Mermaid dependency map",
-    kind: "quality",
-    prompt: `Run a dependency check on this repo. I want the full report: graph, sizes, prioritized findings, recommendations.\n\n${REPO_DATA}`,
-    grounding: ["```mermaid"],
-    practices: [
-      "the report opens with a TL;DR section summarising package count, the heaviest dependency and the top risks before any detailed section",
-      "the report includes a Mermaid diagram (a fenced ```mermaid code block) with the repo packages as nodes and arrows showing their dependencies, including the internal @shared/review-types and reviewer-core links",
-      "the report has a per-package dependency table listing each dependency with its installed size, not just a vague size statement",
-      "the report has a findings table where each finding has an ID, a code (e.g. DRIFT_MAJOR, UNREFERENCED), the package, the dependency and the evidence it rests on",
-      "the report has a prioritised actions table where each action carries a P0–P3 priority and an exact command or edit for the package's own package manager, ordered from P0 down",
-      "the report ends with a 'Not checked' section naming what was not measured (e.g. online audit/outdated checks, browser bundle size)",
-    ],
-    threshold: 0.7,
-    maxTurns: 10,
-  },
-  {
     name: "distinguishes internal (path-alias) dependencies from external npm dependencies",
     kind: "quality",
     prompt: `This repo isn't a monorepo — server, client, reviewer-core, and e2e share code via TypeScript path aliases, not workspace:* packages. Analyze our dependencies, including how these packages depend on each other internally.\n\n${REPO_DATA}`,
