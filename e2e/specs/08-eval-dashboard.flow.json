@@ -4,7 +4,7 @@
   "steps": [
     { "cmd": ["open", "{BASE}/agents"], "label": "load a page with the app shell" },
     { "cmd": ["wait", "--load", "networkidle"], "label": "shell settles" },
-    { "cmd": ["find", "text", "Eval Dashboard", "click"], "label": "click the Eval Dashboard sidebar item" },
+    { "cmd": ["find", "role", "link", "click", "--name", "Eval Dashboard"], "label": "click the Eval Dashboard sidebar item" },
     { "cmd": ["wait", "--url", "/eval"], "label": "eval dashboard route reached" },
     { "cmd": ["wait", "--load", "networkidle"], "label": "overview fetch settles" },
     { "cmd": ["wait", "--text", "Regression harness across all reviewer agents"], "label": "dashboard subtitle renders" },
