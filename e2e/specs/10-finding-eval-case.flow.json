@@ -1,0 +1,18 @@
+{
+  "name": "Turn into eval case appears after Accept and refuses a finding whose review has no agent",
+  "description": "On PR #482 the first seeded finding ('Hardcoded Stripe secret key in commit') is expanded by default and undecided, so it shows no 'Turn into eval case' button. Accepting it reveals the button (spec-0003 AC-1, EC-1 as revised by the user); one click sends the request with the type derived from the decision, and because the seeded review was not produced by an agent the API refuses it and the card shows the reason inline (EC-3). Accept writes to the throwaway hermetic DB only, and this flow runs last; no model is called.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
+    { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
+    { "cmd": ["wait", "--text", "Add rate limiting to public API endpoints"], "label": "seeded PR title row is visible" },
+    { "cmd": ["find", "text", "Add rate limiting to public API endpoints", "click"], "label": "open the PR row" },
+    { "cmd": ["wait", "--url", "/pulls/482"], "label": "navigate to the PR detail route" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "PR detail data settles" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Agent runs"], "label": "switch to the Agent runs tab" },
+    { "cmd": ["wait", "--text", "Hardcoded Stripe secret key in commit"], "label": "seeded FindingCard is visible (the first card is expanded by default)" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Accept"], "label": "accept the seeded finding" },
+    { "cmd": ["wait", "--text", "Turn into eval case"], "label": "the eval-case button appears once the finding is decided" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Turn into eval case"], "label": "click Turn into eval case" },
+    { "cmd": ["wait", "--text", "cannot become an eval case"], "label": "refusal reason (no producing agent) is shown inline" }
+  ]
+}

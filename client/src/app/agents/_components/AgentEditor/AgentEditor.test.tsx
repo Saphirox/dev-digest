@@ -12,6 +12,7 @@ vi.mock("../../../../lib/hooks/agents", () => ({
   useDeleteAgent: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock("./_components/RunReviewMenu", () => ({ RunReviewMenu: () => null }));
+vi.mock("./_components/EvalsTab", () => ({ EvalsTab: () => <div>evals tab body</div> }));
 
 import { AgentEditor } from "./AgentEditor";
 
@@ -46,5 +47,12 @@ describe("A2 Agent Editor (smoke)", () => {
     expect(screen.getByText("Config")).toBeInTheDocument();
     expect(screen.getByText("Configuration")).toBeInTheDocument();
     expect(screen.getByText("Save agent")).toBeInTheDocument();
+  });
+
+  it("AC-7: the Evals tab is listed and renders the Evals tab body instead of the Config form", () => {
+    renderWithIntl(<AgentEditor agent={AGENT} tab="evals" onTab={() => {}} onDeleted={() => {}} />);
+    expect(screen.getByRole("button", { name: /Evals/ })).toBeInTheDocument();
+    expect(screen.getByText("evals tab body")).toBeInTheDocument();
+    expect(screen.queryByText("Save agent")).not.toBeInTheDocument();
   });
 });

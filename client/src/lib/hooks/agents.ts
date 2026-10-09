@@ -3,7 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
-import type { Agent, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
+import type { Agent, AgentVersion, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
 
 export function useAgents() {
   return useQuery({
@@ -88,5 +88,27 @@ export function useProviderModels(provider: Provider | null | undefined) {
     queryFn: () => api.get<ModelInfo[]>(`/providers/${provider}/models`),
     enabled: !!provider,
     staleTime: 5 * 60_000,
+  });
+}
+
+/** Saved config snapshots of an agent, newest first. Seeded agents have none (EC-25). */
+export function useAgentVersions(agentId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["agent-versions", agentId],
+    queryFn: () => api.get<AgentVersion[]>(`/agents/${agentId}/versions`),
+    enabled: !!agentId,
+  });
+}
+
+/** Restore version N's saved config as a new latest version (AC-40). */
+export function usePromoteVersion(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (version: number) => api.post<Agent>(`/agents/${agentId}/versions/${version}/promote`),
+    onSuccess: (agent) => {
+      qc.setQueryData(["agent", agent.id], agent);
+      qc.invalidateQueries({ queryKey: ["agents"] });
+      qc.invalidateQueries({ queryKey: ["agent-versions", agent.id] });
+    },
   });
 }

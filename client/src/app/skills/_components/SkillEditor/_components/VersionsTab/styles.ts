@@ -20,18 +20,6 @@ export const s = {
     listStyle: "none",
   } satisfies CSSProperties,
   date: { marginLeft: "auto", fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
-  diff: { borderTop: "1px solid var(--border)", background: "var(--bg-surface)" } satisfies CSSProperties,
-  diffHead: { padding: "8px 14px", fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
-  diffSame: { padding: "0 14px 12px", fontSize: 12.5, color: "var(--text-muted)" } satisfies CSSProperties,
-  add: { color: "var(--ok)" } satisfies CSSProperties,
-  del: { color: "var(--crit)" } satisfies CSSProperties,
-  diffBody: { margin: 0, padding: "0 0 10px", fontSize: 12.5, lineHeight: 1.6 } satisfies CSSProperties,
-  diffLine: (kind: "same" | "add" | "del"): CSSProperties => ({
-    padding: "0 14px",
-    whiteSpace: "pre-wrap",
-    background: kind === "add" ? "var(--ok-bg)" : kind === "del" ? "var(--crit-bg)" : "transparent",
-    color: kind === "same" ? "var(--text-secondary)" : "var(--text-primary)",
-  }),
   body: {
     margin: 0,
     padding: "12px 14px",

@@ -17,6 +17,7 @@ import { Container, type ContainerOverrides } from './platform/container.js';
 import { AppError } from './platform/errors.js';
 import { modules } from './modules/index.js';
 import { ReviewService } from './modules/reviews/service.js';
+import { EvalsRepository } from './modules/evals/repository.js';
 
 // Attach the DI container to every request/instance.
 declare module 'fastify' {
@@ -82,6 +83,15 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     if (reaped > 0) app.log.info({ reaped }, 'reaped stale running agent_runs on boot');
   } catch (err) {
     app.log.warn({ err: (err as Error).message }, 'stale-run reaping failed (non-fatal)');
+  }
+
+  // Same for eval suite runs: a restart leaves them 'running' and the agent could
+  // never be run again (one running run per agent). Marked failed: interrupted.
+  try {
+    const reapedEvals = await new EvalsRepository(db).reapRunning();
+    if (reapedEvals > 0) app.log.info({ reaped: reapedEvals }, 'reaped stale running eval_suite_runs on boot');
+  } catch (err) {
+    app.log.warn({ err: (err as Error).message }, 'stale eval-run reaping failed (non-fatal)');
   }
 
   // Security headers (X-Content-Type-Options, X-Frame-Options, …). The API

@@ -10,7 +10,7 @@ import { Badge, Button, Skeleton } from "@devdigest/ui";
 import type { Skill, SkillVersion } from "@devdigest/shared";
 import { useSkillVersions, useUpdateSkill } from "../../../../../../lib/hooks/skills";
 import { useToast } from "../../../../../../lib/toast";
-import { diffStats, lineDiff } from "./helpers";
+import { TextDiff } from "@/components/text-diff";
 import { s } from "./styles";
 
 type View = "body" | "diff";
@@ -88,26 +88,13 @@ export function VersionsTab({ skill }: { skill: Skill }) {
 
 function VersionDiff({ from, to, version }: { from: string; to: string; version: number }) {
   const t = useTranslations("skills");
-  const lines = lineDiff(from, to);
-  const { added, removed } = diffStats(lines);
   return (
-    <div style={s.diff} aria-label={t("editor.versions.diffLabel", { version })}>
-      <div style={s.diffHead}>
-        {t("editor.versions.diffHead", { version })} · <span style={s.add}>+{added}</span>{" "}
-        <span style={s.del}>−{removed}</span>
-      </div>
-      {added + removed === 0 ? (
-        <div style={s.diffSame}>{t("editor.versions.noChanges")}</div>
-      ) : (
-        <pre className="mono" style={s.diffBody}>
-          {lines.map((l, i) => (
-            <div key={i} data-kind={l.kind} style={s.diffLine(l.kind)}>
-              {l.kind === "add" ? "+ " : l.kind === "del" ? "- " : "  "}
-              {l.text}
-            </div>
-          ))}
-        </pre>
-      )}
-    </div>
+    <TextDiff
+      from={from}
+      to={to}
+      head={t("editor.versions.diffHead", { version })}
+      label={t("editor.versions.diffLabel", { version })}
+      sameLabel={t("editor.versions.noChanges")}
+    />
   );
 }

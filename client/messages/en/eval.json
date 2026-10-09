@@ -1,84 +1,149 @@
 {
-  "dashboard": {
-    "defaultTitle": "Eval Dashboard",
-    "loading": "Loading eval metrics…",
-    "casesSummary": "{count, plural, one {# eval case} other {# eval cases}} · gold set · {runs, plural, one {# run} other {# runs}}",
-    "configure": "Configure eval cases →",
-    "runEval": "Run eval ({count})",
-    "running": "Running…",
-    "metricTrend": "Metric trend",
-    "recentRuns": "Recent runs",
-    "noRuns": "No runs yet. Create an eval case and run it.",
-    "metrics": {
-      "recall": "RECALL",
-      "precision": "PRECISION",
-      "citationAccuracy": "CITATION ACCURACY"
-    },
-    "legend": {
-      "recall": "Recall",
-      "precision": "Precision",
-      "citation": "Citation"
-    },
-    "table": {
-      "ranAt": "Ran at",
-      "recall": "Recall",
-      "precision": "Precision",
-      "citation": "Citation",
-      "pass": "Pass",
-      "cost": "Cost"
-    },
-    "pass": "pass",
-    "fail": "fail"
+  "status": {
+    "running": "Running",
+    "done": "Done",
+    "failed": "Failed"
   },
-  "caseEditor": {
-    "newCase": "New eval case",
-    "caseTitle": "Eval case · {name}",
-    "runCase": "Run case",
-    "running": "Running…",
-    "save": "Save",
-    "saving": "Saving…",
-    "nameLabel": "Name",
-    "namePlaceholder": "stripe-key-leak",
-    "inputLabel": "Input",
-    "tabs": {
-      "diff": "Diff",
-      "prMeta": "PR meta"
-    },
-    "diffPlaceholder": "--- a/src/config.ts\n+++ b/src/config.ts\n@@ -10,6 +10,7 @@\n+  stripeKey: \"sk_live_...\"",
-    "titleLabel": "Title",
-    "titlePlaceholder": "Add Stripe integration",
-    "bodyLabel": "Body",
-    "bodyPlaceholder": "Wire up payments via Stripe SDK.",
-    "preview": "Preview",
-    "expectedOutput": "Expected output",
-    "validJson": "valid JSON",
-    "invalidJson": "invalid JSON",
-    "lastRunPassed": "Last run passed",
-    "lastRunFailed": "Last run failed",
-    "resultSummary": "recall {recall}% · precision {precision}% · citation {citation}% · {duration}s"
+  "delta": {
+    "up": "{label}: up {points} points",
+    "down": "{label}: down {points} points",
+    "flat": "{label}: no change",
+    "costUp": "{label}: up {amount}",
+    "costDown": "{label}: down {amount}",
+    "costFlat": "{label}: no change"
+  },
+  "legend": {
+    "recall": "Recall",
+    "precision": "Precision",
+    "citation": "Citation"
+  },
+  "trendLabel": "Metric trend over {count, plural, one {# run} other {# runs}}",
+  "metrics": {
+    "recall": "Recall",
+    "precision": "Precision",
+    "citation": "Citation accuracy",
+    "passed": "Cases passed"
+  },
+  "kind": {
+    "must_find": "must find",
+    "must_not_flag": "must not flag"
   },
   "evalsTab": {
     "metricsTitle": "Eval metrics",
-    "metricsSubtitle": "Recall / Precision / Citation for this agent's eval cases",
+    "viewDashboard": "View full dashboard →",
     "casesHeading": "Eval cases",
-    "newCase": "New case",
-    "loadingCases": "Loading cases…",
-    "emptyCases": "No eval cases yet. Create one to assert this agent's expected findings on a sample diff.",
-    "neverRun": "never run",
-    "passed": "passed",
-    "failed": "failed",
-    "recallSuffix": " · recall {recall}%",
-    "run": "Run",
+    "passing": "{passed} / {total} passing",
+    "runAll": "Run all evals",
     "running": "Running…",
-    "edit": "Edit",
+    "newCase": "New eval case",
+    "loadError": "Could not load the eval cases.",
+    "emptyTitle": "No eval cases yet",
+    "emptyBody": "Turn a finding you accepted or dismissed into an eval case, or create one by hand, then run the agent on the set.",
+    "neverRun": "never run",
+    "passed": "Passed",
+    "failed": "Failed",
+    "expectedGot": "expected {expected, plural, one {# finding} other {# findings}}, got {produced}",
+    "runCase": "Run case {name}",
+    "editCase": "Edit case {name}",
+    "deleteCase": "Delete case {name}",
+    "deleteTitle": "Delete eval case",
+    "deleteBody": "Delete the eval case “{name}”? Earlier runs keep their results.",
     "delete": "Delete"
   },
-  "page": {
-    "crumbSkillsLab": "Skills Lab",
-    "crumbEvalDashboard": "Eval Dashboard",
-    "crumbAgents": "Agents",
-    "crumbEvals": "Evals",
-    "crumbNewCase": "New case",
-    "crumbEvalCase": "Eval case"
+  "caseModal": {
+    "newTitle": "New eval case",
+    "title": "Eval case · {name}",
+    "subtitle": "{agent} · simulate a PR and assert the expected output",
+    "nameLabel": "Name",
+    "namePlaceholder": "stripe-key-leak",
+    "diffLabel": "Diff",
+    "diffReadOnly": "Input diff (read-only)",
+    "diffPlaceholder": "diff --git a/src/config.ts b/src/config.ts\n--- a/src/config.ts\n+++ b/src/config.ts\n@@ -10,6 +10,7 @@\n+  stripeKey: \"sk_live_...\"",
+    "expectedLabel": "Expected output",
+    "validJson": "valid JSON",
+    "invalidJson": "invalid JSON",
+    "runCase": "Run case",
+    "lastPassed": "Last run passed",
+    "lastFailed": "Last run failed",
+    "neverRun": "Not run yet.",
+    "resultDetail": "expected {expected, plural, one {# finding} other {# findings}}, got {produced} · {duration} · {cost}"
+  },
+  "dashboard": {
+    "crumbLab": "Skills Lab",
+    "title": "Eval Dashboard",
+    "subtitle": "Regression harness across all reviewer agents · pick an agent to see its runs",
+    "runAll": "Run all agents",
+    "agents": "Agents",
+    "recentRuns": "Recent eval runs · all agents",
+    "loadError": "Could not load the eval dashboard.",
+    "emptyTitle": "No agents with eval cases yet",
+    "emptyBody": "Open an agent's Evals tab to create eval cases, or turn a finding into one from a pull request.",
+    "noRuns": "No eval runs yet.",
+    "lastRun": "Last run",
+    "passLabel": "{passed} pass",
+    "neverRun": "No runs yet",
+    "failedOn": "on case “{name}”",
+    "alreadyRunning": "already running",
+    "couldNotStart": "could not start: {reason}",
+    "short": {
+      "recall": "Recall",
+      "prec": "Prec",
+      "cite": "Cite"
+    }
+  },
+  "table": {
+    "agent": "Agent",
+    "ranAt": "Ran at",
+    "version": "Version",
+    "status": "Status",
+    "recall": "Recall",
+    "precision": "Precision",
+    "citation": "Citation",
+    "pass": "Pass",
+    "cost": "Cost",
+    "select": "Select",
+    "selectRun": "Select run v{version} from {when}",
+    "failedOn": "failed on “{name}”"
+  },
+  "period": {
+    "label": "Period",
+    "7d": "7 days",
+    "30d": "30 days",
+    "90d": "90 days",
+    "all": "All time"
+  },
+  "banner": {
+    "dipped": "{metric} dipped {points} pts",
+    "onVersion": "on v{version} — compare the runs to see what changed."
+  },
+  "agentPage": {
+    "allAgents": "All agents",
+    "notFound": "This agent could not be found.",
+    "subtitle": "Regression harness · {runs, plural, one {# run} other {# runs}} · {cases, plural, one {# eval case} other {# eval cases}}",
+    "runEval": "Run eval",
+    "running": "Running…",
+    "trend": "Metric trend",
+    "noTrend": "No finished runs in this period.",
+    "runs": "Recent runs",
+    "selected": "{count} selected",
+    "compare": "Compare",
+    "loadError": "Could not load the runs.",
+    "noRunsTitle": "No runs in this period",
+    "noRunsBody": "Run the eval to score this agent on its cases, or widen the period."
+  },
+  "compare": {
+    "title": "Compare runs · v{from} → v{to}",
+    "subtitle": "Old run vs new run — metric deltas and prompt diff",
+    "promptHeading": "Effective prompt diff",
+    "promptUnchanged": "The prompt did not change between these runs.",
+    "diffHead": "v{from} (old) → v{to} (new)",
+    "loadError": "Could not load the saved prompts.",
+    "modelChanged": "Model: {from} → {to}",
+    "providerChanged": "Provider: {from} → {to}",
+    "close": "Close",
+    "promote": "Promote v{version}",
+    "alreadyCurrent": "v{version} is already the current version.",
+    "noSnapshot": "v{version} has no saved configuration to restore.",
+    "promoted": "Restored v{from} as v{version}."
   }
 }

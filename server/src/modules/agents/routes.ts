@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
+import { Agent, CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { NotFoundError } from '../../platform/errors.js';
@@ -24,6 +24,7 @@ const VersionParams = z.object({
  *   PUT    /agents/:id              → update / toggle enabled (versions config)
  *   GET    /agents/:id/versions     → config history (newest first)
  *   GET    /agents/:id/versions/:version → one config snapshot
+ *   POST   /agents/:id/versions/:version/promote → restore a version's config as a new version
  *   GET    /agents/:id/skills       → linked skills (ordered)
  *   POST   /agents/:id/skills       → set/reorder linked skills (+ per-link enabled) OR link one
  *   GET    /providers/:id/models    → dynamic model list for a provider (editor)
@@ -154,6 +155,17 @@ export default async function agentsRoutes(appBase: FastifyInstance) {
       const version = await service.getVersion(workspaceId, req.params.id, req.params.version);
       if (!version) throw new NotFoundError('Agent version not found');
       return version;
+    },
+  );
+
+  // Restore: copies version N's saved config into the agent as a NEW latest
+  // version (409 when N has no snapshot or one of its skills was deleted).
+  app.post(
+    '/agents/:id/versions/:version/promote',
+    { schema: { params: VersionParams, response: { 200: Agent } } },
+    async (req): Promise<Agent> => {
+      const { workspaceId } = await getContext(app.container, req);
+      return service.promoteVersion(workspaceId, req.params.id, req.params.version);
     },
   );
 

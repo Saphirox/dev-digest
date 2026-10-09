@@ -8,8 +8,9 @@ import type {
   Provider,
   ReviewStrategy,
 } from '@devdigest/shared';
+import { AgentVersionConfig } from '@devdigest/shared';
 import { assertValidContextPaths } from '../../lib/doc-glob.js';
-import { ValidationError } from '../../platform/errors.js';
+import { AppError, NotFoundError, ValidationError } from '../../platform/errors.js';
 import { AgentsRepository, type SkillLinkInput } from './repository.js';
 import { toAgentDto, toAgentSkillDetail, toAgentVersionDto } from './helpers.js';
 
@@ -146,6 +147,33 @@ export class AgentsService {
     return row ? toAgentVersionDto(row) : undefined;
   }
 
+  /**
+   * Restore version N's saved config into the agent as a NEW latest version
+   * (AC-40). Nothing changes when the request is refused: 404 for an unknown
+   * agent or a version outside 1..latest; 409 when N has no snapshot (EC-25) or
+   * a skill it linked no longer exists in the workspace. A snapshot stores only
+   * the skills that were enabled, so exactly those come back, all enabled.
+   * Existing snapshots are never touched (AC-41).
+   */
+  async promoteVersion(workspaceId: string, agentId: string, version: number): Promise<Agent> {
+    const agent = await this.repo.getById(workspaceId, agentId);
+    if (!agent || version < 1 || version > agent.version) throw new NotFoundError('Agent version not found');
+    const snapshot = await this.repo.getVersion(agentId, version);
+    if (!snapshot) {
+      throw new AppError('conflict', `Version ${version} has no saved configuration to restore`, 409);
+    }
+    const config = AgentVersionConfig.parse(snapshot.configJson);
+    // The repository re-checks the skills inside its transaction, so a skill
+    // deleted after this point is the same 409, never a foreign-key 500.
+    const found = await this.repo.skillIdsInWorkspace(workspaceId, config.skills);
+    const missing = config.skills.filter((id) => !found.has(id));
+    if (missing.length > 0) throw missingSkillsConflict(version, missing);
+    const result = await this.repo.restoreVersion(workspaceId, agentId, config);
+    if (!result) throw new NotFoundError('Agent not found');
+    if (result.missingSkillIds) throw missingSkillsConflict(version, result.missingSkillIds);
+    return toAgentDto(result.row);
+  }
+
   /** Linked skills for an agent, in prompt order, with their link switch. */
   async skillLinks(agentId: string): Promise<AgentSkillDetail[]> {
     const links = await this.repo.linkedSkills(agentId);
@@ -201,4 +229,13 @@ export class AgentsService {
       return [];
     }
   }
+}
+
+function missingSkillsConflict(version: number, missing: string[]): AppError {
+  return new AppError(
+    'conflict',
+    `Version ${version} cannot be restored: ${missing.length} linked skill(s) no longer exist (${missing.join(', ')})`,
+    409,
+    { missing_skill_ids: missing },
+  );
 }
