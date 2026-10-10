@@ -141,6 +141,13 @@
       "when": 1791276746154,
       "tag": "0019_nostalgic_timeslip",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791638740888,
+      "tag": "0020_numerous_sasquatch",
+      "breakpoints": true
     }
   ]
 }

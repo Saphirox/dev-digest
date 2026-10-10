@@ -1,25 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { z } from 'zod';
 import { RunRequest, SmartDiff } from '@devdigest/shared';
 import type { IntentDeriveResult, PrIntentRecord, RunEvent } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
-import { NotFoundError } from '../../platform/errors.js';
+import { AppError, NotFoundError } from '../../platform/errors.js';
 import { ReviewService } from './service.js';
 
 /**
- * A missing/`null` JSON body arrives on `req.body` as `undefined`/`null`
- * (never `{}`) — coerce it to `{}` BEFORE the vendored `RunRequest` contract
- * runs, so an absent body still validates and reaches `resolveTargets`'
- * `invalid_run_request` check (contract itself stays untouched; see plan
- * 0013 Step 10a / Risks: "Empty body").
- */
-const RunRequestBody = z.preprocess((val) => val ?? {}, RunRequest);
-
-/**
  * reviews module.
- *   POST   /pulls/:id/review  {agentId} | {all:true}  → run review(s); returns runs
+ *   POST   /pulls/:id/review  {agentIds}                → run review(s); returns runs (+ multi_agent_run_id for 2+)
+ *   GET    /multi-runs/:id                              → one multi-agent run: runs, reviews, finding groups (no model call)
  *   GET    /runs/:id/events                            → SSE stream of RunEvent (replay-first)
  *   GET    /runs/:id/trace                             → the single-document RunTrace
  *   GET    /pulls/:id/reviews                          → persisted reviews + findings for a PR
@@ -36,30 +27,40 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
 
   // ---- Run a review (manual trigger) -------------------------------
   // Tight per-route limit: each call can fan out to expensive LLM runs.
-  // Schema-validated (both fields optional; empty/absent body is OK — see
-  // RunRequestBody above).
+  // The body is deliberately NOT schema-validated by Fastify (that would answer
+  // 422 `validation_error`): the handler parses `RunRequest` itself so every
+  // malformed request — missing/empty `agentIds`, the removed `agentId`/`all`
+  // fields (`.strict()`), a bad uuid — gets the spec's 400 `invalid_run_request`.
   app.post(
     '/pulls/:id/review',
     {
-      schema: { params: IdParams, body: RunRequestBody },
+      schema: { params: IdParams },
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     },
     async (req) => {
     const { workspaceId } = await getContext(container, req);
-    // Fallback for the case Fastify skips body validation entirely on a
-    // genuinely absent body (no content-type / no bytes sent).
-    const body = req.body ?? {};
-    const targets = await service.resolveTargets(workspaceId, {
-      ...(body.agentId !== undefined ? { agentId: body.agentId } : {}),
-      ...(body.all !== undefined ? { all: body.all } : {}),
-    });
-    const { runs, reviews } = await service.runReview(
+    const parsed = RunRequest.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      throw new AppError(
+        'invalid_run_request',
+        'Provide agentIds: a non-empty list of agent ids',
+        400,
+      );
+    }
+    const targets = await service.resolveTargets(workspaceId, parsed.data.agentIds);
+    const { runs, reviews, multi_agent_run_id } = await service.runReview(
       workspaceId,
       req.params.id,
       targets,
       req.log,
     );
-    return { pr_id: req.params.id, runs, reviews };
+    return { pr_id: req.params.id, runs, reviews, ...(multi_agent_run_id ? { multi_agent_run_id } : {}) };
+  });
+
+  // ---- One multi-agent run (runs + reviews + finding groups; no model call) --
+  app.get('/multi-runs/:id', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(container, req);
+    return service.getMultiRun(workspaceId, req.params.id);
   });
 
   // ---- SSE: live run events (replay buffer first, then live; ends on done) -

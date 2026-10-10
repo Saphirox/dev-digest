@@ -1,6 +1,7 @@
 import type { Container } from '../../platform/container.js';
 import type {
   Agent,
+  AgentRunEstimate,
   AgentSkillDetail,
   AgentVersion,
   CiFailOn,
@@ -65,6 +66,16 @@ export class AgentsService {
       this.repo.skillCounts(workspaceId),
     ]);
     return rows.map((r) => ({ ...toAgentDto(r), skill_count: skillCounts.get(r.id) ?? 0 }));
+  }
+
+  /** Average duration/cost of each agent's recent done runs (null = no data). Pure read, no model call. */
+  async runEstimates(workspaceId: string): Promise<AgentRunEstimate[]> {
+    const rows = await this.repo.runEstimates(workspaceId);
+    return rows.map((r) => ({
+      agent_id: r.agentId,
+      avg_duration_ms: r.avgDurationMs ?? null,
+      avg_cost_usd: r.avgCostUsd ?? null,
+    }));
   }
 
   async get(workspaceId: string, id: string): Promise<Agent | undefined> {

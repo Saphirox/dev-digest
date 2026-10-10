@@ -3,6 +3,7 @@ import type {
   FindingActionKind,
   IntentDeriveResult,
   PrIntentRecord,
+  MultiAgentRun,
   RunEventKind,
   RunTrace,
   SmartDiff,
@@ -20,6 +21,7 @@ import type { IntentModel, IntentSources, IntentStore } from './intent/ports.js'
 import { RunLogger } from '../../platform/run-logger.js';
 import { loadDiff } from './diff-loader.js';
 import { buildSmartDiff, ROLE_ORDER } from './smart-diff/index.js';
+import { groupFindings } from './multi-run/helpers.js';
 
 // Re-export DTO types + converters for backward-compatible imports from
 // './service.js' (these previously lived here; logic now in ./helpers.ts).
@@ -95,19 +97,21 @@ export class ReviewService {
   // ===========================================================================
 
   /**
-   * Resolve which agents to run. `all` → all enabled agents; else a single agent.
+   * Resolve which agents to run, in the order requested. Every id is resolved
+   * in the workspace BEFORE anything is written, so one foreign or unknown id
+   * (404) or a duplicate (400) leaves no rows behind.
    */
-  async resolveTargets(
-    workspaceId: string,
-    opts: { agentId?: string; all?: boolean },
-  ): Promise<AgentRow[]> {
-    if (opts.all) return this.agents.listEnabled(workspaceId);
-    if (opts.agentId) {
-      const agent = await this.agents.getById(workspaceId, opts.agentId);
-      if (!agent) throw new NotFoundError('Agent not found');
-      return [agent];
+  async resolveTargets(workspaceId: string, agentIds: string[]): Promise<AgentRow[]> {
+    if (new Set(agentIds).size !== agentIds.length) {
+      throw new AppError('invalid_run_request', 'agentIds must not contain duplicates', 400);
     }
-    throw new AppError('invalid_run_request', 'Provide agentId or all:true', 400);
+    const targets: AgentRow[] = [];
+    for (const id of agentIds) {
+      const agent = await this.agents.getById(workspaceId, id);
+      if (!agent) throw new NotFoundError('Agent not found');
+      targets.push(agent);
+    }
+    return targets;
   }
 
   /** Delete a whole review run (one agent's pass) + its findings (cascade). */
@@ -151,15 +155,21 @@ export class ReviewService {
   /**
    * Run a review for each target agent. Each agent gets its own runId
    * (= agent_runs.id) created up-front so the SSE route can be subscribed
-   * before/while the run progresses. A partial failure in one agent does not
-   * abort the others.
+   * before/while the run progresses. The agents run concurrently and a failure
+   * in one does not abort the others. One target is today's single-agent run;
+   * two or more are grouped under a `multi_agent_runs` parent (its id is
+   * returned as `multi_agent_run_id`).
    */
   async runReview(
     workspaceId: string,
     prId: string,
     targets: AgentRow[],
     logger?: Logger,
-  ): Promise<{ runs: { run_id: string; agent_id: string; agent_name: string }[]; reviews: ReviewDto[] }> {
+  ): Promise<{
+    runs: { run_id: string; agent_id: string; agent_name: string }[];
+    reviews: ReviewDto[];
+    multi_agent_run_id?: string;
+  }> {
     const pull = await this.repo.getPull(workspaceId, prId);
     if (!pull) throw new NotFoundError('Pull request not found');
     const repo = await this.repo.getRepo(pull.repoId);
@@ -170,16 +180,31 @@ export class ReviewService {
     // stream. The actual (slow) review runs in the background below.
     const runs: { run_id: string; agent_id: string; agent_name: string }[] = [];
     const jobs: { agent: AgentRow; runId: string }[] = [];
-    for (const agent of targets) {
-      const runId = await this.repo.createAgentRun({
+    let multiRunId: string | undefined;
+    if (targets.length > 1) {
+      const created = await this.repo.createMultiAgentRun({
         workspaceId,
-        agentId: agent.id,
         prId,
-        provider: agent.provider,
-        model: agent.model,
+        agents: targets.map((a) => ({ agentId: a.id, provider: a.provider, model: a.model })),
       });
-      runs.push({ run_id: runId, agent_id: agent.id, agent_name: agent.name });
-      jobs.push({ agent, runId });
+      multiRunId = created.multiRunId;
+      targets.forEach((agent, i) => {
+        const runId = created.runs[i]!.runId;
+        runs.push({ run_id: runId, agent_id: agent.id, agent_name: agent.name });
+        jobs.push({ agent, runId });
+      });
+    } else {
+      for (const agent of targets) {
+        const runId = await this.repo.createAgentRun({
+          workspaceId,
+          agentId: agent.id,
+          prId,
+          provider: agent.provider,
+          model: agent.model,
+        });
+        runs.push({ run_id: runId, agent_id: agent.id, agent_name: agent.name });
+        jobs.push({ agent, runId });
+      }
     }
 
     // Fire-and-forget: the HTTP response returns now with the runIds; reviews
@@ -188,7 +213,52 @@ export class ReviewService {
       logger?.error({ prId, err: (err as Error).message }, 'review: background execution crashed');
     });
 
-    return { runs, reviews: [] };
+    return { runs, reviews: [], ...(multiRunId ? { multi_agent_run_id: multiRunId } : {}) };
+  }
+
+  /**
+   * One multi-agent run: its child runs (agent list order), their persisted
+   * reviews, and the cross-agent finding groups. Computed on every read from
+   * stored rows — no model call. 404 when missing or in another workspace.
+   */
+  async getMultiRun(
+    workspaceId: string,
+    id: string,
+  ): Promise<Omit<MultiAgentRun, 'reviews'> & { reviews: ReviewDto[] }> {
+    const head = await this.repo.getMultiAgentRun(workspaceId, id);
+    if (!head) throw new NotFoundError('Multi-agent run not found');
+    const runs = await this.repo.listRunsForMultiRun(workspaceId, id);
+    const rows = await this.repo.reviewsForRuns(
+      workspaceId,
+      runs.map((r) => r.run_id),
+    );
+    const nameByRun = new Map(runs.map((r) => [r.run_id, r.agent_name]));
+    const reviews = rows.map(({ review, findings }) =>
+      reviewToDto(review, findings, review.runId ? nameByRun.get(review.runId) : null),
+    );
+    const groupable = rows.flatMap(({ review, findings }) =>
+      review.runId && review.agentId
+        ? findings.map((f) => ({
+            id: f.id,
+            agent_id: review.agentId!,
+            run_id: review.runId!,
+            file: f.file,
+            start_line: f.startLine,
+            end_line: f.endLine,
+            severity: f.severity,
+          }))
+        : [],
+    );
+    return {
+      id: head.id,
+      pr_id: head.prId,
+      pr_number: head.prNumber,
+      pr_title: head.prTitle,
+      ran_at: head.ranAt,
+      runs,
+      reviews,
+      groups: groupFindings(groupable, runs),
+    };
   }
 
   private publish(runId: string, kind: RunEventKind, msg: string, data?: unknown) {

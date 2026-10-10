@@ -1,8 +1,8 @@
-import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { AgentVersionConfig, CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
-import { DEFAULT_AGENT_DESCRIPTION, INITIAL_AGENT_VERSION } from './constants.js';
+import { DEFAULT_AGENT_DESCRIPTION, INITIAL_AGENT_VERSION, RUN_ESTIMATE_WINDOW } from './constants.js';
 import { isConfigChange } from './helpers.js';
 
 /**
@@ -84,6 +84,40 @@ export class AgentsRepository {
       .select()
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.enabled, true)))
+      .orderBy(asc(t.agents.createdAt), asc(t.agents.id));
+  }
+
+  /**
+   * Per workspace agent: the mean `duration_ms` and mean `cost_usd` of its last
+   * `RUN_ESTIMATE_WINDOW` `done` runs (any PR, newest `ran_at` first). `AVG`
+   * skips NULLs, so an unknown cost never counts as free; no `done` run at all
+   * → both NULL. Agents come back in list order.
+   */
+  async runEstimates(
+    workspaceId: string,
+  ): Promise<{ agentId: string; avgDurationMs: number | null; avgCostUsd: number | null }[]> {
+    const ranked = this.db
+      .select({
+        agentId: t.agentRuns.agentId,
+        durationMs: t.agentRuns.durationMs,
+        costUsd: t.agentRuns.costUsd,
+        rn: sql<number>`row_number() over (partition by ${t.agentRuns.agentId} order by ${t.agentRuns.ranAt} desc, ${t.agentRuns.id})`.as(
+          'rn',
+        ),
+      })
+      .from(t.agentRuns)
+      .where(and(eq(t.agentRuns.workspaceId, workspaceId), eq(t.agentRuns.status, 'done')))
+      .as('ranked');
+    return this.db
+      .select({
+        agentId: t.agents.id,
+        avgDurationMs: sql<number | null>`avg(${ranked.durationMs})::float8`,
+        avgCostUsd: sql<number | null>`avg(${ranked.costUsd})::float8`,
+      })
+      .from(t.agents)
+      .leftJoin(ranked, and(eq(ranked.agentId, t.agents.id), lte(ranked.rn, RUN_ESTIMATE_WINDOW)))
+      .where(eq(t.agents.workspaceId, workspaceId))
+      .groupBy(t.agents.id)
       .orderBy(asc(t.agents.createdAt), asc(t.agents.id));
   }
 

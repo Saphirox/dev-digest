@@ -126,7 +126,7 @@ d('project context (fixture clone)', () => {
   }
 
   async function run(app: Awaited<ReturnType<typeof makeApp>>['app'], prId: string, agentId: string) {
-    const res = await app.inject({ method: 'POST', url: `/pulls/${prId}/review`, payload: { agentId } });
+    const res = await app.inject({ method: 'POST', url: `/pulls/${prId}/review`, payload: { agentIds: [agentId] } });
     expect(res.statusCode).toBe(200);
     const runId = res.json().runs[0].run_id as string;
     await waitForPrRuns(pg.handle.db, prId, { expected: 1 });

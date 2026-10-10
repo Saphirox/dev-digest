@@ -3,12 +3,20 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
-import type { Agent, AgentVersion, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
+import type { Agent, AgentRunEstimate, AgentVersion, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
 
 export function useAgents() {
   return useQuery({
     queryKey: ["agents"],
     queryFn: () => api.get<Agent[]>("/agents"),
+  });
+}
+
+/** Per-agent average duration/cost over its recent done runs (null when none). */
+export function useAgentRunEstimates() {
+  return useQuery({
+    queryKey: ["agent-run-estimates"],
+    queryFn: () => api.get<AgentRunEstimate[]>("/agents/run-estimates"),
   });
 }
 

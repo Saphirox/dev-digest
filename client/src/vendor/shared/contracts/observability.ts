@@ -1,14 +1,16 @@
 import { z } from 'zod';
 import { Severity } from './findings.js';
+import { ReviewRecord } from './review-api.js';
+import { RunSummary } from './trace.js';
 
 /**
  * A5 — Observability / Multi-agent contracts (L07).
  *
  * These are NEW contracts (A5 owns this file; the barrel re-exports it). They
  * sit alongside A2's `review-api.ts`:
- *   - MultiAgentRun        the response of POST /pulls/:id/multi-agent-run
- *   - AgentColumn          one agent's column in the multi-agent view
- *   - Conflict / ConflictTake  where agents disagree on the same file:line
+ *   - MultiAgentRun        the response of GET /multi-runs/:id
+ *   - FindingGroup         findings from several agents overlapping on one file range
+ *   - AgentRunEstimate     per-agent average duration/cost for the picker
  *   - AgentStats           per-agent quality aggregates (GET /agents/:id/stats)
  *   - CuratorResult        the cross-session memory curator outcome
  *
@@ -19,71 +21,48 @@ import { Severity } from './findings.js';
 // Multi-Agent Review
 // ---------------------------------------------------------------------------
 
-/** A finding as surfaced in a multi-agent column (subset of FindingRecord). */
-export const AgentColumnFinding = z.object({
-  id: z.string(),
-  severity: Severity,
-  category: z.string(),
-  title: z.string(),
-  file: z.string(),
-  start_line: z.number().int(),
-  kind: z.string().nullish(),
-});
-export type AgentColumnFinding = z.infer<typeof AgentColumnFinding>;
-
-/** One agent's result column in the multi-agent review. */
-export const AgentColumn = z.object({
+/** One finding's membership in a group: which agent/run reported it. */
+export const FindingGroupMember = z.object({
+  finding_id: z.string(),
+  agent_id: z.string(),
   run_id: z.string(),
-  agent_id: z.string(),
-  agent_name: z.string(),
-  provider: z.string().nullable(),
-  model: z.string().nullable(),
-  status: z.enum(['done', 'failed', 'running']),
-  verdict: z.string().nullable(),
-  score: z.number().int().nullable(),
-  summary: z.string().nullable(),
-  duration_ms: z.number().int().nullable(),
-  cost_usd: z.number().nullable(),
-  findings: z.array(AgentColumnFinding),
 });
-export type AgentColumn = z.infer<typeof AgentColumn>;
-
-/** One agent's stance on a contended file:line. */
-export const ConflictTake = z.object({
-  agent_id: z.string(),
-  persona: z.string(),
-  /** Severity if the agent flagged it, or 'ignored' when it did not. */
-  verdict: z.union([Severity, z.literal('ignored')]),
-  note: z.string(),
-});
-export type ConflictTake = z.infer<typeof ConflictTake>;
+export type FindingGroupMember = z.infer<typeof FindingGroupMember>;
 
 /**
- * A conflict = a file:line that at least one agent flagged and at least one
- * other agent (that also reviewed) did NOT, OR where agents assigned divergent
- * severities. Computed from persisted findings; not stored.
+ * Findings from different agents that overlap on the same file and line range.
+ * `conflict` = a `done` participant has no member in the group, or the members'
+ * severities differ. Computed from persisted findings; not stored.
  */
-export const Conflict = z.object({
+export const FindingGroup = z.object({
   file: z.string(),
-  line: z.number().int(),
-  title: z.string(),
-  takes: z.array(ConflictTake),
+  start_line: z.number().int(),
+  end_line: z.number().int(),
+  conflict: z.boolean(),
+  members: z.array(FindingGroupMember),
 });
-export type Conflict = z.infer<typeof Conflict>;
+export type FindingGroup = z.infer<typeof FindingGroup>;
 
-/** Response of POST /pulls/:id/multi-agent-run and GET /pulls/:id/multi-agent. */
+/** Response of GET /multi-runs/:id. */
 export const MultiAgentRun = z.object({
   id: z.string(),
   pr_id: z.string(),
-  pr_number: z.number().int().nullish(),
+  pr_number: z.number().int(),
+  pr_title: z.string(),
   ran_at: z.string(),
-  agent_count: z.number().int(),
-  total_duration_ms: z.number().int(),
-  total_cost_usd: z.number().nullable(),
-  columns: z.array(AgentColumn),
-  conflicts: z.array(Conflict),
+  runs: z.array(RunSummary),
+  reviews: z.array(ReviewRecord),
+  groups: z.array(FindingGroup),
 });
 export type MultiAgentRun = z.infer<typeof MultiAgentRun>;
+
+/** Per-agent average duration/cost over its past done runs; null when none. */
+export const AgentRunEstimate = z.object({
+  agent_id: z.string(),
+  avg_duration_ms: z.number().nullable(),
+  avg_cost_usd: z.number().nullable(),
+});
+export type AgentRunEstimate = z.infer<typeof AgentRunEstimate>;
 
 // ---------------------------------------------------------------------------
 // Per-agent Stats (GET /agents/:id/stats)

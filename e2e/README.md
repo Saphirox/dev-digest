@@ -103,3 +103,5 @@ a CI artifact by `.github/workflows/e2e-web.yml`).
 | `08-eval-dashboard` | sidebar → Eval Dashboard → `/eval` title + empty state |
 | `09-agent-evals-tab` | Security Reviewer → Evals tab → empty case list + New / Run all controls |
 | `10-finding-eval-case` | PR #482 finding → Accept → Turn into eval case appears → no-agent refusal shown inline |
+| `11-multi-agent-configure` | sidebar → Multi-Agent Review landing → Configure run → pick PR #482 → agents checked, footer, count follows selection |
+| `12-pr-agent-picker` | PR #482 → Run Review opens the agent picker → uncheck / Clear update the run button count (nothing run) |

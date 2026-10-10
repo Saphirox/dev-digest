@@ -13,14 +13,14 @@ import type { Severity } from "@devdigest/shared";
 export const SEVERITIES = ["CRITICAL", "WARNING", "SUGGESTION"] as const satisfies readonly Severity[];
 
 /** Position in `SEVERITIES`; anything unrecognised sorts after all of them. */
-function rank(severity: string): number {
+export function severityRank(severity: string): number {
   const i = (SEVERITIES as readonly string[]).indexOf(severity);
   return i === -1 ? SEVERITIES.length : i;
 }
 
 /** A copy sorted CRITICAL → WARNING → SUGGESTION; ties keep their input order. */
 export function sortBySeverity<T extends { severity: string }>(items: readonly T[]): T[] {
-  return [...items].sort((a, b) => rank(a.severity) - rank(b.severity));
+  return [...items].sort((a, b) => severityRank(a.severity) - severityRank(b.severity));
 }
 
 /** Count per severity. Callers pass the list actually being represented, so a

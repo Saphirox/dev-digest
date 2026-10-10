@@ -73,6 +73,27 @@ export async function reviewsForPull(
   }));
 }
 
+/** Reviews produced by the given runs (newest first), each with its findings. */
+export async function reviewsForRuns(
+  db: Db,
+  workspaceId: string,
+  runIds: string[],
+): Promise<{ review: ReviewRow; findings: FindingRow[] }[]> {
+  if (runIds.length === 0) return [];
+  const reviews = await db
+    .select()
+    .from(t.reviews)
+    .where(and(eq(t.reviews.workspaceId, workspaceId), inArray(t.reviews.runId, runIds)))
+    .orderBy(desc(t.reviews.createdAt));
+  if (reviews.length === 0) return [];
+  const ids = reviews.map((r) => r.id);
+  const findings = await db.select().from(t.findings).where(inArray(t.findings.reviewId, ids));
+  return reviews.map((review) => ({
+    review,
+    findings: findings.filter((f) => f.reviewId === review.id),
+  }));
+}
+
 export async function getReview(db: Db, reviewId: string): Promise<ReviewRow | undefined> {
   const [row] = await db.select().from(t.reviews).where(eq(t.reviews.id, reviewId));
   return row;

@@ -60,7 +60,9 @@ export class ReviewsApiRepository implements ReviewsStore {
   constructor(private readonly client: DevDigestApiClient) {}
 
   async startReview(prId: string, agentId: string): Promise<StartReviewRunRecord[]> {
-    const body = await this.client.post(`/pulls/${encodeURIComponent(prId)}/review`, { agentId });
+    const body = await this.client.post(`/pulls/${encodeURIComponent(prId)}/review`, {
+      agentIds: [agentId],
+    });
     const parsed = parseObject<{ runs: StartReviewRunRecord[] }>(
       StartReviewResponseSchema,
       body,
