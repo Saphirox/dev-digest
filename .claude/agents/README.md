@@ -321,8 +321,10 @@ format — that skill, not the curator, performs the write.
 
 - **Responsibility:** write or update tests for behaviour that already exists
   — client components/hooks (RTL + Vitest), server unit and `*.it.test.ts`
-  tests, `reviewer-core` engine tests — or reproduce a reported bug with a
-  failing test first.
+  tests, `reviewer-core` engine tests, and new deterministic e2e flows
+  (`e2e/specs/NN-name.flow.json`, run with `npm run e2e:hermetic`) for each
+  user journey a spec adds — or reproduce a reported bug with a failing test
+  first.
 - **Permissions:** can edit and write test files, fixtures and test helpers
   only; production code is off-limits by prompt (no hook scopes it). Has
   `Skill` for `react-testing-library` / `onion-architecture`.
@@ -335,7 +337,7 @@ format — that skill, not the curator, performs the write.
   incl. the skipped count), Not covered, Production code untouched (`git
   status --short`), Follow-ups, INSIGHTS.
 - **Not for:** production code, architecture/security review, plan
-  verification, e2e specs, deciding whether a feature is right.
+  verification, deciding whether a feature is right.
 
 ## architecture-reviewer
 
