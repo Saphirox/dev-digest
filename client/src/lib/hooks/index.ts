@@ -13,3 +13,4 @@ export * from "./brief";
 export * from "./smart-diff";
 export * from "./blast";
 export * from "./evals";
+export * from "./ci";
