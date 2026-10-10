@@ -14,3 +14,4 @@ renumbered.
 |---|---|---|---|---|---|---|---|---|
 | 0001 | 2026-10-03 | spec → plan → `/run-sdd` | Project Context (spec-0001, plan 0014) | 80.74M | 25 | 2 / 1 (+1 security) | P-0001-1…6 (6 open) | [0001-run-sdd-project-context.md](0001-run-sdd-project-context.md) |
 | 0002 | 2026-10-03 | run-sdd | PR Brief (SPEC-0002, plan 0015) | 86.07M (agents 23.67M) | 18 | 2 / 1 | P-0002-1 … P-0002-6 (6 open) | [0002-run-sdd-pr-brief.md](0002-run-sdd-pr-brief.md) |
+| 0003 | 2026-10-10 | run-sdd | Multi-Agent Review (spec-0004, plan 0018) | 49.24M (agents 29.23M) | 12 | 3 (1 wasted) / 1 | P-0003-1 … P-0003-4 (4 open); P-0001-1/P-0002-4 superseded by P-0003-1 | [0003-run-sdd-multi-agent-review.md](0003-run-sdd-multi-agent-review.md) |
