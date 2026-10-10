@@ -57,6 +57,9 @@ const TOOL_NAMES = ['list_agents', 'run_agent_on_pr', 'get_findings', 'get_conve
  * exhausts its (tiny, test-sized) wait budget — same script as before.
  */
 class FakeApiClient {
+  /** Every POST this fake served, so a test can assert the request body. */
+  posts: { path: string; body: unknown }[] = [];
+
   async get(path: string): Promise<unknown> {
     if (path === '/repos') return [REPO];
     if (path === '/agents') return [AGENT];
@@ -90,7 +93,8 @@ class FakeApiClient {
     throw new Error(`FakeApiClient: unhandled GET ${path}`);
   }
 
-  async post(path: string, _body: unknown): Promise<unknown> {
+  async post(path: string, body: unknown): Promise<unknown> {
+    this.posts.push({ path, body });
     if (path === `/pulls/${PR.id}/review`) {
       return {
         runs: [{ run_id: 'run-1', agent_id: AGENT.id, agent_name: AGENT.name }] satisfies StartReviewRunRecord[],
@@ -197,6 +201,23 @@ describe('mcp tools (InMemoryTransport contract)', () => {
     const content = result.content as { type: string; text: string }[];
     expect(content[0]?.text).toContain('get_findings');
     expect(content[0]?.text).toContain('run-1');
+  }, 10_000);
+
+  it('AC-40: run_agent_on_pr POSTs {agentIds:[<agent id>]} to /pulls/:id/review', async () => {
+    const fake = new FakeApiClient();
+    const server = createApp(
+      new Container({ apiUrl: 'http://fake', waitMs: 30 }, { client: fake as unknown as DevDigestApiClient, pollMs: 10 }),
+    );
+    const bodyClient = await connectedClient(server);
+    try {
+      await bodyClient.callTool({
+        name: 'run_agent_on_pr',
+        arguments: { repo: 'acme/payments-api', pr: 7, agent: 'Reviewer' },
+      });
+    } finally {
+      await bodyClient.close();
+    }
+    expect(fake.posts).toEqual([{ path: `/pulls/${PR.id}/review`, body: { agentIds: [AGENT.id] } }]);
   }, 10_000);
 
   it('delivers a progress notification to the client when a progressToken is sent', async () => {

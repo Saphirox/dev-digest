@@ -35,6 +35,8 @@ import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.j
 import { FsDocSource } from '../adapters/docs/fs.js';
 import type { DocSource } from '../modules/project-context/ports.js';
 import { ProjectContextService } from '../modules/project-context/service.js';
+import { FsRunnerBundle } from '../adapters/runner-bundle/fs.js';
+import type { RunnerBundleSource } from '../modules/ci/ports.js';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -59,6 +61,8 @@ export interface ContainerOverrides {
   tokenizer?: Tokenizer;
   /** Project Context document reader (fs walk + realpath-guarded read). */
   docSource?: DocSource;
+  /** Export-to-CI runner bundle reader — tests inject a fake bundle. */
+  runnerBundle?: RunnerBundleSource;
 }
 
 export class Container {
@@ -85,6 +89,7 @@ export class Container {
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
   private _docSource?: DocSource;
+  private _runnerBundle?: RunnerBundleSource;
   private _projectContext?: ProjectContextService;
   private _priceBook?: PriceBook;
   private _featureModels?: FeatureModels;
@@ -160,6 +165,13 @@ export class Container {
     if (this.overrides.docSource) return this.overrides.docSource;
     this._docSource ??= new FsDocSource();
     return this._docSource;
+  }
+
+  /** The built agent-runner bundle (the `agent-runner/dist/` directory) Export-to-CI embeds. */
+  get runnerBundle(): RunnerBundleSource {
+    if (this.overrides.runnerBundle) return this.overrides.runnerBundle;
+    this._runnerBundle ??= new FsRunnerBundle(this.config.runnerBundlePath);
+    return this._runnerBundle;
   }
 
   /**

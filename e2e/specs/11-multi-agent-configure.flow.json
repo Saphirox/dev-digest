@@ -1,0 +1,22 @@
+{
+  "name": "Multi-Agent Review: sidebar → landing → Configure run lists the seeded agents",
+  "description": "Sidebar 'Multi-Agent Review' opens the landing page (spec-0004 AC-12), its CTA opens Configure run which asks for a PR first (AC-13); choosing seeded PR #482 lists the agents with the enabled ones checked and the fan-out footer (AC-14, AC-16, AC-37); unchecking one agent updates the run button count (AC-17 selection). The Run multi-agent review button is only asserted present via its label, never clicked: it would start model calls.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
+    { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
+    { "cmd": ["wait", "--text", "Multi-Agent Review"], "label": "sidebar item is visible" },
+    { "cmd": ["find", "text", "Multi-Agent Review", "click"], "label": "open Multi-Agent Review from the sidebar" },
+    { "cmd": ["wait", "--url", "/multi-agent"], "label": "landing route reached" },
+    { "cmd": ["wait", "--text", "No agents selected"], "label": "landing empty state is shown" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Configure run"], "label": "click Configure run" },
+    { "cmd": ["wait", "--url", "/multi-agent/configure"], "label": "configure route reached" },
+    { "cmd": ["wait", "--text", "Pick a pull request first"], "label": "no PR chosen yet: agents are withheld" },
+    { "cmd": ["wait", "--text", "Run multi-agent review (0)"], "label": "run button shows zero agents" },
+    { "cmd": ["select", "select", "#482 · Add rate limiting to public API endpoints"], "label": "choose seeded PR #482" },
+    { "cmd": ["wait", "--text", "Security Reviewer"], "label": "seeded agent card is listed" },
+    { "cmd": ["wait", "--text", "Run multi-agent review (3)"], "label": "the three enabled seeded agents are checked" },
+    { "cmd": ["wait", "--text", "parallel fan-out"], "label": "estimate footer is shown" },
+    { "cmd": ["find", "role", "checkbox", "click", "--name", "Security Reviewer"], "label": "uncheck Security Reviewer" },
+    { "cmd": ["wait", "--text", "Run multi-agent review (2)"], "label": "run button count follows the selection" }
+  ]
+}

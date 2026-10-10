@@ -124,7 +124,10 @@ instead of into another round.
 Spawn `test-writer` with the spec path, the plan path and `changedPaths`:
 one test per `AC`/`EC` (and each `NFR` with a number), the ID in the test
 title, fixtures from the spec's *Examples*, test level from its
-*Traceability* verification hints. Add its test files to `changedPaths`.
+*Traceability* verification hints — plus one new e2e flow per user journey
+the spec adds (the plan's e2e step, run with `npm run e2e:hermetic`). Add
+its test files and flows to `changedPaths`; a flow written but not run
+(Docker or `agent-browser` missing) goes to `manualChecks`.
 Record its *Not covered* items; ACs it marks as reachable only by eye go to
 `manualChecks`.
 

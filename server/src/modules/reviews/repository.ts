@@ -110,6 +110,14 @@ export class ReviewRepository {
     return reviewRepo.latestFindingRangesForPull(this.db, prId);
   }
 
+  /** Reviews produced by the given runs (newest first), each with its findings. */
+  reviewsForRuns(
+    workspaceId: string,
+    runIds: string[],
+  ): Promise<{ review: ReviewRow; findings: FindingRow[] }[]> {
+    return reviewRepo.reviewsForRuns(this.db, workspaceId, runIds);
+  }
+
   getReview(reviewId: string): Promise<ReviewRow | undefined> {
     return reviewRepo.getReview(this.db, reviewId);
   }
@@ -192,6 +200,24 @@ export class ReviewRepository {
     model: string | null;
   }): Promise<string> {
     return runRepo.createAgentRun(this.db, values);
+  }
+
+  /** Parent + one running child run per agent, in one transaction. */
+  createMultiAgentRun(values: {
+    workspaceId: string;
+    prId: string;
+    agents: runRepo.MultiRunAgent[];
+  }): Promise<{ multiRunId: string; runs: { runId: string; agentId: string }[] }> {
+    return runRepo.createMultiAgentRun(this.db, values);
+  }
+
+  getMultiAgentRun(workspaceId: string, id: string): Promise<runRepo.MultiAgentRunHead | undefined> {
+    return runRepo.getMultiAgentRun(this.db, workspaceId, id);
+  }
+
+  /** Child runs of a multi-agent run, in agent list order. */
+  listRunsForMultiRun(workspaceId: string, multiRunId: string): Promise<RunSummary[]> {
+    return runRepo.listRunsForMultiRun(this.db, workspaceId, multiRunId);
   }
 
   completeAgentRun(runId: string, values: runRepo.CompleteRunValues): Promise<void> {

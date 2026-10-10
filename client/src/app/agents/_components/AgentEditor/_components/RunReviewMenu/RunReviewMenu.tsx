@@ -28,7 +28,7 @@ export function RunReviewMenu({ agentId }: { agentId: string }) {
           hint: pr.author,
           onClick: () =>
             run.mutate(
-              { prId: pr.id, agentId },
+              { prId: pr.id, agentIds: [agentId] },
               { onSuccess: () => router.push(`/repos/${activeRepo.id}/pulls/${pr.number}`) },
             ),
         }))

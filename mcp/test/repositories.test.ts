@@ -86,7 +86,7 @@ describe('AgentsApiRepository', () => {
 });
 
 describe('ReviewsApiRepository', () => {
-  it('startReview POSTs {agentId} to the percent-encoded prId path and returns runs', async () => {
+  it('startReview POSTs {agentIds:[agentId]} to the percent-encoded prId path and returns runs', async () => {
     const runs = [{ run_id: 'run1', agent_id: 'a1', agent_name: 'Reviewer' }];
     const fake = new FakeClient();
     fake.post.mockResolvedValue({ runs });
@@ -95,7 +95,7 @@ describe('ReviewsApiRepository', () => {
     await expect(repo.startReview('p1/with slash', 'a1')).resolves.toEqual(runs);
     expect(fake.post).toHaveBeenCalledWith(
       `/pulls/${encodeURIComponent('p1/with slash')}/review`,
-      { agentId: 'a1' },
+      { agentIds: ['a1'] },
     );
   });
 

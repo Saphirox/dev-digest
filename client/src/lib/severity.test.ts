@@ -3,13 +3,19 @@
  * the chips/pills display.
  */
 import { describe, it, expect } from "vitest";
-import { SEVERITIES, countBlockers, countBySeverity, sortBySeverity } from "./severity";
+import { SEVERITIES, countBlockers, countBySeverity, severityRank, sortBySeverity } from "./severity";
 
 const f = (id: string, severity: string) => ({ id, severity });
 
 describe("SEVERITIES", () => {
   it("lists the contract severities worst first", () => {
     expect(SEVERITIES).toEqual(["CRITICAL", "WARNING", "SUGGESTION"]);
+  });
+});
+
+describe("severityRank", () => {
+  it("ranks contract severities worst first and unknown ones after all of them", () => {
+    expect(["CRITICAL", "WARNING", "SUGGESTION", "INFO"].map(severityRank)).toEqual([0, 1, 2, 3]);
   });
 });
 

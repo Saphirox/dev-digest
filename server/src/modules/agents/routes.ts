@@ -19,6 +19,7 @@ const VersionParams = z.object({
 /**
  * A2 — agents module (owner A2).
  *   GET    /agents                  → list (workspace-scoped)
+ *   GET    /agents/run-estimates    → per-agent average duration/cost of the last 10 done runs
  *   GET    /agents/:id              → one agent
  *   POST   /agents                  → create
  *   PUT    /agents/:id              → update / toggle enabled (versions config)
@@ -90,6 +91,12 @@ export default async function agentsRoutes(appBase: FastifyInstance) {
   app.get('/agents', async (req) => {
     const { workspaceId } = await getContext(app.container, req);
     return service.list(workspaceId);
+  });
+
+  // Static path, registered before `/agents/:id` (find-my-way prefers it anyway).
+  app.get('/agents/run-estimates', async (req) => {
+    const { workspaceId } = await getContext(app.container, req);
+    return service.runEstimates(workspaceId);
   });
 
   app.get('/agents/:id', { schema: { params: IdParams } }, async (req) => {

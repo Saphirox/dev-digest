@@ -1,12 +1,9 @@
 /**
  * POST /pulls/:id/review — body validation only (no agent run reaches the
  * pipeline in any of these cases, so no `openrouter` override is needed:
- * `RunRequest.parse` / `resolveTargets` throw before any LLM call).
- * Characterises current behaviour (green today; plan 0013 Step 10a wraps the
- * manual `RunRequest.parse(req.body ?? {})` in a route-local schema with no
- * change to status/code — see plan Risks: "Empty body").
- * Asserts status + error code only, never `details` (plan Risks: the 422
- * `details` payload shape changes under the refactor).
+ * the route's `RunRequest.safeParse` throws before any LLM call).
+ * Every malformed body answers 400 `invalid_run_request` (spec-0004 EC-1).
+ * Asserts status + error code only, never `details`.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { eq } from 'drizzle-orm';
@@ -70,15 +67,15 @@ d('POST /pulls/:id/review — run-request body validation (Testcontainers pg)', 
     await app.close();
   });
 
-  it('{ all: "yes" } (wrong type) → 422 validation_error', async () => {
+  it('{ all: "yes" } (removed field) → 400 invalid_run_request', async () => {
     const app = await buildApp({ config: config(), db: pg.handle.db, overrides: {} });
     const res = await app.inject({
       method: 'POST',
       url: `/pulls/${prId}/review`,
       payload: { all: 'yes' },
     });
-    expect(res.statusCode).toBe(422);
-    expect(res.json().error.code).toBe('validation_error');
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('invalid_run_request');
     await app.close();
   });
 });

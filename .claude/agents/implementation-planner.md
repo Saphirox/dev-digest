@@ -340,6 +340,8 @@ schema, `stateDiagram-v2` for states. Show the target design.>
    - Files: <`path`, …>
    - Skills: <skill names for this step>
    - Verify: `<exact command>` in `<module>/` (e2e only if truly needed, and only `npm run e2e:hermetic`)
+
+When the spec adds a user journey (a new page or route, or a new entry point on an existing page), add an **e2e step addressed to `test-writer`**: the new flow(s) by name, the journey's clicks and visible texts, the AC IDs each flow exercises, where it must stop to avoid a model call, and `Verify: npm run e2e:hermetic` in `e2e/`.
 2. …
 
 ## Work split
