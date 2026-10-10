@@ -1,0 +1,242 @@
+# evals suite — the Claude Code harness evals (@devdigest/evals), on the Anthropic API.
+#
+# On a PR, scripts/ci-detect.mjs maps the changed files onto suites:
+#   .claude/skills/<s>/**          → evals/skills/<s>    (if it has evals; else a "no evals" notice)
+#   .claude/agents/<a>.md          → evals/agents/<a>    + the workflow tier
+#   CLAUDE.md / AGENTS.md / .claude/settings.json      → the workflow tier
+#   the eval engine (evals/src, deps, proxy, this file) → everything
+#
+# Model selection, first non-empty wins (no code change needed to switch):
+#   1. workflow_dispatch inputs (Actions → evals → Run workflow)
+#   2. repo Variables: EVAL_MODEL, EVAL_JUDGE_MODEL, EVAL_WORKFLOW_MODEL
+#      (Settings → Secrets and variables → Actions → Variables)
+#   3. the defaults below (Haiku under test, Sonnet as judge)
+#
+# Needs the repo secret ANTHROPIC_API_KEY — every tier runs in the Claude Agent SDK against
+# api.anthropic.com, no proxy. Without it (e.g. a PR from a fork, which gets no secrets) the
+# model-backed jobs are skipped with a notice; the static job still runs. OpenRouter + the
+# LiteLLM proxy (evals/proxy/) are local-only.
+#
+# Blocking: static + skills + agents fail the check. The workflow tier is advisory
+# (continue-on-error): it asserts subagent dispatch / skill activation, which is less
+# deterministic than the content tiers.
+name: evals
+
+on:
+  pull_request:
+    paths:
+      - '.claude/skills/**'
+      - '.claude/agents/**'
+      - '.claude/settings.json'
+      - '.claude/CLAUDE.md'
+      - 'CLAUDE.md'
+      - 'AGENTS.md'
+      - 'evals/**'
+      - '.github/workflows/evals.yml'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'auto (from diff vs main) | all | skills | agents | workflow | skills/<name> | agents/<name>'
+        default: all
+      model:
+        description: 'Anthropic model ID for the model under test (blank = repo var / default)'
+        required: false
+      judge_model:
+        description: 'Anthropic model ID for the LLM judge (blank = repo var / default)'
+        required: false
+      workflow_model:
+        description: 'Anthropic model ID for the workflow tier only (blank = repo var / model)'
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EVAL_BACKEND: anthropic
+  EVAL_MODEL: ${{ inputs.model || vars.EVAL_MODEL || 'claude-haiku-5-5' }}
+  # Judge defaults to a stronger family than the model under test, not to the test model.
+  EVAL_JUDGE_MODEL: ${{ inputs.judge_model || vars.EVAL_JUDGE_MODEL || 'claude-sonnet-5-5' }}
+  EVAL_WORKFLOW_MODEL: ${{ inputs.workflow_model || vars.EVAL_WORKFLOW_MODEL || inputs.model || vars.EVAL_MODEL || 'claude-haiku-5-5' }}
+
+jobs:
+  detect:
+    name: detect suites
+    runs-on: ubuntu-latest
+    outputs:
+      skills: ${{ steps.detect.outputs.skills }}
+      agents: ${{ steps.detect.outputs.agents }}
+      run_workflow: ${{ steps.detect.outputs.run_workflow }}
+      has_key: ${{ steps.key.outputs.has_key }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - id: key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Evals skipped::ANTHROPIC_API_KEY secret is not available (fork PR or not configured) — only the static job runs"
+          fi
+
+      - id: detect
+        env:
+          EVAL_TARGET: ${{ inputs.target || 'auto' }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="${BASE_SHA:-$(git merge-base origin/main HEAD)}"
+          CHANGED_FILES="$(git diff --name-only "$base"...HEAD)"
+          export CHANGED_FILES
+          node evals/scripts/ci-detect.mjs
+
+      - name: Summary
+        run: |
+          {
+            echo "### Eval suites"
+            echo "| tier | run |"
+            echo "|---|---|"
+            echo "| skills | \`${{ steps.detect.outputs.skills }}\` |"
+            echo "| agents | \`${{ steps.detect.outputs.agents }}\` |"
+            echo "| workflow | ${{ steps.detect.outputs.run_workflow }} |"
+            echo
+            echo "Models: test \`$EVAL_MODEL\` · judge \`$EVAL_JUDGE_MODEL\` · workflow \`$EVAL_WORKFLOW_MODEL\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  static:
+    name: static (no model)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: evals
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: evals/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - name: Unit tests (stats + ci-detect)
+        run: pnpm vitest run src/ scripts/
+      - name: Skill structure gate
+        run: pnpm eval:quality
+
+  skills:
+    name: skill · ${{ matrix.name }}
+    needs: [detect, static]
+    if: needs.detect.outputs.has_key == 'true' && needs.detect.outputs.skills != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 2 # stay under API rate limits; throttled runs degrade to one turn
+      matrix:
+        name: ${{ fromJSON(needs.detect.outputs.skills) }}
+    defaults:
+      run:
+        working-directory: evals
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: evals/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      # Trailing slash: vitest filters by substring, so `skills/x` would also match `skills/x-y/`.
+      - run: pnpm vitest run "skills/${{ matrix.name }}/"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-skill-${{ matrix.name }}
+          path: evals/results/
+          if-no-files-found: ignore
+
+  agents:
+    name: agent · ${{ matrix.name }}
+    needs: [detect, static]
+    if: needs.detect.outputs.has_key == 'true' && needs.detect.outputs.agents != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        name: ${{ fromJSON(needs.detect.outputs.agents) }}
+    defaults:
+      run:
+        working-directory: evals
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: evals/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run "agents/${{ matrix.name }}/"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-agent-${{ matrix.name }}
+          path: evals/results/
+          if-no-files-found: ignore
+
+  workflow:
+    name: workflow tier (advisory)
+    needs: [detect, static]
+    if: needs.detect.outputs.has_key == 'true' && needs.detect.outputs.run_workflow == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: evals
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: evals/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      # The workflow tier may need a stronger model than the content tiers (subagent dispatch).
+      - run: pnpm vitest run workflow/ --no-file-parallelism
+        env:
+          EVAL_MODEL: ${{ env.EVAL_WORKFLOW_MODEL }}
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-workflow
+          path: evals/results/
+          if-no-files-found: ignore

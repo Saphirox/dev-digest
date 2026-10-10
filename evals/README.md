@@ -8,7 +8,8 @@ Runs on the Claude Code **subscription** by default — the API key is stripped 
 processes, so calls use the login / credential helper, never per-token API billing. No external
 services, no third-party judge.
 
-The **same tests** can also run on **OpenRouter** (DeepSeek and other cheap models) by setting
+The **same tests** can also run on an **Anthropic API key** (`EVAL_BACKEND=anthropic` — what CI
+uses) or on **OpenRouter** (DeepSeek and other cheap models, local-only) by setting
 `EVAL_BACKEND=openrouter` — no code changes, just env vars. See
 [Runners: Claude Code vs OpenRouter](#runners-claude-code-default-vs-openrouter) below.
 
@@ -72,6 +73,7 @@ differs per backend.
 | `EVAL_BACKEND` | Runtime | Auth | Model name format |
 |---|---|---|---|
 | `subscription` *(default)* | Claude Agent SDK on the Claude Code login | none (API key stripped) | Anthropic ID — `claude-haiku-4-5` |
+| `anthropic` *(CI)* | Claude Agent SDK, every tier, straight to api.anthropic.com | `ANTHROPIC_API_KEY` (billed per token) | Anthropic ID — `claude-haiku-5-5` |
 | `openrouter` | see split below | `OPENROUTER_API_KEY` | OpenRouter slug — `deepseek/deepseek-chat`, `anthropic/claude-haiku-4.5`, `google/gemini-...` |
 
 **Why the backend splits by tier.** OpenRouter's native "Anthropic Skin" only serves *Anthropic*
@@ -88,9 +90,10 @@ asserts on. So under `openrouter`:
   (`http://localhost:4000`). See [Running tool tiers on cheap models](#running-tool-tiers-on-cheap-models-litellm-proxy).
 
 The default (`subscription`) path is untouched — the dispatcher only diverges when
-`EVAL_BACKEND=openrouter`.
+`EVAL_BACKEND=openrouter`. `anthropic` is opt-in only: a key exported in your shell is still
+stripped under the default, so local runs never bill it by accident.
 
-### Examples — the same `pnpm eval:skills`, three ways
+### Examples — the same `pnpm eval:skills`, four ways
 
 ```bash
 # 1. Local, Anthropic (default — set nothing)
@@ -107,6 +110,13 @@ pnpm eval:skills
 EVAL_BACKEND=openrouter \
 EVAL_MODEL=anthropic/claude-haiku-4.5 \
 OPENROUTER_API_KEY=sk-or-... \
+pnpm eval:skills
+
+# 4. Anthropic API key — exactly what CI runs (no proxy, every tier)
+EVAL_BACKEND=anthropic \
+EVAL_MODEL=claude-haiku-5-5 \
+EVAL_JUDGE_MODEL=claude-sonnet-5-5 \
+ANTHROPIC_API_KEY=sk-ant-... \
 pnpm eval:skills
 ```
 
@@ -126,9 +136,9 @@ inside `evals/` and needs no code changes to use.
 
 | File | Role |
 |------|------|
-| `proxy/litellm.config.yaml` | LiteLLM config: a wildcard route forwarding any `EVAL_MODEL` slug to OpenRouter, in no-auth mode |
+| `proxy/litellm.config.yaml` | LiteLLM config: a wildcard route forwarding any `EVAL_MODEL` slug to OpenRouter |
 | `proxy/docker-compose.yml` | Runs `ghcr.io/berriai/litellm` on `:4000`, both wire formats on one port |
-| `scripts/litellm-proxy.sh` | `up` / `down` / `wait` wrapper (reads `OPENROUTER_API_KEY` from env, else `~/.devdigest/secrets.json`) |
+| `scripts/litellm-proxy.sh` | `up` / `down` / `wait` wrapper (reads `OPENROUTER_API_KEY` from env, else `~/.devdigest/secrets.json`; generates `EVAL_PROXY_KEY` if unset) |
 | `src/runtime/env.ts` | Points the SDK's `ANTHROPIC_BASE_URL` at `OPENROUTER_BASE_URL` (the proxy) under `EVAL_BACKEND=openrouter` |
 | `src/runtime/run-openrouter.ts` | Content tier's direct OpenAI-format call — also honours `OPENROUTER_BASE_URL` |
 
@@ -145,6 +155,7 @@ pnpm proxy:up                                  # → http://localhost:4000
 EVAL_BACKEND=openrouter \
 OPENROUTER_BASE_URL=http://localhost:4000 \
 OPENROUTER_API_KEY=sk-or-... \
+EVAL_PROXY_KEY=<printed by proxy:up> \
 EVAL_MODEL=google/gemini-2.5-flash \
 EVAL_JUDGE_MODEL=google/gemini-2.5-flash \
 pnpm eval:workflow
@@ -154,8 +165,9 @@ pnpm proxy:down
 ```
 
 `EVAL_MODEL` is forwarded verbatim to OpenRouter (the wildcard route in `proxy/litellm.config.yaml`),
-so you never edit config to try a new model. The proxy runs in **no-auth** mode — do not expose the
-port publicly.
+so you never edit config to try a new model. LiteLLM refuses to boot without a master key, so the
+proxy takes one from `EVAL_PROXY_KEY` (any `sk-…` value, ephemeral per run) and both tiers send it
+as their bearer instead of the OpenRouter key. Do not expose the port publicly.
 
 #### Which cheap model — verified
 
@@ -186,62 +198,38 @@ workflow cases:
 > checkout is disposable); locally, prefer the Anthropic path or a throwaway clone for the workflow
 > tier.
 
-### Wiring it into GitHub Actions (per-PR)
+### GitHub Actions (per-PR) — `.github/workflows/evals.yml`
 
-The engine is CI-ready: bring the proxy up as a step, wait for it, run the tier, tear it down. Put
-the OpenRouter key in the repo's **Actions secrets** as `OPENROUTER_API_KEY` (Settings → Secrets and
-variables → Actions). Create `.github/workflows/<name>.yml` in your repo:
+Runs on PRs that touch `.claude/skills/**`, `.claude/agents/**`, `.claude/settings.json`, the root
+`CLAUDE.md`/`AGENTS.md` or `evals/**`, and manually (Actions → evals → Run workflow).
+`scripts/ci-detect.mjs` maps the diff onto suites:
 
-```yaml
-name: evals
-on:
-  pull_request:
-    paths: ['evals/**', '.claude/**', 'CLAUDE.md']   # only when the harness/artifacts change
+| Changed | Runs |
+|---|---|
+| `.claude/skills/<s>/**` or `evals/skills/<s>/**` | `skills/<s>/` — or a "no evals" notice if it has none |
+| `.claude/agents/<a>.md` or `evals/agents/<a>/**` | `agents/<a>/` + the workflow tier |
+| root `CLAUDE.md` / `AGENTS.md` (CLAUDE.md is a symlink — the diff shows `AGENTS.md`), `.claude/settings.json`, `evals/workflow/**` | the workflow tier |
+| the engine: `evals/src`, deps, `proxy/`, `scripts/`, the workflow file | everything that has evals |
 
-permissions:
-  contents: read
+Jobs: `detect` → `static` (no model: typecheck, unit tests, `eval:quality`) → one matrix job per
+skill and per agent, `max-parallel: 2` → the workflow tier. Every model job runs with
+`EVAL_BACKEND=anthropic` — the Claude Agent SDK straight to api.anthropic.com, no OpenRouter, no
+LiteLLM proxy, no Docker. Skill and agent jobs block the PR; the workflow tier is **advisory**
+(`continue-on-error`) because subagent dispatch is less deterministic. Each job uploads
+`results/` as an artifact. OpenRouter and `proxy/` remain for local cheap-model runs only.
 
-jobs:
-  workflow-evals:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: evals
-    env:
-      EVAL_BACKEND: openrouter
-      OPENROUTER_BASE_URL: http://localhost:4000
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}   # repo Actions secret
-      EVAL_MODEL: google/gemini-2.5-flash
-      EVAL_JUDGE_MODEL: google/gemini-2.5-flash
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 10 }
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: evals/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
+**Setup:** add the repo secret `ANTHROPIC_API_KEY` (Settings → Secrets and variables → Actions).
+Without it — e.g. a PR from a fork, which gets no secrets — the model jobs are skipped with a
+notice and only `static` runs.
 
-      # --- the engine ---
-      - run: docker compose -f proxy/docker-compose.yml up -d   # OPENROUTER_API_KEY from job env
-      - run: pnpm proxy:wait                                     # block until the proxy answers
-      - run: pnpm eval:workflow                                  # or eval:agents / eval:skills / eval
-      - if: failure()
-        run: docker compose -f proxy/docker-compose.yml logs --tail 100
-      - if: always()
-        run: docker compose -f proxy/docker-compose.yml down
-```
+**Choosing the model** — first non-empty wins, no commit needed:
 
-Notes:
-- ubuntu runners ship Docker + `docker compose`, so no extra setup is needed.
-- The proxy container reads `OPENROUTER_API_KEY` straight from the job `env` (which is fed by the
-  secret) — you don't pass it to `docker compose` explicitly.
-- Because tool tiers cost real tokens, gate on `paths:` (only when the harness/artifacts change) and
-  keep the case count small. For a stricter gate, split into a required `eval:agents`/`eval:skills`
-  job and a non-blocking `eval:workflow` job (activation flakiness, above).
+1. `workflow_dispatch` inputs `model`, `judge_model`, `workflow_model` (+ `target`: `auto` · `all`
+   · `skills` · `agents` · `workflow` · `skills/<name>` · `agents/<name>`);
+2. repo Variables `EVAL_MODEL`, `EVAL_JUDGE_MODEL`, `EVAL_WORKFLOW_MODEL`;
+3. the defaults: `claude-haiku-5-5` under test and for the workflow tier, `claude-sonnet-5-5` as
+   the judge (a stronger family; it does **not** fall back to the test model). Anthropic model
+   IDs only — an OpenRouter slug like `deepseek/…` fails in CI.
 
 ## Module layout — `src/` (the engine)
 

@@ -19,9 +19,8 @@ import { RESULTS_DIR } from "./artifacts/paths.js";
 import { aggregate, loadRecords, recordCount, type NodeAggregate, type Stats } from "./records/stats.js";
 
 /**
- * vitest treats a path pattern as a SUBSTRING filter, so a bare `agents/architecture-reviewer`
- * also matches `agents/architecture-reviewer-lite/...` and silently doubles the run with the
- * wrong agent. Expand any positional arg that points at a directory into the exact `.eval.ts`
+ * vitest treats a path pattern as a SUBSTRING filter, so a bare `agents/<name>` also matches a
+ * sibling `agents/<name>-variant/...` and silently doubles the run with the wrong agent. Expand any positional arg that points at a directory into the exact `.eval.ts`
  * file paths inside it (which are NOT substrings of a sibling directory's files), so an A/B stays
  * a clean A/B. Args that already name a file, or that don't resolve to a directory, pass through.
  */

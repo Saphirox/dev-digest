@@ -2,8 +2,8 @@
 name: onion-architecture
 description: "Onion Architecture for the DevDigest backend (server/ Fastify + Drizzle API, the reviewer-core engine, and the mcp/ stdio MCP server, which mirrors server/'s module layout): which ring a piece of code belongs to, which way imports may point, and how Fastify routes, services, Drizzle repositories, ports/adapters, the DI container and tests fit the rings. Use whenever you add or change backend code: a new module, route, service, repository, query, adapter, port, job handler, SSE stream, reviewer-core feature, or MCP tool/service in mcp/; when you decide where a backend function or file belongs; move logic out of a route; add a transaction; wire something into platform/container.ts; review a server PR for layering; or answer 'where should this go' on the backend. Trigger on routes.ts, tools.ts, service.ts, repository.ts, ports.ts, helpers.ts, container.db, container.ts, adapters/, drizzle in a route, port, adapter, dependency injection, layering, clean/hexagonal/onion architecture, dependency-cruiser, arch:check, even when the user doesn't say 'architecture'. Not for Fastify API mechanics, Drizzle query syntax or Postgres schema design: those live in fastify-best-practices, drizzle-orm-patterns and postgresql-table-design."
 metadata:
-  version: "1.1.0"
-  updated: "2026-09-26"
+  version: "1.3.0"
+  updated: "2026-10-03"
 ---
 
 # Onion Architecture (backend)
@@ -42,8 +42,9 @@ Sources for every rule: [references.md](references.md).
 1. Read `server/AGENTS.md` (and `reviewer-core/AGENTS.md` if you touch it).
 2. Copy the shape of a **clean** module: `repos`, `agents` or `reviews`
    (`routes.ts` → `service.ts` → `repository.ts`, plus `helpers.ts` and `constants.ts`).
-3. **Don't** copy `polling`, `workspace` or `settings`. Their routes
-   query Drizzle directly through `container.db`. That is known debt, not a
+3. **Don't** copy `repo-intel` (its service and pipeline call
+   `src/adapters/*` directly) or `reviews/run-executor.ts` /
+   `reviews/diff-loader.ts` (they import `db/schema`). That is known debt, not a
    pattern (see the debt list in `references/layers-and-dependency-rule.md`).
 
 Why: in Onion Architecture a rule that holds almost everywhere is worth
@@ -142,17 +143,100 @@ rules are known debt that new code must not add to.
 | `no-cross-module-internals` | error | module A importing module B's `routes`/`service`/`repository`/`run-executor` |
 | `platform-not-outward` | error | `platform/*` (except `container.ts`) importing `modules/*` |
 | `not-to-unresolvable` | error | imports that don't resolve (typos, or a package the ring doesn't install) |
-| `routes-no-persistence` | warn | `routes.ts` importing `drizzle-orm` or `src/db/*` |
+| `routes-no-persistence` | error | `routes.ts` importing `drizzle-orm` or `src/db/*` |
 | `application-no-drizzle` | warn | non-repository module files importing `drizzle-orm` or `src/db/schema` |
 | `modules-no-concrete-adapters` | warn | `modules/*` importing `src/adapters/*` |
 | `adapters-not-inward-to-app` | warn | `adapters/*` importing `modules/*` or the composition root |
-| `pure-module-files-no-io` | warn | `helpers.ts`/`constants.ts` importing Fastify, Drizzle, `src/db`, adapters or the container |
+| `pure-module-files-no-io` | error | `helpers.ts`/`constants.ts` importing Fastify, Drizzle, `src/db`, adapters or the container |
 | `no-circular` | warn | import cycles |
 
 Run it: `cd server && ./node_modules/.bin/depcruise src ../reviewer-core/src --config .dependency-cruiser.cjs --output-type err`
 (or `pnpm arch:check`, where the pnpm wrapper works; see the `ERR_PNPM_IGNORED_BUILDS`
-entry in the root `INSIGHTS.md`). Baseline on 2026-09-19: **0 errors, 27 warnings** (29 before `pulls` got its service/repository split).
+entry in the root `INSIGHTS.md`). Baseline on 2026-10-03: **0 errors, 15 warnings**, all in `repo-intel` and `reviews/{run-executor,diff-loader}.ts`.
 A change that raises the warning count adds debt, so fix it or justify it in the PR.
+
+## Blind spots: what `arch:check` passes but is still wrong
+
+dependency-cruiser only sees import edges that its rules name. A green
+`arch:check` (or a green `mcp/test/architecture.test.ts`) proves those edges
+are absent. It doesn't prove the change is layered right. When you review,
+check these by reading the code, because no tool will:
+
+| Not caught | Why the checker misses it | Look for |
+|---|---|---|
+| An npm SDK used in a module (`openai`, `@anthropic-ai/sdk`, `octokit`, `simple-git`, `@ast-grep/*`) | `modules-no-concrete-adapters` matches `src/adapters/*` only, not packages in `node_modules` | `import … from 'octokit'` (or another SDK) in `service.ts`/`routes.ts`; `new Octokit(`/`new OpenAI(` outside `src/adapters/` |
+| HTTP types in the application ring | No rule forbids `fastify` imports from `service.ts` | `FastifyReply`/`FastifyRequest` in a service signature, `reply.code(…)` below a route |
+| `process.env` in a module or `reviewer-core` | Not an import, so invisible to dependency-cruiser | `process.env.` under `src/modules/` or in `reviewer-core`. Config comes from `AppConfig`, secrets from `container.secrets`. Today only `platform/config.ts`, two adapters (`secrets/local.ts`, `git/simple-git.ts`) and the DB scripts read it |
+| A rule weakened in the same PR | The checker obeys its own config | A diff to `.dependency-cruiser.cjs` (a new `pathNot`, a `severity` lowered to `warn`, a rule deleted) or to `mcp/test/architecture.test.ts`'s allowlists that exempts the PR's own files. Treat it as blocking: fix the code, don't exempt it. Only a deliberate, explained policy change (with the debt list updated) may touch the config |
+| Unscoped queries, multi-write use cases without a transaction | Not an import question | Each repository `where` has `workspaceId`; two writes that must succeed together share one `db.transaction` |
+
+## Deep trace: leaks that hide one hop away
+
+The blind-spots table catches what sits *in* a file. The harder leaks sit
+one file further away, behind a type alias or inside a callback, so a
+line-by-line read of each file looks clean. For a new module, or any PR
+whose CI is green, trace these three things before you sign off:
+
+1. **Follow every import chain to the end.** A file is as impure as the most
+   impure thing it reaches, directly or through a sibling. Start at each
+   `helpers.ts`, `constants.ts` and `ports.ts` and follow the relative imports
+   (`./calendar.ts`, `./format.ts`, …) all the way down. The `pure-module-files-no-io`
+   rule only checks the *direct* imports of `helpers`/`constants`, and only
+   for Fastify, Drizzle, `src/db`, adapters and the container. So
+   `helpers.ts → ./calendar.ts → node:fs` passes. Domain code must not reach
+   I/O builtins (`node:fs`, `node:child_process`, `node:net`, `node:http(s)`),
+   global `fetch`, `process.env` or module-load side effects (a
+   `readFileSync` at the top level). Pure builtins such as `node:path` and
+   `node:url` are fine (`reviews/intent/helpers.ts` uses `node:path`). Fix: load
+   the data in a repository or adapter and pass it into the helper as an argument.
+2. **Read port and deps types as contracts.** Nothing in `ports.ts` or in a
+   service's `…Deps` may name an infrastructure type: `Db`, `DbExecutor` or any
+   alias built from them (`Parameters<Db['transaction']>…`), a Drizzle row type
+   (`$inferSelect`, `InferSelectModel`), `FastifyRequest`/`FastifyReply`, or an
+   SDK type. `application-no-drizzle` matches `src/db/schema` but **not**
+   `src/db/client`, so `import type { Db, DbExecutor } from '../../db/client.js'`
+   in a service or port passes `arch:check`. Today only repositories import it
+   (`reviews/repository/*.repo.ts`, `repo-intel/repository.ts`). A service that
+   calls `this.deps.db.transaction(…)` owns a Drizzle transaction. Fix: a
+   `UnitOfWork` port (`references/application-services.md` §3), with the
+   Drizzle side in the repository.
+3. **List every `await` inside a transaction callback.** Only store writes,
+   and the reads they depend on, belong there. A GitHub, LLM, git or `fetch`
+   call inside `transaction(async (tx) => …)` (or `uow.run(…)`) holds the row
+   locks and the pool connection for the whole network round trip, and it
+   rolls back DB work for a network error. Fix: make the external call first,
+   then open the transaction for the writes only.
+
+Report a trace finding as the chain, with a `file:line` per hop, e.g.
+`helpers.ts:2 → calendar.ts:1 → node:fs (readFileSync at calendar.ts:4)`, so
+the author sees why a file that looks clean isn't.
+
+## Reviewing a new module
+
+A new feature module is a unit of review on its own. Before the per-line
+findings, check that the module is wired in and covered by the enforcement:
+
+1. **server/**: registered in `src/modules/index.ts` (one import + one entry).
+   Otherwise none of its routes exist. dependency-cruiser picks it up by path
+   with no config change. If the PR *does* change `.dependency-cruiser.cjs`,
+   see the blind-spots row above.
+2. **mcp/**: registered in `src/modules/index.ts` **and** added to
+   `MODULE_NAMES` in `mcp/test/architecture.test.ts`. If it's missing,
+   `resolveFile` throws for every file of the module and the whole
+   architecture suite fails.
+3. **Shape**: `routes.ts`/`tools.ts` → `service.ts` → `repository.ts` +
+   `ports.ts`, and `helpers.ts`/`constants.ts` for pure code, like
+   `conventions` (server) or `blast` (mcp).
+4. **Imports**: list every `../<other-module>/` import in the new files.
+   - server/: one to another module's `routes`/`service`/`repository`/`run-executor`
+     is an error, and that includes taking a type from it. Pure `helpers`/`constants`
+     and `ports` types are tolerated; the repo already does it, e.g.
+     `brief/service.ts` → `blast/helpers.js`. Get a collaborator through your
+     own `ports.ts`, built in your `routes.ts` plugin or taken from the container.
+   - mcp/: any import of another module's file is an error. Shared code goes
+     through `modules/_shared/`.
+5. **Tests by ring**: a service test with a fake store and an `*.it.test.ts`
+   for the repository (server), or `mcp/test/` service + repository tests.
 
 ## Anti-patterns → fix
 
@@ -178,4 +262,7 @@ A change that raises the warning count adds debt, so fix it or justify it in the
 - [ ] `reviewer-core` stays pure: no DB, fs, GitHub, `process.env`. Only `src/llm/` touches an SDK.
 - [ ] Tests match the ring: pure unit tests for domain and services (with fakes), `*.it.test.ts` for repositories.
 - [ ] `arch:check`: 0 errors, and the warning count is not above the baseline.
+- [ ] The blind spots above were checked by reading the code, not inferred from a green `arch:check`. No `.dependency-cruiser.cjs` or `architecture.test.ts` exemption for the PR's own files.
+- [ ] Deep trace done: import chains from pure files followed to the end, no infrastructure type in `ports.ts`/service deps, no external call inside a transaction.
+- [ ] A new module is registered (`modules/index.ts`; for `mcp/` also `MODULE_NAMES`) and its cross-module imports pass the per-package rule in "Reviewing a new module".
 - [ ] `mcp/` changes: `modules/<f>/{tools,service,helpers}.ts` layout as in `references/mcp-package.md`; `tools.ts` may import its own module's `ports`/`repository` (to build its repository + service from `container.client`/`container.resolver`, like `routes.ts` from `container.db`) and calls one service method — it never imports `adapters/` directly, nor another module's internals; only `messages.ts` writes model-facing error text; `cd mcp && npm test` (incl. `architecture.test.ts`) passes.

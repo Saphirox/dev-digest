@@ -31,6 +31,8 @@ export interface RecordData {
   verdict?: Verdict;
   grounded?: number;
   threshold?: number;
+  /** The judge threw (no/bad JSON, auth error…): the case failed, whatever the run did. */
+  judgeError?: string;
   extra?: Record<string, unknown>;
 }
 
@@ -40,14 +42,15 @@ export interface RecordData {
  * from being silently empty.
  */
 export function record(label: string, data: RecordData): void {
-  const { result, verdict, grounded, threshold, extra } = data;
+  const { result, verdict, grounded, threshold, judgeError, extra } = data;
   const state = expect.getState();
   const nodeid = `${state.testPath ?? "?"} > ${state.currentTestName ?? label}`;
 
-  // outcome: grounding gate failure short-circuits to false; else the judge threshold; else
-  // "did the run itself succeed" (workflow tests have neither grounding nor a judge verdict).
+  // outcome: grounding gate failure or a judge error short-circuits to false; else the judge
+  // threshold; else "did the run itself succeed" (workflow tests have neither grounding nor a
+  // judge verdict).
   const outcome =
-    grounded !== undefined && grounded < 1
+    (grounded !== undefined && grounded < 1) || judgeError !== undefined
       ? false
       : verdict && threshold !== undefined
         ? verdict.score >= threshold
@@ -71,6 +74,7 @@ export function record(label: string, data: RecordData): void {
     threshold,
     practices: verdict?.results ?? [],
     grounded,
+    judge_error: judgeError,
     num_turns: result.numTurns,
     metrics: result.metrics,
     trace: {

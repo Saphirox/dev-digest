@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Finding, Severity, FindingCategory } from './findings.js';
 
 /**
  * Conformance, Onboarding, Eval, Memory, Conventions, Skills,
@@ -70,6 +71,50 @@ export type EvalRun = z.infer<typeof EvalRun>;
 export const EvalOwnerKind = z.enum(['skill', 'agent']);
 export type EvalOwnerKind = z.infer<typeof EvalOwnerKind>;
 
+// What an eval case expects of the agent: a grounded finding at file:lines
+// (`must_find`) or none there (`must_not_flag`). Ranges are inclusive.
+export const EvalExpectationKind = z.enum(['must_find', 'must_not_flag']);
+export type EvalExpectationKind = z.infer<typeof EvalExpectationKind>;
+
+export const EvalExpectation = z
+  .object({
+    kind: EvalExpectationKind,
+    file: z.string().min(1),
+    // Upper bound: line numbers come from request bodies.
+    start_line: z.number().int().min(1).max(1_000_000),
+    end_line: z.number().int().max(1_000_000),
+  })
+  .refine((e) => e.start_line <= e.end_line, {
+    message: 'start_line must be <= end_line',
+    path: ['end_line'],
+  });
+export type EvalExpectation = z.infer<typeof EvalExpectation>;
+
+// Outcome for one case, in a suite run (`suite_run_id` set) or on its own
+// (`suite_run_id` null). Carries a snapshot of the case name and expectation it
+// was scored against, so editing or deleting the case later changes nothing
+// (`case_id` becomes null on delete).
+export const EvalCaseResult = z.object({
+  id: z.string(),
+  case_id: z.string().nullable(),
+  suite_run_id: z.string().nullable(),
+  case_name: z.string(),
+  expected_output: EvalExpectation,
+  pass: z.boolean(),
+  expected_count: z.number().int(),
+  produced_count: z.number().int(),
+  /** Findings kept / dropped by the grounding gate. */
+  kept_count: z.number().int(),
+  dropped_count: z.number().int(),
+  /** The grounded findings the agent produced for the case. */
+  findings: z.array(Finding),
+  duration_ms: z.number().int().nullable(),
+  /** Null when the cost of the review is unknown. */
+  cost_usd: z.number().nullable(),
+  ran_at: z.string(),
+});
+export type EvalCaseResult = z.infer<typeof EvalCaseResult>;
+
 export const EvalCase = z.object({
   id: z.string(),
   owner_kind: EvalOwnerKind,
@@ -78,8 +123,16 @@ export const EvalCase = z.object({
   input_diff: z.string(),
   input_files: z.unknown(),
   input_meta: z.unknown(),
-  expected_output: z.unknown(),
+  expected_output: EvalExpectation,
   notes: z.string().nullish(),
+  created_at: z.string(),
+  /** Null for hand-made cases and after the source finding is deleted (EC-24). */
+  source_finding_id: z.string().nullable(),
+  /** Snapshot of the source finding's labels; null for hand-made cases. */
+  title: z.string().nullable(),
+  severity: Severity.nullable(),
+  category: FindingCategory.nullable(),
+  latest_result: EvalCaseResult.nullable(),
 });
 export type EvalCase = z.infer<typeof EvalCase>;
 
@@ -314,3 +367,28 @@ export const AgentSkillDetail = Skill.extend({
   link_enabled: z.boolean(),
 });
 export type AgentSkillDetail = z.infer<typeof AgentSkillDetail>;
+
+// The immutable config snapshot captured in `agent_versions` whenever an agent's
+// config changes (everything but `enabled`). Mirrors the shape written by the
+// agents repository — provider/model/prompt/output_schema/strategy/gate/repo_intel
+// plus the ordered skill ids linked at snapshot time. Used for reproducibility
+// (eval replays a past version) and for surfacing an agent's edit history.
+export const AgentVersionConfig = z.object({
+  provider: Provider,
+  model: z.string(),
+  system_prompt: z.string(),
+  output_schema: z.unknown().nullish(),
+  strategy: ReviewStrategy,
+  ci_fail_on: CiFailOn,
+  repo_intel: z.boolean(),
+  skills: z.array(z.string()),
+});
+export type AgentVersionConfig = z.infer<typeof AgentVersionConfig>;
+
+export const AgentVersion = z.object({
+  agent_id: z.string(),
+  version: z.number().int(),
+  config: AgentVersionConfig,
+  created_at: z.string(),
+});
+export type AgentVersion = z.infer<typeof AgentVersion>;

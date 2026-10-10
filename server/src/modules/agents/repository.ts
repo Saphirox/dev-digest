@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
-import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
+import type { AgentVersionConfig, CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
 import { DEFAULT_AGENT_DESCRIPTION, INITIAL_AGENT_VERSION } from './constants.js';
 import { isConfigChange } from './helpers.js';
 
@@ -43,6 +43,9 @@ export interface UpdateAgent {
   /** Project Context paths — NOT a config change (no version bump, D-13). */
   contextPaths?: string[];
 }
+
+/** `restoreVersion`'s outcome: the new row, or the snapshot skills that no longer exist (nothing written). */
+export type RestoreResult = { row: AgentRow; missingSkillIds?: never } | { row?: never; missingSkillIds: string[] };
 
 /** One entry of an agent's ordered skill set, as the Skills tab saves it. */
 export interface SkillLinkInput {
@@ -166,6 +169,63 @@ export class AgentsRepository {
 
     if (configChanged && row) await this.snapshotVersion(row, nextVersion);
     return row;
+  }
+
+  /**
+   * Restore a saved config as a new latest version, in one transaction: set the
+   * config fields, replace the skill links with the snapshot's (in order, all
+   * enabled), bump the version in SQL and snapshot it. `name`, `description`,
+   * `enabled` and `context_paths` are not part of a snapshot and stay as they are.
+   * Earlier snapshots are not touched. Returns `{ missingSkillIds }` (and writes
+   * nothing) when a snapshot skill no longer exists in the workspace.
+   */
+  async restoreVersion(
+    workspaceId: string,
+    agentId: string,
+    config: AgentVersionConfig,
+  ): Promise<RestoreResult | undefined> {
+    return this.db.transaction(async (tx) => {
+      // Re-check the snapshot's skills inside the transaction and lock them
+      // (FOR SHARE): a skill deleted after the service's pre-check is reported
+      // as missing here instead of failing the link insert on its foreign key,
+      // and a delete racing this restore waits for it to commit.
+      if (config.skills.length > 0) {
+        const live = new Set(
+          (
+            await tx
+              .select({ id: t.skills.id })
+              .from(t.skills)
+              .where(and(eq(t.skills.workspaceId, workspaceId), inArray(t.skills.id, config.skills)))
+              .for('share')
+          ).map((r) => r.id),
+        );
+        const missingSkillIds = config.skills.filter((id) => !live.has(id));
+        if (missingSkillIds.length > 0) return { missingSkillIds };
+      }
+      const [row] = await tx
+        .update(t.agents)
+        .set({
+          provider: config.provider,
+          model: config.model,
+          systemPrompt: config.system_prompt,
+          outputSchema: (config.output_schema as object | null | undefined) ?? null,
+          strategy: config.strategy,
+          ciFailOn: config.ci_fail_on,
+          repoIntel: config.repo_intel,
+          version: sql`${t.agents.version} + 1`,
+        })
+        .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.id, agentId)))
+        .returning();
+      if (!row) return undefined;
+      await tx.delete(t.agentSkills).where(eq(t.agentSkills.agentId, agentId));
+      if (config.skills.length > 0) {
+        await tx
+          .insert(t.agentSkills)
+          .values(config.skills.map((skillId, i) => ({ agentId, skillId, enabled: true, order: i })));
+      }
+      await this.snapshotVersion(row, row.version, tx);
+      return { row };
+    });
   }
 
   private async snapshotVersion(row: AgentRow, version: number, db: Executor = this.db): Promise<void> {

@@ -100,3 +100,6 @@ a CI artifact by `.github/workflows/e2e-web.yml`).
 | `05-pr-diff` | PR #482 → Files changed tab → seeded file renders in the diff viewer |
 | `06-onboarding` | `/onboarding` → add-repository form renders (no submit) |
 | `07-settings` | `/settings/api-keys` + `/settings/models` → section titles render |
+| `08-eval-dashboard` | sidebar → Eval Dashboard → `/eval` title + empty state |
+| `09-agent-evals-tab` | Security Reviewer → Evals tab → empty case list + New / Run all controls |
+| `10-finding-eval-case` | PR #482 finding → Accept → Turn into eval case appears → no-agent refusal shown inline |

@@ -19,6 +19,11 @@ const usePrSmartDiff = vi.fn();
 const usePrReviews = vi.fn();
 const usePrBrief = vi.fn();
 const useFindingActionMutate = vi.fn();
+// FindingCard's EvalCaseAction hook (not under test here), mocked by its exact module path.
+vi.mock("@/lib/hooks/evals", () => ({
+  useCreateEvalCaseFromFinding: () => ({ mutate: vi.fn(), isPending: false, isError: false, error: null }),
+}));
+
 vi.mock("@/lib/hooks", () => ({
   usePrSmartDiff: (prId: string | null) => usePrSmartDiff(prId),
   usePrReviews: (prId: string | null) => usePrReviews(prId),

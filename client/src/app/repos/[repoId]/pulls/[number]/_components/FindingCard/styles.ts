@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 /** Co-located styles for FindingCard (extracted from inline styles). */
 export const s = {
-  card: (focused: boolean, sevColor: string, muted: boolean): CSSProperties => ({
+  card: (focused: boolean, sevColor: string): CSSProperties => ({
     borderRadius: 8,
     // All-longhand (never mix `border` shorthand with `borderLeft` — React warns
     // about updating shorthand + non-shorthand on the same rerender).
@@ -13,8 +13,7 @@ export const s = {
     borderLeftColor: sevColor,
     background: "var(--bg-elevated)",
     overflow: "hidden",
-    opacity: muted ? 0.6 : 1,
-    transition: "opacity .2s, border-color .12s, box-shadow .12s",
+    transition: "border-color .12s, box-shadow .12s",
     boxShadow: focused ? "0 0 0 1px " + sevColor : "none",
   }),
   header: {
@@ -32,12 +31,11 @@ export const s = {
     gap: 10,
     flexWrap: "wrap",
   } satisfies CSSProperties,
-  title: (muted: boolean, dismissed: boolean): CSSProperties => ({
+  title: {
     fontSize: 14,
     fontWeight: 600,
-    color: muted ? "var(--text-muted)" : "var(--text-primary)",
-    textDecoration: dismissed ? "line-through" : "none",
-  }),
+    color: "var(--text-primary)",
+  } satisfies CSSProperties,
   acceptedTag: { fontSize: 12, fontWeight: 600, color: "var(--ok)" } satisfies CSSProperties,
   dismissedTag: {
     fontSize: 12,
@@ -72,6 +70,18 @@ export const s = {
     color: "var(--text-muted)",
     marginBottom: 8,
     textTransform: "uppercase",
+  } satisfies CSSProperties,
+  /* The vendored Button only styles `active` for kind="tertiary", so the
+     decision buttons carry their own chosen state (AC-43). */
+  acceptActive: {
+    background: "var(--ok-bg)",
+    color: "var(--ok)",
+    borderColor: "var(--ok)",
+  } satisfies CSSProperties,
+  rejectActive: {
+    background: "var(--bg-hover)",
+    color: "var(--text-primary)",
+    borderColor: "var(--text-muted)",
   } satisfies CSSProperties,
   actions: {
     display: "flex",

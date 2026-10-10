@@ -98,8 +98,9 @@ not easier. Convert the whole service or leave it.
 
 ## 3. Transactions: the service owns the boundary
 
-As of 2026-09-19 there is no `db.transaction(` anywhere in `server/src`. The
-first multi-write use case sets the pattern, so use this one.
+`db.transaction(` already exists in some repositories (`settings`, `agents`,
+`conventions`; each wraps its writes inside one repository method). A
+use case that spans several repositories uses the pattern below.
 
 **Rule:** the *use case* decides what must be atomic, so the service owns the
 boundary. Repositories must work the same inside or outside a transaction,

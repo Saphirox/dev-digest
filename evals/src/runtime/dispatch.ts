@@ -1,7 +1,8 @@
 /**
  * Content-tier runner selection. Content-only calls (skillTask, the LLM judge) can run on any
  * OpenAI-compatible backend, so under EVAL_BACKEND=openrouter they go direct through
- * run-openrouter (native DeepSeek / any model, no proxy). Default is the Claude Agent SDK.
+ * run-openrouter (native DeepSeek / any model, no proxy). Every other backend (subscription,
+ * anthropic) uses the Claude Agent SDK.
  *
  * Tool-using tiers (agentTask, workflowTask) do NOT use this — they call runClaude directly,
  * because only the Agent SDK produces the subagent/skill/file-read trace they assert on.

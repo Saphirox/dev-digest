@@ -1,0 +1,13 @@
+{
+  "name": "Eval Dashboard is reachable from the sidebar and renders its empty state",
+  "description": "From the app shell, click the new 'Eval Dashboard' item in the SKILLS LAB group and land on /eval. On a freshly-seeded DB no agent has eval cases, so the page shows its title and the 'No agents with eval cases yet' empty state (spec-0003 AC-22, AC-23, EC-5). Read-only: nothing here starts an eval run or calls a model.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/agents"], "label": "load a page with the app shell" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "shell settles" },
+    { "cmd": ["find", "role", "link", "click", "--name", "Eval Dashboard"], "label": "click the Eval Dashboard sidebar item" },
+    { "cmd": ["wait", "--url", "/eval"], "label": "eval dashboard route reached" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "overview fetch settles" },
+    { "cmd": ["wait", "--text", "Regression harness across all reviewer agents"], "label": "dashboard subtitle renders" },
+    { "cmd": ["wait", "--text", "No agents with eval cases yet"], "label": "empty state renders for a seed with no eval cases" }
+  ]
+}

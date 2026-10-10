@@ -91,6 +91,7 @@ function runQualityCases(artifact: string, cases: QualityCase[], task: Task): vo
       // (e.g. baseline: grounding gate fails, judge skipped) still leaves a record.
       let grounded: number | undefined;
       let verdict: Verdict | undefined;
+      let judgeError: string | undefined;
       try {
         // Cheap deterministic tier first — the grounding gate. When it fails the judge is skipped.
         if (c.grounding?.length) grounded = patternMatch(result.text, c.grounding);
@@ -98,8 +99,11 @@ function runQualityCases(artifact: string, cases: QualityCase[], task: Task): vo
           verdict = await llmJudge(result.text, c.practices);
           logVerdict(c.name, verdict);
         }
+      } catch (e) {
+        judgeError = e instanceof Error ? e.message : String(e);
+        throw e;
       } finally {
-        record(c.name, { result, verdict, grounded, threshold });
+        record(c.name, { result, verdict, grounded, threshold, judgeError });
       }
 
       if (grounded !== undefined) {

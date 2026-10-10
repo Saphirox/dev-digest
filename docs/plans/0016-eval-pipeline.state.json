@@ -1,0 +1,283 @@
+{
+  "plan": "docs/plans/0016-eval-pipeline.md",
+  "spec": "specs/spec-0003-eval-pipeline.md",
+  "phase": "done",
+  "mode": "multi-agent",
+  "changedPaths": [
+    "server/src/vendor/shared/contracts/eval-ci.ts",
+    "server/src/vendor/shared/contracts/knowledge.ts",
+    "client/src/vendor/shared/contracts/eval-ci.ts",
+    "client/src/vendor/shared/contracts/knowledge.ts",
+    "server/src/db/schema/eval.ts",
+    "server/src/db/schema.ts",
+    "server/src/db/migrations/0019_nostalgic_timeslip.sql",
+    "server/src/db/migrations/meta/0019_snapshot.json",
+    "server/src/db/migrations/meta/_journal.json",
+    "server/src/modules/evals/constants.ts",
+    "server/src/modules/evals/helpers.ts",
+    "server/src/modules/evals/ports.ts",
+    "server/src/modules/evals/repository.ts",
+    "server/src/modules/evals/service.ts",
+    "server/src/modules/evals/suite-runner.ts",
+    "server/src/modules/evals/engine.ts",
+    "server/src/modules/evals/routes.ts",
+    "server/test/evals-scoring.test.ts",
+    "server/test/evals-service.test.ts",
+    "server/test/evals-cases.it.test.ts",
+    "server/test/evals-runs.it.test.ts",
+    "server/test/evals-rate-limit.it.test.ts",
+    "server/test/evals-fixtures.ts",
+    "server/test/agents-promote.it.test.ts",
+    "server/src/modules/agents/routes.ts",
+    "server/src/modules/agents/service.ts",
+    "server/src/modules/agents/repository.ts",
+    "server/src/modules/index.ts",
+    "server/src/app.ts",
+    "client/messages/en/eval.json",
+    "client/messages/en/prReview.json",
+    "client/src/app/agents/_components/AgentEditor/AgentEditor.test.tsx",
+    "client/src/app/agents/_components/AgentEditor/AgentEditor.tsx",
+    "client/src/app/agents/_components/AgentEditor/constants.ts",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/FindingCard/FindingCard.test.tsx",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/FindingCard/FindingCard.tsx",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/FindingsPanel/FindingsPanel.test.tsx",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/SmartDiffViewer/SmartDiffViewer.test.tsx",
+    "client/src/app/skills/_components/SkillEditor/_components/VersionsTab/VersionsTab.tsx",
+    "client/src/app/skills/_components/SkillEditor/_components/VersionsTab/styles.ts",
+    "client/src/app/skills/_components/SkillEditor/_components/VersionsTab/helpers.test.ts",
+    "client/src/components/text-diff/helpers.test.ts",
+    "client/src/app/skills/_components/SkillEditor/_components/VersionsTab/helpers.ts",
+    "client/src/components/text-diff/helpers.ts",
+    "client/src/lib/hooks/agents.ts",
+    "client/src/lib/hooks/index.ts",
+    "client/src/vendor/ui/nav.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/EvalsTab/EvalsTab.test.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/EvalsTab/EvalsTab.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/EvalsTab/_components/EvalCaseModal/EvalCaseModal.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/EvalsTab/_components/EvalCaseModal/helpers.test.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/EvalsTab/_components/EvalCaseModal/helpers.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/EvalsTab/_components/EvalCaseModal/index.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/EvalsTab/_components/EvalCaseModal/styles.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/EvalsTab/_components/EvalCaseRow/EvalCaseRow.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/EvalsTab/_components/EvalCaseRow/index.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/EvalsTab/_components/EvalCaseRow/styles.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/EvalsTab/index.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/EvalsTab/styles.ts",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/AgentEvalView.test.tsx",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/AgentEvalView.tsx",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/_components/CompareRunsModal/CompareRunsModal.tsx",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/_components/CompareRunsModal/index.ts",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/_components/CompareRunsModal/styles.ts",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/_components/PeriodFilter/PeriodFilter.tsx",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/_components/PeriodFilter/index.ts",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/_components/PeriodFilter/styles.ts",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/_components/RegressionBanner/RegressionBanner.tsx",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/_components/RegressionBanner/index.ts",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/_components/RegressionBanner/styles.ts",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/_components/RunsTable/RunsTable.tsx",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/_components/RunsTable/index.ts",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/_components/RunsTable/styles.ts",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/helpers.test.ts",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/helpers.ts",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/index.ts",
+    "client/src/app/eval/[agentId]/_components/AgentEvalView/styles.ts",
+    "client/src/app/eval/[agentId]/page.tsx",
+    "client/src/app/eval/_components/EvalDashboardView/EvalDashboardView.test.tsx",
+    "client/src/app/eval/_components/EvalDashboardView/EvalDashboardView.tsx",
+    "client/src/app/eval/_components/EvalDashboardView/helpers.ts",
+    "client/src/app/eval/_components/EvalDashboardView/index.ts",
+    "client/src/app/eval/_components/EvalDashboardView/styles.ts",
+    "client/src/app/eval/page.tsx",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/FindingCard/_components/EvalCaseAction/EvalCaseAction.tsx",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/FindingCard/_components/EvalCaseAction/index.ts",
+    "client/src/app/repos/[repoId]/pulls/[number]/_components/FindingCard/_components/EvalCaseAction/styles.ts",
+    "client/src/components/app-shell/nav.test.tsx",
+    "client/src/components/eval-metrics/DeltaChip.tsx",
+    "client/src/components/eval-metrics/MetricBar.tsx",
+    "client/src/components/eval-metrics/MetricTile.test.tsx",
+    "client/src/components/eval-metrics/MetricTile.tsx",
+    "client/src/components/eval-metrics/MetricTrendChart.tsx",
+    "client/src/components/eval-metrics/RunStatusLabel.tsx",
+    "client/src/components/eval-metrics/helpers.test.ts",
+    "client/src/components/eval-metrics/helpers.ts",
+    "client/src/components/eval-metrics/index.ts",
+    "client/src/components/eval-metrics/styles.ts",
+    "client/src/components/text-diff/TextDiff.test.tsx",
+    "client/src/components/text-diff/TextDiff.tsx",
+    "client/src/components/text-diff/index.ts",
+    "client/src/components/text-diff/styles.ts",
+    "client/src/lib/hooks/evals.test.ts",
+    "client/src/lib/hooks/evals.ts",
+    "e2e/specs/08-eval-dashboard.flow.json",
+    "e2e/specs/09-agent-evals-tab.flow.json",
+    "e2e/specs/10-finding-eval-case.flow.json",
+    "e2e/README.md"
+  ],
+  "archReview": {
+    "round": 2,
+    "findings": [
+      {
+        "id": "AR-1-1",
+        "severity": "suggestion",
+        "location": "server/src/modules/evals/repository.ts:65-316",
+        "claim": "several repo queries not workspace-scoped (defence in depth)",
+        "status": "fixed",
+        "fixedInRound": 2
+      },
+      {
+        "id": "AR-1-2",
+        "severity": "suggestion",
+        "location": "client/src/components/eval-metrics/index.ts:6",
+        "claim": "export * barrel in shared folder",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-1-3",
+        "severity": "suggestion",
+        "location": "client eval RunsTable/CompareRunsModal/EvalDashboardView/MetricTrendChart",
+        "claim": "metric key->label list duplicated in 4 files",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-1-4",
+        "severity": "suggestion",
+        "location": "client AgentEvalView/eval-metrics/EvalCaseModal helpers.ts",
+        "claim": "literals in helpers.ts instead of constants.ts",
+        "status": "deferred"
+      }
+    ],
+    "note": "reviewer note (no severity): promoteVersion skill-existence check outside restoreVersion tx -> race hits FK instead of 409"
+  },
+  "verify": {
+    "round": 3,
+    "fixList": [
+      {
+        "row": "plan row 8 / AR-1-1",
+        "owner": "implementer",
+        "item": "workspace scoping in evals repository",
+        "status": "fixed"
+      },
+      {
+        "row": "out-of-plan 1",
+        "owner": "implementer",
+        "item": "promote race -> 500 instead of 409",
+        "status": "fixed"
+      },
+      {
+        "row": "out-of-plan 2",
+        "owner": "implementer",
+        "item": "startSuiteRun parses cases after inserting running row",
+        "status": "fixed"
+      },
+      {
+        "row": "S10 AC-10",
+        "owner": "test-writer",
+        "item": "context_paths + repo_intel ignored test",
+        "status": "fixed"
+      },
+      {
+        "row": "S66 EC-24",
+        "owner": "test-writer",
+        "item": "case still runs after source deleted; no link in client",
+        "status": "fixed"
+      },
+      {
+        "row": "plan row 6 (Step 5)",
+        "owner": "implementer",
+        "item": "finishSuiteRun/failSuiteRun/insertResults lock not workspace-scoped + doc comment",
+        "status": "fixed"
+      }
+    ]
+  },
+  "security": {
+    "status": "done: all HIGH closed; MEDIUM/LOW SEC-4..6 to report; pre-existing reviewer-core range loop out of scope",
+    "findings": [
+      {
+        "id": "SEC-1",
+        "severity": "HIGH(critical)",
+        "claim": "rangeIntersects loops lo..hi; start_line 1e300 hangs event loop",
+        "status": "fixed"
+      },
+      {
+        "id": "SEC-2",
+        "severity": "MEDIUM(warning)",
+        "claim": "input_diff/name/notes unbounded; many-file diff fans out paid LLM calls",
+        "status": "fixed"
+      },
+      {
+        "id": "SEC-3",
+        "severity": "MEDIUM(warning)",
+        "claim": "empty hunk with huge header -> grounding fallback fills 2^24 Set",
+        "status": "fixed"
+      },
+      {
+        "id": "SEC-4",
+        "severity": "MEDIUM",
+        "claim": "runCase rethrows ExternalServiceError with raw model output in details",
+        "status": "deferred-report"
+      },
+      {
+        "id": "SEC-5",
+        "severity": "LOW",
+        "claim": "pre-existing grounding.ts range loop reachable via LLM output",
+        "status": "deferred-report"
+      },
+      {
+        "id": "SEC-6",
+        "severity": "LOW",
+        "claim": "agentWorkspace existence oracle; client lineDiff O(n*m)",
+        "status": "deferred-report"
+      },
+      {
+        "id": "SEC-7",
+        "severity": "HIGH",
+        "claim": "deleted-only hunk with huge declared size bypassed hasEmptyHunk -> buildLineIndex fallback",
+        "status": "fixed (findBogusHunk)"
+      },
+      {
+        "id": "SEC-8",
+        "severity": "MEDIUM",
+        "claim": "from-finding path skipped 1M line cap -> 500 on case list",
+        "status": "fixed (safeParse -> 409)"
+      }
+    ]
+  },
+  "manualChecks": [
+    "AC-21 compare-runs-modal.png",
+    "AC-23/AC-38 eval-dashboard.png",
+    "AC-28 eval-case-modal.png",
+    "AC-36/37/38 agent-eval-page.png",
+    "AC-7/8/42 agent-editor-evals-tab.png",
+    "AC-1/AC-6 finding-card-eval-action.png",
+    "NFR-5 focus ring",
+    "NFR-6 colour twins rendered"
+  ],
+  "notes": "Plan open questions Q1/Q2 not overridden by user -> planner defaults apply (server allows promoting current version; must_find edit re-validated with 422).",
+  "log": [
+    "2026-10-06 run-sdd started; spec approved, plan ready",
+    "2026-10-06 wave 1 done (steps 1-3); deviations: EvalExpectation/EvalCaseResult in knowledge.ts (import cycle); title/severity/category snapshot in input_meta",
+    "2026-10-06 wave 2 server done (steps 4-9): typecheck ok, arch 0/15, test 606 pass none skipped; deviation engine.ts added",
+    "2026-10-06 wave 2 client done (steps 10-15): typecheck ok, 381 tests pass; deviations: nav icon Gauge, Run case in modal, skills not loaded",
+    "2026-10-06 user: migrate done; after loop -> e2e + chrome testing",
+    "2026-10-06 arch review r1: 0 critical/warning, 4 suggestions deferred",
+    "2026-10-06 e2e flows 08-10 written (not yet run: agent-browser not installed)",
+    "2026-10-06 test-writer: +3 tests (AC-37 x2, AC-5 update, AC-38); server 608 / client 383 pass, 0 skipped, no bugs",
+    "2026-10-06 verifier r1: 73/76 must met, 0 behaviour bugs; fix round 1 started (project agent types unavailable -> general-purpose agents following .claude/agents/*.md)",
+    "2026-10-06 fix round 1 done: scoping, promote race (FOR SHARE recheck), stuck run; tests AC-10/EC-24 added; server 612 pass 0 skipped, client 384",
+    "2026-10-06 arch review r2 (fix files): AR-1-1 closed, no new findings",
+    "2026-10-06 verifier r2: spec 77/77 met, no bugs; plan row 6 not-met -> fix round 2",
+    "2026-10-06 fix round 2 done (last allowed): 3 writes scoped, doc comment; server 612 pass 0 skipped",
+    "2026-10-08 final verify: spec 77/77, plan all met except manual row 30; security review: 1 critical + 2 warnings -> fix round; agent-browser installed (user approved)",
+    "2026-10-08 security re-check 2: all HIGH closed; server 627 pass",
+    "2026-10-08 e2e hermetic 10/10 pass",
+    "2026-10-08 user change: FindingCard no muting, button only after decision (EC-1 rev, AC-43); Accept/Reject pressed state",
+    "2026-10-08 user change: case kind follows current decision (EC-11/D-5 rev); verified via API",
+    "2026-10-08 incident: started one real-LLM suite run from Chrome; user forbids real-model testing (memory saved)"
+  ],
+  "userInstructions": [
+    "dev DB migrated (0019 applied) 2026-10-06",
+    "plan-verifier bugs/critical -> fix and restart the loop",
+    "add e2e flows (e2e/specs) for the feature",
+    "AFTER the run-sdd loop finishes: test major cases in Chrome via claude-in-chrome"
+  ]
+}

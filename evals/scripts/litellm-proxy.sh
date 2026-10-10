@@ -47,6 +47,7 @@ wait_healthy() {
 case "${1:-up}" in
   up)
     load_key
+    export EVAL_PROXY_KEY="${EVAL_PROXY_KEY:-sk-$(openssl rand -hex 32)}"
     "${COMPOSE[@]}" up -d
     wait_healthy
     cat >&2 <<EOF
@@ -56,6 +57,7 @@ Proxy ready. To route every eval tier through it:
   export EVAL_BACKEND=openrouter
   export OPENROUTER_BASE_URL=${URL}
   export OPENROUTER_API_KEY=<your key>   # also used by the proxy container
+  export EVAL_PROXY_KEY=${EVAL_PROXY_KEY}   # the proxy's master key (ephemeral)
   export EVAL_MODEL=google/gemini-2.5-flash        # cheap model that survives the tool tiers
   export EVAL_JUDGE_MODEL=google/gemini-2.5-flash
   pnpm eval:workflow
@@ -65,7 +67,7 @@ EOF
     ;;
   down)
     # compose interpolates the env block even on `down`, so the var must be present (value unused).
-    OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-unused}" "${COMPOSE[@]}" down
+    OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-unused}" EVAL_PROXY_KEY="${EVAL_PROXY_KEY:-unused}" "${COMPOSE[@]}" down
     ;;
   wait)
     wait_healthy

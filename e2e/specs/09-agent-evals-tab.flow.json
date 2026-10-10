@@ -1,0 +1,17 @@
+{
+  "name": "Agent editor has an Evals tab with an empty eval set",
+  "description": "Open the seeded Security Reviewer, switch to the new Evals tab and confirm the case list's empty state plus the 'New eval case' and 'Run all evals' controls render (spec-0003 AC-7, AC-12, AC-26, EC-5). Read-only: no button is clicked, so no case is created and no model is called.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/agents"], "label": "load the agents page" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "agents fetch settles" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Security Reviewer"], "label": "open the seeded Security Reviewer" },
+    { "cmd": ["wait", "--url", "/agents/"], "label": "agent editor route reached" },
+    { "cmd": ["wait", "--text", "Configuration"], "label": "agent editor rendered (first visit compiles the route under next dev)" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Evals"], "label": "switch to the Evals tab" },
+    { "cmd": ["wait", "--url", "tab=evals"], "label": "evals tab is active in the URL" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "eval cases fetch settles" },
+    { "cmd": ["wait", "--text", "No eval cases yet"], "label": "empty eval set renders" },
+    { "cmd": ["wait", "--text", "New eval case"], "label": "manual new-case control renders" },
+    { "cmd": ["wait", "--text", "Run all evals"], "label": "run-all control renders" }
+  ]
+}

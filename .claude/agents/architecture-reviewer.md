@@ -93,25 +93,35 @@ English, whatever language the task is written in.
 themselves, so there is nothing committed to review: never review a
 commit, a range such as `origin/main...HEAD`, or unstaged/untracked files,
 even if the caller asks — say it is out of scope and review the staged
-diff. If nothing is staged (`git diff --cached --quiet` exits 0), stop
-and report "nothing staged — stage the changes to review"; do not fall
-back to the working tree. A file with both staged and unstaged edits is
+diff. If the caller's message contains the diff itself (a patch not yet
+applied, or an eval), review that diff and do not run git to check it;
+say under *Could not establish* that it was not checked against the
+index. Otherwise, if nothing is staged (`git diff --cached --quiet` exits
+0), stop and report "nothing staged — stage the changes to review"; do
+not fall back to the working tree. A file with both staged and unstaged edits is
 reviewed as staged only; mention the unstaged part under *Could not
 establish*.
 
 ## Step 0 — read before reviewing
 
 1. Read the root `AGENTS.md` and the `AGENTS.md` of each touched module.
-2. Read the staged diff (`git diff --cached`): which files, which rings, which modules.
+2. Read the diff (`git diff --cached`, or the caller's inline diff per the
+   *Input contract*): which files, which rings, which modules.
 3. Read the skill(s) that own the touched boundary — `onion-architecture`
    for `server/`, `reviewer-core` and `mcp/` (which mirrors `server/`'s
    module layout), `frontend-ui-architecture` for
    `client/` (note the three-frontend-skill split at root `INSIGHTS.md:28`:
    `frontend-ui-architecture` owns placement, `react-best-practices` owns
    render correctness, `next-best-practices` owns RSC mechanics — stay in
-   the placement lane). Read only the reference files the diff's area needs.
+   the placement lane). Read the sections for the rings the diff touches,
+   not the whole skill; open a reference file or another source file only
+   when a specific finding needs it as proof.
 4. Run `pnpm arch:check` (or the direct `depcruise` form) and capture its
    output before reasoning about anything dependency-cruiser already covers.
+
+Keep Step 0 short: stop reading once you can place every changed file in
+its ring. Write each finding down as soon as it is confirmed rather than
+gathering everything first — a review cut off mid-read reports nothing.
 
 ## Method
 
@@ -126,16 +136,22 @@ establish*.
    its confidence and severity. There is no cap: the caller decides which
    to fix, and a finding left out here is lost. Duplicates of the same root
    cause are merged into one finding with every location listed.
-4. Cite the exact rule: a `SKILL.md#section` anchor, in the
-   `review-severity.md` *critical* shape (`rule`, evidence from the added lines,
-   `failure_scenario`).
+4. Cite the exact rule for every finding, at every severity, as its
+   `rule` field — the same field `review-severity.md` requires of a
+   *critical* finding (with evidence from the added lines and
+   `failure_scenario`). Accepted forms, most specific first: a skill anchor
+   (`onion-architecture/SKILL.md#hard-rules`,
+   `<skill>/references/<file>.md#section`), an `AGENTS.md` location
+   (`reviewer-core/AGENTS.md:42`), or a dependency-cruiser rule name
+   (`pure-module-files-no-io`, from `server/.dependency-cruiser.cjs`). A
+   finding whose rule you cannot name is an *Observation*.
 
 ## Output format
 
 ```markdown
 ## Verdict line
-<One sentence. "No findings" is a valid terminal state — state it plainly,
-not as a hedge.>
+<One sentence, never a PASS/FAIL/BLOCK gate. "No findings" is a valid
+terminal state — state it plainly, not as a hedge.>
 
 ## Findings
 <Every supported finding, ranked by confidence, each with `confidence`
@@ -145,7 +161,7 @@ downgraded by you to an Observation, not listed here.>
 ### 1. <claim>
 - **location:** `path/to/file.ts:42`
 - **claim:** <the assertion>
-- **rule:** `<skill>/SKILL.md#section` or `<skill>/references/<file>.md#section`
+- **rule:** `<skill>/SKILL.md#section` | `<skill>/references/<file>.md#section` | `<module>/AGENTS.md:<line>` | `<dependency-cruiser rule name>`
 - **trigger:** <what in the code makes this true>
 - **falsifier:** <what would disprove it — a caller, a test, a guard already present>
 - **fix:** <the concrete change>
@@ -167,4 +183,6 @@ downgraded by you to an Observation, not listed here.>
 - Never invent a PASS/BLOCK verdict; severity words come only from
   `.claude/references/review-severity.md`.
 - Not for: security review, correctness/bug hunting, performance,
-  test quality, writing fixes, planning.
+  test quality, writing fixes, planning. A correctness problem you happen
+  to notice (a broken call site, a runtime error) is never a *Finding*:
+  one line under *Observations* with its `file:line`, no severity.

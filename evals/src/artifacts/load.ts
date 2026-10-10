@@ -15,12 +15,17 @@ function stripFrontmatter(md: string): string {
   return md;
 }
 
-/** SKILL.md plus every references/*.md — the full payload the harness would assemble. */
+/**
+ * SKILL.md plus a top-level template.md (the output skeleton a skill tells the model to fill)
+ * plus every references/*.md — the full payload the harness would assemble.
+ */
 export function skillContent(skillName: string): string {
   const dir = join(SKILLS_DIR, skillName);
   const skillMd = join(dir, "SKILL.md");
   if (!existsSync(skillMd)) throw new Error(`SKILL.md not found: ${skillMd}`);
   const parts = [readFileSync(skillMd, "utf8")];
+  const template = join(dir, "template.md");
+  if (existsSync(template)) parts.push(`\n\n## Template: template.md\n\n${readFileSync(template, "utf8")}`);
   const refs = join(dir, "references");
   if (existsSync(refs)) {
     for (const f of readdirSync(refs).filter((f) => f.endsWith(".md")).sort()) {
