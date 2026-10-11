@@ -48,7 +48,7 @@ describe("RunReviewMenu", () => {
     open();
     fireEvent.click(screen.getByText("#7 PR 7"));
     const [input, opts] = runMutate.mock.calls[0]!;
-    expect(input).toEqual({ prId: "pr7", agentId: "ag1" });
+    expect(input).toEqual({ prId: "pr7", agentIds: ["ag1"] });
     opts.onSuccess();
     expect(push).toHaveBeenCalledWith("/repos/repo1/pulls/7");
   });

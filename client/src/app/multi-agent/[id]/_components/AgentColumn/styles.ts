@@ -1,0 +1,46 @@
+import type { CSSProperties } from "react";
+
+/** Co-located styles for AgentColumn. */
+export const s = {
+  column: {
+    display: "flex",
+    flexDirection: "column",
+    minWidth: 0,
+    border: "1px solid var(--border)",
+    borderTop: "3px solid var(--accent)",
+    borderRadius: 10,
+    background: "var(--bg-elevated)",
+    overflow: "hidden",
+  } satisfies CSSProperties,
+  header: { display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: "1px solid var(--border)" } satisfies CSSProperties,
+  tile: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    display: "grid",
+    placeItems: "center",
+    flexShrink: 0,
+    color: "var(--accent)",
+    background: "var(--bg-hover)",
+  } satisfies CSSProperties,
+  headText: { flex: 1, minWidth: 0 } satisfies CSSProperties,
+  name: { fontSize: 14.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } satisfies CSSProperties,
+  meta: { fontSize: 12, color: "var(--text-muted)", marginTop: 2 } satisfies CSSProperties,
+  body: { flex: 1, padding: 12, display: "flex", flexDirection: "column", gap: 8, minHeight: 120 } satisfies CSSProperties,
+  finding: (color: string): CSSProperties => ({
+    display: "flex",
+    gap: 8,
+    padding: "10px 12px",
+    borderRadius: 6,
+    borderLeft: "3px solid " + color,
+    background: "var(--bg-surface)",
+  }),
+  findingIcon: (color: string): CSSProperties => ({ color, flexShrink: 0, marginTop: 2 }),
+  findingTitle: { fontSize: 13.5, fontWeight: 500, lineHeight: 1.35 } satisfies CSSProperties,
+  findingLoc: { fontSize: 11.5, color: "var(--text-muted)", marginTop: 3, wordBreak: "break-all" } satisfies CSSProperties,
+  note: { fontSize: 13, color: "var(--text-muted)", margin: "auto", textAlign: "center" } satisfies CSSProperties,
+  failed: { fontSize: 13, color: "var(--crit)", lineHeight: 1.45 } satisfies CSSProperties,
+  failedLabel: { fontWeight: 700, marginBottom: 4 } satisfies CSSProperties,
+  footer: { display: "flex", alignItems: "center", padding: "8px 12px", borderTop: "1px solid var(--border)" } satisfies CSSProperties,
+  count: { marginLeft: "auto", fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
+} as const;

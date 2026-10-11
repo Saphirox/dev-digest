@@ -193,7 +193,7 @@ const INTENT_FIXTURE = {
     const res = await app.inject({
       method: 'POST',
       url: `/pulls/${pr.id}/review`,
-      payload: { agentId: agent.id },
+      payload: { agentIds: [agent.id] },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
@@ -265,7 +265,7 @@ const INTENT_FIXTURE = {
       const res = await app.inject({
         method: 'POST',
         url: `/pulls/${pr.id}/review`,
-        payload: { agentId: agent.id },
+        payload: { agentIds: [agent.id] },
       });
       await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
       const runId = res.json().runs[0].run_id;
@@ -298,7 +298,7 @@ const INTENT_FIXTURE = {
         payload: { name: 'Claude Rev', provider: 'anthropic', model: 'claude-x', system_prompt: 'rev' },
       })
     ).json();
-    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentIds: [agent.id] } });
     await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
     const reviews = (
       await app.inject({ method: 'GET', url: `/pulls/${pr.id}/reviews` })
@@ -318,7 +318,7 @@ const INTENT_FIXTURE = {
         payload: { name: 'ActAgent', provider: 'openai', model: 'gpt-4.1', system_prompt: 's' },
       })
     ).json();
-    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentIds: [agent.id] } });
     await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
     const reviews = (
       await app.inject({ method: 'GET', url: `/pulls/${pr.id}/reviews` })
@@ -352,7 +352,7 @@ const INTENT_FIXTURE = {
     // The run is synchronous; events are buffered on the bus. Subscribing after
     // the run still replays the buffer (replay-first semantics), then completes.
     const body = (
-      await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } })
+      await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentIds: [agent.id] } })
     ).json();
     const runId = body.runs[0].run_id;
 
@@ -365,14 +365,18 @@ const INTENT_FIXTURE = {
     await app.close();
   });
 
-  it('run all enabled agents reviews with each enabled agent', async () => {
+  it('running every enabled agent id starts a multi-agent run', async () => {
     const app = await appWith(REVIEW_FIXTURE);
     const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agents = (await app.inject({ method: 'GET', url: '/agents' })).json() as { id: string; enabled: boolean }[];
+    const enabledIds = agents.filter((a) => a.enabled).map((a) => a.id);
     const body = (
-      await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { all: true } })
+      await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentIds: enabledIds } })
     ).json();
     // seed has 2 enabled agents; we may have created more above in this PR's ws.
+    expect(body.runs.length).toBe(enabledIds.length);
     expect(body.runs.length).toBeGreaterThanOrEqual(2);
+    expect(typeof body.multi_agent_run_id).toBe('string');
     await app.close();
   });
 });

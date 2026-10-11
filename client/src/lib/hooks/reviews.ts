@@ -8,6 +8,7 @@ import { api, API_BASE } from "../api";
 import { notify } from "../toast";
 import type {
   FindingActionKind,
+  MultiAgentRun,
   PrReviewComment,
   ReviewRecord,
   ReviewRunResponse,
@@ -120,27 +121,38 @@ export function useCreatePrComment(prId: string | null | undefined) {
   });
 }
 
-// ---- Run a review (all enabled agents or a specific agent) ----
+// ---- Run a review (one POST with the chosen agent ids) ----
 export interface RunReviewInput {
   prId: string;
-  agentId?: string;
-  all?: boolean;
+  /** Agents to run, in the order they should be listed. One id → a single-agent
+      review; two or more → a multi-agent run (`multi_agent_run_id` in the reply). */
+  agentIds: string[];
 }
 
 export function useRunReview() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ prId, agentId, all }: RunReviewInput) =>
-      api.post<ReviewRunResponse>(`/pulls/${prId}/review`, {
-        ...(agentId ? { agentId } : {}),
-        ...(all ? { all } : {}),
-      }),
+    mutationFn: ({ prId, agentIds }: RunReviewInput) =>
+      api.post<ReviewRunResponse>(`/pulls/${prId}/review`, { agentIds }),
     onSuccess: (_d, { prId }) => {
       qc.invalidateQueries({ queryKey: ["reviews", prId] });
       // Smart Diff joins these findings with its own query; invalidating only
       // one half leaves coloured markers with no badge until a reload.
       qc.invalidateQueries({ queryKey: ["pr-smart-diff", prId] });
     },
+  });
+}
+
+// ---- One multi-agent run: child runs, their reviews and the disagreement groups ----
+/** Polls every 4 s while any child run is still running, so a column flips to
+    done even when its SSE stream was missed. */
+export function useMultiRun(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ["multi-run", id],
+    queryFn: () => api.get<MultiAgentRun>(`/multi-runs/${id}`),
+    enabled: !!id,
+    refetchInterval: (query) =>
+      query.state.data?.runs.some((r) => r.status === "running") ? 4000 : false,
   });
 }
 

@@ -74,7 +74,7 @@ vi.mock("./_components/OverviewTab", () => ({ OverviewTab: () => null }));
 vi.mock("./_components/IntentCard", () => ({ IntentCard: () => null }));
 vi.mock("./_components/BlastRadiusCard", () => ({ BlastRadiusCard: () => null }));
 vi.mock("./_components/FindingsTab", () => ({ FindingsTab: () => null }));
-vi.mock("./_components/RunTraceDrawer", () => ({ default: () => null }));
+vi.mock("@/components/run-trace-drawer", () => ({ default: () => null }));
 vi.mock("./_components/DiffTab", () => ({
   DiffTab: ({ focusPath }: { focusPath?: string | null }) => <div>files changed, focus: {focusPath ?? "none"}</div>,
 }));

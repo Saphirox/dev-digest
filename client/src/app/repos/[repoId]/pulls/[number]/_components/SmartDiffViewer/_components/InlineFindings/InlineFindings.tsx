@@ -7,7 +7,7 @@
 
 import React from "react";
 import type { FindingActionKind, FindingRecord } from "@devdigest/shared";
-import { FindingCard } from "../../../FindingCard";
+import { FindingCard } from "@/components/finding-card";
 import { sortBySeverity } from "@/lib/severity";
 import { s } from "./styles";
 

@@ -146,7 +146,7 @@ folder:
 | `client/` (pnpm) | `pnpm test`, `pnpm typecheck` |
 | `reviewer-core/` (npm) | `npm test`, `npm run typecheck` |
 | `mcp/` (npm) | `npm test`, `npm run typecheck` (read `mcp/AGENTS.md` first — tool output budgets are enforced by `test/tools.test.ts`) |
-| `e2e/` (npm) | only when the plan asks, and only `npm run e2e:hermetic` (read `e2e/AGENTS.md` first); never against the normal dev DB. Changes that need new or edited `e2e/specs/*.flow.json` are a *Follow-up* for the user |
+| `e2e/` (npm) | only when the plan asks, and only `npm run e2e:hermetic` (read `e2e/AGENTS.md` first); never against the normal dev DB. New flows are written by `test-writer`; a change that breaks an existing `e2e/specs/*.flow.json` is a *Follow-up* for the user |
 
 - **"Own changes" is about attribution, not scope.** Typecheck and `arch:check`
   cannot be limited to a diff. Run the tests for the files you touched first

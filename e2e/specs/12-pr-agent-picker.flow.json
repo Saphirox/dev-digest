@@ -1,0 +1,133 @@
+{
+  "name": "PR page Run Review opens the agent picker",
+  "description": "On PR #482 the Run Review trigger opens the agent picker instead of running (spec-0004 AC-18): enabled seeded agents are checked (AC-37, AC-41: no 'Run all' item), unchecking one lowers the multi-agent button count, and Clear empties the selection (EC-12). Nothing is run: the Run multi-agent review button is only asserted present via its label, never clicked, so no model is called.",
+  "steps": [
+    {
+      "cmd": [
+        "open",
+        "{BASE}/"
+      ],
+      "label": "load the app root"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/pulls"
+      ],
+      "label": "land on the PR list"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Add rate limiting to public API endpoints"
+      ],
+      "label": "seeded PR row is visible"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Add rate limiting to public API endpoints",
+        "click"
+      ],
+      "label": "open the PR row"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/pulls/482"
+      ],
+      "label": "navigate to the PR detail route"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "PR detail data settles"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "button",
+        "click",
+        "--name",
+        "Run Review"
+      ],
+      "label": "open the Run Review picker"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "PICK AGENTS TO RUN"
+      ],
+      "label": "picker header is shown (rendered upper-case by CSS)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Run multi-agent review (3)"
+      ],
+      "label": "the three enabled seeded agents are checked"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--fn",
+        "!document.body.innerText.includes('Run all')"
+      ],
+      "label": "the picker has no 'Run all' item (AC-41)"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "checkbox",
+        "click",
+        "--name",
+        "Security Reviewer"
+      ],
+      "label": "uncheck Security Reviewer"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Run multi-agent review (2)"
+      ],
+      "label": "button count follows the selection"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Clear",
+        "click"
+      ],
+      "label": "click Clear"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Run multi-agent review (0)"
+      ],
+      "label": "selection is empty"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--fn",
+        "Array.from(document.querySelectorAll('button')).some(b => b.textContent.includes('Run multi-agent review') && b.disabled)"
+      ],
+      "label": "Run multi-agent review is disabled after Clear (AC-41)"
+    }
+  ]
+}

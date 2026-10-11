@@ -291,10 +291,9 @@ export const IndexStatus = z.object({
 export type IndexStatus = z.infer<typeof IndexStatus>;
 
 // ---- Run request (review trigger; owned by A2, contract lives here) ----
-export const RunRequest = z.object({
-  agentId: z.string().optional(),
-  all: z.boolean().optional(),
-});
+export const RunRequest = z
+  .object({ agentIds: z.array(z.string().uuid()).min(1) })
+  .strict();
 export type RunRequest = z.infer<typeof RunRequest>;
 
 // ---- Structured API error envelope (returned by the API; UX taxonomy is FE) ----
