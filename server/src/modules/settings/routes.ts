@@ -49,7 +49,8 @@ export default async function settingsRoutes(appBase: FastifyInstance) {
     '/settings/test-connection',
     {
       schema: { body: ConnTestRequest },
-      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      // Each call hits a provider with the user's key: keep it tight.
+      config: { rateLimit: { max: 5, timeWindow: 60 } },
     },
     async (req): Promise<ConnTestResult> => {
       return service.testConnection(req.body);
