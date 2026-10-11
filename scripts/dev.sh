@@ -84,6 +84,13 @@ install_if_needed server
 # reviewer-core's RAW source is imported by the API at runtime (tsconfig alias);
 # without its deps the API crashes at boot with ERR_MODULE_NOT_FOUND. It uses npm.
 [ -d reviewer-core/node_modules ] || { log "installing deps in reviewer-core"; (cd reviewer-core && npm ci); }
+# Export-to-CI embeds the whole agent-runner/dist/ (index.js + its ncc chunks +
+# package.json); the API answers 503 runner_bundle_missing without it. Call ncc
+# directly (same as `pnpm build`) so a pnpm dep-status check can't block it.
+if [ ! -f agent-runner/dist/index.js ]; then
+  log "building agent-runner (agent-runner/dist)"
+  (cd agent-runner && { [ -d node_modules ] || pnpm install --frozen-lockfile; } && ./node_modules/.bin/ncc build src/index.ts -o dist)
+fi
 
 # --- migrate + seed ----------------------------------------------------------
 log "applying migrations"

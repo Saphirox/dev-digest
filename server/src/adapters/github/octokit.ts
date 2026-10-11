@@ -1,4 +1,5 @@
 import { Octokit } from 'octokit';
+import { unzipSync } from 'fflate';
 import type {
   GitHubClient,
   RepoRef,
@@ -11,7 +12,10 @@ import type {
   OpenPrPayload,
   CommitFilesPayload,
   IssueMeta,
+  WorkflowRunSummary,
+  ArtifactJsonResult,
 } from '@devdigest/shared';
+import { GitHubPermissionError } from '../../platform/errors.js';
 import { withRetry, withTimeout } from '../../platform/resilience.js';
 
 const TIMEOUT = 30_000;
@@ -265,6 +269,20 @@ export class OctokitGitHubClient implements GitHubClient {
     repo: RepoRef,
     payload: CommitFilesPayload,
   ): Promise<{ branch: string }> {
+    try {
+      return await this.commitFilesOnce(repo, payload);
+    } catch (err) {
+      // GitHub answers 403/404/422 when the token may not write the files
+      // (typically a missing `workflow` scope); callers match the typed error.
+      const status = (err as { status?: number }).status;
+      if (status === 403 || status === 404 || status === 422) {
+        throw new GitHubPermissionError((err as Error).message);
+      }
+      throw err;
+    }
+  }
+
+  private commitFilesOnce(repo: RepoRef, payload: CommitFilesPayload): Promise<{ branch: string }> {
     return withRetry(() =>
       withTimeout(
         (async () => {
@@ -361,6 +379,113 @@ export class OctokitGitHubClient implements GitHubClient {
       body: res.data.body,
       state: res.data.state,
     };
+  }
+
+  async getDefaultBranch(repo: RepoRef): Promise<string> {
+    const res = await withRetry(() =>
+      withTimeout(this.octokit.rest.repos.get({ owner: repo.owner, repo: repo.name }), TIMEOUT),
+    );
+    return res.data.default_branch;
+  }
+
+  async listWorkflowRuns(
+    repo: RepoRef,
+    workflowFile: string,
+    limit: number,
+  ): Promise<WorkflowRunSummary[]> {
+    return withRetry(() =>
+      withTimeout(
+        (async () => {
+          const res = await this.octokit.rest.actions.listWorkflowRuns({
+            owner: repo.owner,
+            repo: repo.name,
+            workflow_id: workflowFile,
+            status: 'completed',
+            event: 'pull_request',
+            per_page: 100,
+          });
+          // SEC-2: drop skipped runs (fork PRs run without secrets and produce no artifact) and
+          // runs from other repositories BEFORE the limit, so they cannot push real runs out.
+          const target = `${repo.owner}/${repo.name}`.toLowerCase();
+          return res.data.workflow_runs
+            .filter(
+              (r) =>
+                r.conclusion !== 'skipped' &&
+                (r.head_repository?.full_name ?? '').toLowerCase() === target,
+            )
+            .slice(0, limit)
+            .map((r) => ({
+              id: r.id,
+              attempt: r.run_attempt ?? 1,
+              head_sha: r.head_sha,
+              html_url: r.html_url,
+              pr_number: r.pull_requests?.[0]?.number ?? null,
+              started_at: r.run_started_at ?? r.created_at ?? null,
+            }));
+        })(),
+        TIMEOUT,
+      ),
+    );
+  }
+
+  async downloadArtifactJson(
+    repo: RepoRef,
+    runId: number,
+    name: string,
+    maxBytes: number,
+  ): Promise<ArtifactJsonResult> {
+    return withRetry(() =>
+      withTimeout(
+        (async () => {
+          const list = await this.octokit.rest.actions.listWorkflowRunArtifacts({
+            owner: repo.owner,
+            repo: repo.name,
+            run_id: runId,
+            name,
+            per_page: 1,
+          });
+          const artifact = list.data.artifacts.find((a) => a.name === name && !a.expired);
+          if (!artifact) return { kind: 'missing' as const };
+          if (artifact.size_in_bytes > maxBytes) return { kind: 'too_large' as const };
+
+          const dl = await this.octokit.rest.actions.downloadArtifact({
+            owner: repo.owner,
+            repo: repo.name,
+            artifact_id: artifact.id,
+            archive_format: 'zip',
+          });
+          const zip = new Uint8Array(dl.data as ArrayBuffer);
+          if (zip.byteLength > maxBytes) return { kind: 'too_large' as const };
+
+          // Only the result file is inflated, and only when it declares a size
+          // within the cap (a lying header is caught by the length check below).
+          const fileName = `${name}.json`;
+          let tooLarge = false;
+          let files: Record<string, Uint8Array>;
+          try {
+            files = unzipSync(zip, {
+              filter: (f) => {
+                if (f.name !== fileName) return false;
+                if (f.originalSize > maxBytes) {
+                  tooLarge = true;
+                  return false;
+                }
+                return true;
+              },
+            });
+          } catch {
+            // Hostile or corrupt archive: a per-run result, never a repo-level failure.
+            return { kind: 'invalid' as const };
+          }
+          if (tooLarge) return { kind: 'too_large' as const };
+          const bytes = files[fileName];
+          if (!bytes) return { kind: 'missing' as const };
+          if (bytes.byteLength > maxBytes) return { kind: 'too_large' as const };
+          return { kind: 'ok' as const, text: new TextDecoder().decode(bytes) };
+        })(),
+        TIMEOUT,
+      ),
+    );
   }
 
   async currentLogin(): Promise<string> {

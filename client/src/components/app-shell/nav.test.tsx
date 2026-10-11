@@ -25,3 +25,11 @@ describe("Eval Dashboard sidebar item (AC-22)", () => {
     expect(screen.getByRole("link", { name: /Agents/ }).firstElementChild).toHaveStyle({ fontWeight: "500" });
   });
 });
+
+describe("CI Runs sidebar item (AC-30)", () => {
+  it("sits in the Skills Lab group and opens /ci-runs", () => {
+    const lab = NAV.find((g) => g.section === "SKILLS LAB");
+    expect(lab?.items.find((i) => i.key === "ci-runs")).toMatchObject({ label: "CI Runs", href: "/ci-runs" });
+    expect(activeKeyFor("/ci-runs")).toBe("ci-runs");
+  });
+});

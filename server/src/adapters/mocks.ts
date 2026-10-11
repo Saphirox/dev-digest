@@ -17,6 +17,8 @@ import type {
   OpenPrPayload,
   CommitFilesPayload,
   IssueMeta,
+  WorkflowRunSummary,
+  ArtifactJsonResult,
   GitClient,
   CloneOptions,
   UnifiedDiff,
@@ -128,6 +130,14 @@ export interface MockGitHubOptions {
   comments?: PrReviewComment[];
   /** Commit SHAs returned by `listCommitShasForPath`, keyed by path. */
   commitsByPath?: Record<string, string[]>;
+  /** Default branch returned by `getDefaultBranch` (default "main"). */
+  defaultBranch?: string;
+  /** Runs returned by `listWorkflowRuns`; an `Error` makes it throw (e.g. a 403). */
+  workflowRuns?: WorkflowRunSummary[] | Error;
+  /** `downloadArtifactJson` results keyed by run id; absent key = no artifact. */
+  artifacts?: Record<number, ArtifactJsonResult | Error>;
+  /** When set, `commitFiles` throws it (e.g. `new GitHubPermissionError()` for a missing `workflow` scope). */
+  commitError?: Error;
   /** PRs returned by `listPullsForCommit`, keyed by commit sha. */
   pullsBySha?: Record<
     string,
@@ -231,6 +241,7 @@ export class MockGitHubClient implements GitHubClient {
   }
 
   async commitFiles(_repo: RepoRef, payload: CommitFilesPayload): Promise<{ branch: string }> {
+    if (this.opts.commitError) throw this.opts.commitError;
     this.committed.push(payload);
     return { branch: payload.branch };
   }
@@ -246,6 +257,31 @@ export class MockGitHubClient implements GitHubClient {
 
   async currentLogin(): Promise<string> {
     return this.opts.login ?? 'mock-user';
+  }
+
+  async getDefaultBranch(_repo: RepoRef): Promise<string> {
+    return this.opts.defaultBranch ?? 'main';
+  }
+
+  async listWorkflowRuns(
+    _repo: RepoRef,
+    _workflowFile: string,
+    limit: number,
+  ): Promise<WorkflowRunSummary[]> {
+    const runs = this.opts.workflowRuns ?? [];
+    if (runs instanceof Error) throw runs;
+    return runs.slice(0, limit);
+  }
+
+  async downloadArtifactJson(
+    _repo: RepoRef,
+    runId: number,
+    _name: string,
+    _maxBytes: number,
+  ): Promise<ArtifactJsonResult> {
+    const a = this.opts.artifacts?.[runId];
+    if (a instanceof Error) throw a;
+    return a ?? { kind: 'missing' };
   }
 
   async listCommitShasForPath(_repo: RepoRef, path: string, limit: number): Promise<string[]> {

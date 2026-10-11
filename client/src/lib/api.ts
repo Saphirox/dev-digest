@@ -18,6 +18,33 @@ export class ApiError extends Error {
   }
 }
 
+/** Normalize a non-2xx response into an ApiError (shared by JSON and blob calls). */
+async function readApiError(res: Response): Promise<ApiError> {
+  let code: string | undefined;
+  let message = `${res.status} ${res.statusText}`;
+  let details: unknown;
+  try {
+    const body = await res.json();
+    if (body?.error) {
+      code = body.error.code;
+      message = body.error.message ?? message;
+      details = body.error.details;
+    }
+  } catch {
+    /* non-JSON error body */
+  }
+  return new ApiError(message, res.status, code, details);
+}
+
+function networkError(e: unknown): ApiError {
+  return new ApiError(
+    `Cannot reach the DevDigest engine at ${API_BASE}. Is the API running?`,
+    0,
+    "network_error",
+    e
+  );
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
@@ -33,33 +60,29 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     });
   } catch (e) {
     // network failure / API down → full-screen error candidate
-    throw new ApiError(
-      `Cannot reach the DevDigest engine at ${API_BASE}. Is the API running?`,
-      0,
-      "network_error",
-      e
-    );
+    throw networkError(e);
   }
 
-  if (!res.ok) {
-    let code: string | undefined;
-    let message = `${res.status} ${res.statusText}`;
-    let details: unknown;
-    try {
-      const body = await res.json();
-      if (body?.error) {
-        code = body.error.code;
-        message = body.error.message ?? message;
-        details = body.error.details;
-      }
-    } catch {
-      /* non-JSON error body */
-    }
-    throw new ApiError(message, res.status, code, details);
-  }
+  if (!res.ok) throw await readApiError(res);
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+/** POST a JSON body and return the response as a Blob (file downloads). */
+export async function postBlob(path: string, body?: unknown): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: body != null ? { "content-type": "application/json" } : {},
+      body: body != null ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    throw networkError(e);
+  }
+  if (!res.ok) throw await readApiError(res);
+  return res.blob();
 }
 
 export const api = {

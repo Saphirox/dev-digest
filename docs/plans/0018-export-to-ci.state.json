@@ -1,0 +1,251 @@
+{
+  "plan": "docs/plans/0018-export-to-ci.md",
+  "spec": "specs/spec-0004-export-to-ci.md",
+  "phase": "done",
+  "mode": "multi-agent",
+  "notes": "Docker Postgres is running: apply the new migration with `cd server && pnpm db:migrate`. The shared DB schema may differ from this branch because another worktree migrates it too \u2014 that is expected, do NOT fix or reconcile drift. Do NOT run e2e tests (e2e/) without explicit user approval. Unit and *.it.test.ts tests are fine. Keep it the simplest first iteration.",
+  "changedPaths": [
+    "agent-runner/insights/INSIGHTS.md",
+    "client/messages/en/ci.json",
+    "client/src/app/agents/_components/AgentEditor/AgentEditor.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/CiTab/CiTab.test.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/CiTab/CiTab.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/CiTab/helpers.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/CiTab/index.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/CiTab/styles.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/ConfigTab/ConfigTab.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/ConfigTab/constants.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/ExportCiWizard.test.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/ExportCiWizard.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/_components/ConfigureStep/ConfigureStep.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/_components/ConfigureStep/index.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/_components/InstallStep/InstallStep.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/_components/InstallStep/index.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/_components/PreviewStep/PreviewStep.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/_components/PreviewStep/index.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/_components/TargetStep/TargetStep.tsx",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/_components/TargetStep/index.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/constants.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/helpers.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/index.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/styles.ts",
+    "client/src/app/agents/_components/AgentEditor/_components/ExportCiWizard/useExportCiWizard.ts",
+    "client/src/app/agents/_components/AgentEditor/constants.ts",
+    "client/src/app/ci-runs/_components/CiRunsView/CiRunsView.test.tsx",
+    "client/src/app/ci-runs/_components/CiRunsView/CiRunsView.tsx",
+    "client/src/app/ci-runs/_components/CiRunsView/helpers.ts",
+    "client/src/app/ci-runs/_components/CiRunsView/index.ts",
+    "client/src/app/ci-runs/_components/CiRunsView/styles.ts",
+    "client/src/app/ci-runs/page.tsx",
+    "client/src/components/app-shell/nav.test.tsx",
+    "client/src/components/ci-verdict-badge/CiVerdictBadge.tsx",
+    "client/src/components/ci-verdict-badge/index.ts",
+    "client/src/lib/api.ts",
+    "client/src/lib/github-urls.ts",
+    "client/src/lib/hooks/ci.ts",
+    "client/src/lib/hooks/index.ts",
+    "client/src/vendor/shared/contracts/eval-ci.ts",
+    "client/src/vendor/ui/nav.ts",
+    "scripts/dev.sh",
+    "server/INSIGHTS.md",
+    "server/package.json",
+    "server/pnpm-lock.yaml",
+    "server/src/adapters/github/octokit.ts",
+    "server/src/adapters/mocks.ts",
+    "server/src/adapters/runner-bundle/fs.ts",
+    "server/src/db/migrations/0020_flawless_apocalypse.sql",
+    "server/src/db/migrations/meta/0020_snapshot.json",
+    "server/src/db/migrations/meta/_journal.json",
+    "server/src/db/schema/ci.ts",
+    "server/src/modules/ci/constants.ts",
+    "server/src/modules/ci/helpers.ts",
+    "server/src/modules/ci/ports.ts",
+    "server/src/modules/ci/repository.ts",
+    "server/src/modules/ci/routes.ts",
+    "server/src/modules/ci/service.ts",
+    "server/src/modules/index.ts",
+    "server/src/platform/config.ts",
+    "server/src/platform/container.ts",
+    "server/src/vendor/shared/adapters.ts",
+    "server/src/vendor/shared/contracts/eval-ci.ts",
+    "server/test/ci-export.it.test.ts",
+    "server/test/ci-helpers.test.ts",
+    "server/test/ci-runner-bundle.test.ts",
+    "server/test/ci-runs.it.test.ts",
+    "server/test/ci-service.test.ts",
+    "server/src/platform/errors.ts",
+    "server/test/ci-octokit.test.ts"
+  ],
+  "archReview": {
+    "round": 3,
+    "findings": [
+      {
+        "id": "AR-1-1",
+        "severity": "warning",
+        "location": "server/src/modules/ci/service.ts:123-131",
+        "claim": "service maps Octokit err.status (403/404/422) \u2014 HTTP detail should be a typed error from the adapter",
+        "status": "fixed",
+        "fixedInRound": 1
+      },
+      {
+        "id": "AR-1-2",
+        "severity": "warning",
+        "location": "server/src/modules/ci/repository.ts:42-73",
+        "claim": "CiStore.upsertInstallation not workspace-scoped",
+        "status": "fixed",
+        "fixedInRound": 1
+      },
+      {
+        "id": "AR-1-3",
+        "severity": "warning",
+        "location": "client/.../ExportCiWizard/constants.ts:17",
+        "claim": "client hard-codes WORKFLOW_PATH instead of CiFile.editable",
+        "status": "fixed",
+        "fixedInRound": 1
+      },
+      {
+        "id": "AR-1-4",
+        "severity": "suggestion",
+        "location": "client CiTab.tsx:11, CiRunsView.tsx:11",
+        "claim": "deep import bypasses ci-verdict-badge index",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-1-5",
+        "severity": "suggestion",
+        "location": "server/src/modules/ci/service.ts:52-55",
+        "claim": "toRef pure helper belongs in helpers.ts",
+        "status": "deferred"
+      },
+      {
+        "id": "AR-2-1",
+        "severity": "warning",
+        "location": "server/src/modules/ci/repository.ts:69-81",
+        "claim": "insert branch of upsertInstallation ignores workspaceId (orphan row + 500 on foreign agent)",
+        "status": "fixed",
+        "fixedInRound": 2
+      },
+      {
+        "id": "AR-2-2",
+        "severity": "warning",
+        "location": "server/src/platform/errors.ts:55-61",
+        "claim": "GitHubPermissionError extends Error, not AppError",
+        "status": "fixed",
+        "fixedInRound": 2
+      }
+    ]
+  },
+  "verify": {
+    "round": 2,
+    "fixList": []
+  },
+  "security": "required",
+  "manualChecks": [
+    "AC-1, AC-2 vs specs/images/spec-0004/wizard-target.png",
+    "AC-3, AC-4 vs wizard-preview.png",
+    "AC-10..AC-13 vs wizard-configure.png",
+    "AC-14 vs wizard-install.png",
+    "AC-21, AC-22 vs agent-ci-tab.png"
+  ],
+  "log": [
+    "2026-10-10 inputs resolved; spec approved, plan ready; security required (CI artifact output derived from LLM run is rendered in the studio)",
+    "2026-10-10 wave 1 contracts done (steps 1-2); no external consumers; node_modules installed in server/client/agent-runner/reviewer-core",
+    "2026-10-10 wave 2 client track done (steps 11-15): 410 client tests green, tsc clean",
+    "2026-10-10 wave 2 server steps 3-9 done (680 server tests green, arch 0/15); step 10 BLOCKED: ncc emits dist/index.js + 300.index.js + package.json",
+    "2026-10-10 user chose: export whole agent-runner/dist; AC-3 + plan step 10 amended. Step 10 done: 684 server tests green, arch 0/15, dev.sh builds runner via ncc",
+    "2026-10-10 arch review r1: 0 critical, 3 warnings (fixing), 2 suggestions (deferred)",
+    "2026-10-10 arch r1 fixes applied (AR-1-1..3 + stale comments); server 684 / client 410 green; arch 0/15",
+    "2026-10-10 arch r2: AR-1-1..3 closed; new warnings AR-2-1, AR-2-2",
+    "2026-10-10 arch r2 fixes applied (AR-2-1, AR-2-2); server 685 green; arch 0/15",
+    "2026-10-10 arch r3: AR-2-1, AR-2-2 closed; no new findings; arch loop done",
+    "2026-10-10 test-writer: +4 tests; server 687, client 411 green",
+    "2026-10-10 user asked to roll back migration 0020 on the shared DB; done (tables were empty); drizzle row id 28 removed",
+    "2026-10-10 plan-verifier r1: must 51/53; EC-2 + NFR-2 not-met (test side only); no code fixes",
+    "2026-10-10 test-writer fix round: ci-octokit.test.ts (EC-2 x4, NFR-2 x5); 46 unit tests green",
+    "2026-10-10 plan-verifier r2: EC-2, NFR-2, Goal met -> must 53/53; fix list empty (DB-backed evidence from before rollback)",
+    "2026-10-10 security review: 2 HIGH (SEC-1, SEC-2) -> fix round; MEDIUM/LOW to report",
+    "2026-10-10 security re-check: SEC-2 closed; SEC-1 leftover (corrupt zip throws in downloadArtifactJson) fixed by main session -> {kind:invalid}; null head_repository now fails closed; migration 0020 re-applied; server 701/701 incl .it, tsc clean, arch 0/15"
+  ],
+  "clientReport": {
+    "deviations": [
+      "AC-1 title: \"Export to CI\" + subtitle per frame",
+      "extras: useExportCiZip, shared CiVerdictBadge, isGithubUrl, nav test",
+      "+ Add repository row only when >=1 installation",
+      "secrets badges required/auto (no live checks)"
+    ],
+    "notVerified": [
+      "no browser check",
+      "server route/error codes coded against plan only"
+    ]
+  },
+  "serverReport": {
+    "deviations": [
+      "yaml ^2.9.0",
+      "FsRunnerBundle structural port impl (arch warning)",
+      "EC-16 + default-branch check only for open_pr",
+      "CiAgentSource/CiRepoSource ports in routes",
+      "zip reply cast as never",
+      "missing token in refresh -> all repos in failed_repos",
+      "invalid later attempt deletes earlier agent_runs row",
+      "export/refresh rate-limited 10/min",
+      "migration applied via tsx src/db/migrate.ts"
+    ],
+    "notVerified": [
+      "real Octokit methods",
+      "workflow-scope status code"
+    ]
+  },
+  "testReport": {
+    "added": [
+      "AC-7 ci-helpers",
+      "AC-30 ordering ci-runs.it",
+      "AC-23 options CiTab",
+      "AC-18 client title"
+    ],
+    "notCovered": [
+      "EC-3/EC-4 only via mock in ci-service.test.ts, not .it",
+      "CiTab refetch after export (hook invalidate) untested"
+    ]
+  },
+  "dbMigration": "0020 re-applied 2026-10-10 at user request (drizzle row id 30). Another worktree applied its own migration (id 29) meanwhile - expected drift, untouched.",
+  "securityFindings": [
+    {
+      "id": "SEC-1",
+      "sev": "HIGH",
+      "where": "service.ts:263-280 + CiResultArtifact",
+      "claim": "out-of-range ints in forged artifact abort repo refresh forever (breaks EC-9)",
+      "status": "fixed"
+    },
+    {
+      "id": "SEC-2",
+      "sev": "HIGH",
+      "where": "octokit.ts listWorkflowRuns",
+      "claim": "skipped fork-PR runs ingested as Failed and push real runs out of 20-run window",
+      "status": "fixed"
+    },
+    {
+      "id": "SEC-3",
+      "sev": "MEDIUM",
+      "claim": "Infinity/negative cost_usd accepted (covered by SEC-1 fix .finite().min(0))",
+      "status": "fixed"
+    },
+    {
+      "id": "SEC-4",
+      "sev": "MEDIUM",
+      "claim": "whole dist/ export ships any stray file (dotfiles, .env, maps); consider allowlist",
+      "status": "report"
+    },
+    {
+      "id": "SEC-5",
+      "sev": "LOW",
+      "claim": "actions pinned by tag not SHA; persist-credentials default; preview re-reads bundle; fflate CPU",
+      "status": "report"
+    },
+    {
+      "id": "SEC-6",
+      "sev": "MEDIUM",
+      "claim": "~100 skipped fork runs can still crowd real runs off the single 100-run page (needs pagination)",
+      "status": "report"
+    }
+  ]
+}
