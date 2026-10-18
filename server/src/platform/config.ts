@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import { z } from 'zod';
 import { homedir } from 'node:os';
-import { join, isAbsolute, resolve } from 'node:path';
+import { join, isAbsolute, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DEFAULT_CONTEXT_GLOB } from '../lib/doc-glob.js';
 
 /**
@@ -33,6 +34,9 @@ const EnvSchema = z.object({
   API_PORT: z.coerce.number().int().default(3001),
   WEB_PORT: z.coerce.number().int().default(3000),
   DEVDIGEST_CLONE_DIR: z.string().optional(),
+  // Built agent-runner directory exported by Export-to-CI. Default: the repo's
+  // `agent-runner/dist/` (index.js + its chunks; built by scripts/dev.sh).
+  DEVDIGEST_RUNNER_BUNDLE: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   // `.env` (and .env.example) ship `LOG_LEVEL=` empty; an empty string is not a
   // valid enum member, so coerce '' → undefined to fall through to the default.
@@ -65,7 +69,15 @@ export type AppConfig = {
   repoIntelEnabled: boolean;
   /** Glob (over repo-relative posix paths) that selects Project Context documents. */
   contextGlob: string;
+  /** Absolute path to the built agent-runner `dist/` directory (Export-to-CI); `DEVDIGEST_RUNNER_BUNDLE` overrides it. */
+  runnerBundlePath: string;
 };
+
+// server/{src,dist}/platform → repo root → agent-runner/dist/
+const DEFAULT_RUNNER_BUNDLE = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../agent-runner/dist',
+);
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = EnvSchema.parse(env);
@@ -84,5 +96,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     embeddingsEnabled: parsed.EMBEDDINGS_ENABLED === 'true',
     repoIntelEnabled: parsed.REPO_INTEL_ENABLED !== 'false',
     contextGlob: parsed.CONTEXT_GLOB?.trim() || DEFAULT_CONTEXT_GLOB,
+    runnerBundlePath: parsed.DEVDIGEST_RUNNER_BUNDLE?.trim()
+      ? resolve(process.cwd(), parsed.DEVDIGEST_RUNNER_BUNDLE.trim())
+      : DEFAULT_RUNNER_BUNDLE,
   };
 }

@@ -124,7 +124,7 @@ d('Review run derives + persists intent (Testcontainers pg)', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/pulls/${pr.id}/review`,
-      payload: { agentId: agent.id },
+      payload: { agentIds: [agent.id] },
     });
     expect(res.statusCode).toBe(200);
     const runId = res.json().runs[0].run_id;
@@ -179,7 +179,7 @@ d('Review run derives + persists intent (Testcontainers pg)', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/pulls/${pr.id}/review`,
-      payload: { agentId: agent.id },
+      payload: { agentIds: [agent.id] },
     });
     const runId = res.json().runs[0].run_id;
 
@@ -265,7 +265,7 @@ d('Review run derives + persists intent (Testcontainers pg)', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/pulls/${pr.id}/review`,
-      payload: { agentId: agent.id },
+      payload: { agentIds: [agent.id] },
     });
     expect(res.statusCode).toBe(200);
     const runId = res.json().runs[0].run_id;

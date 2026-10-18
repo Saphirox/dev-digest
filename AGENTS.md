@@ -88,8 +88,10 @@ not a separate package.
   Running `pnpm install` inside an npm package silently writes a competing
   `pnpm-lock.yaml` (and a stray `pnpm-workspace.yaml`) — check `git status`
   before committing.
-- `e2e/specs/*.flow.json` and the `devdigest_pgdata` Docker volume — see
-  [e2e/AGENTS.md](e2e/AGENTS.md) before touching either.
+- Existing `e2e/specs/*.flow.json` steps and their order, and the
+  `devdigest_pgdata` Docker volume — see [e2e/AGENTS.md](e2e/AGENTS.md) before
+  touching either. New flow files are added only by `test-writer`, under its
+  e2e rules (`.claude/agents/test-writer.md`).
 
 ## Insights loop — mandatory
 

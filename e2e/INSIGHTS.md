@@ -20,6 +20,9 @@ coming back graduates into this module's AGENTS.md as a standing rule.
 
 ## Recurring Errors & Fixes
 
+- 2026-10-10 · `wait --text` matches the RENDERED text, so a CSS `text-transform: uppercase` heading ("Pick agents to run" in the catalogue) must be waited on as "PICK AGENTS TO RUN" — the symptom is a flow failing right after a click that did work. Debug by booting the stack with a copy of `scripts/e2e.sh` whose final `npm test` is `sleep`, then `agent-browser snapshot`.
+- 2026-10-10 · `npm run e2e:hermetic` dies at `pnpm db:migrate` with `ERR_PNPM_IGNORED_BUILDS` and leaves an untracked `server/pnpm-workspace.yaml`. Run it with `pnpm_config_verify_deps_before_run=false` and delete that stray file. A native `<select>` is driven with the `select <css> <label>` verb.
+
 ## Session Notes
 
 ## Open Questions

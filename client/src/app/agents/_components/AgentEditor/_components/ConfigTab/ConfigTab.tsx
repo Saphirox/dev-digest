@@ -8,8 +8,8 @@ import { useUpdateAgent, useProviderModels } from "../../../../../../lib/hooks/a
 import { useToast } from "../../../../../../lib/toast";
 import { DeleteAgentModal } from "../../../DeleteAgentModal";
 import { toModelOptions } from "../../../../../../lib/model-label";
+import { CI_FAIL_ON_VALUES } from "../../constants";
 import {
-  CI_FAIL_ON_VALUES,
   OUTPUT_SCHEMA_VALUE,
   PROVIDER_OPTIONS,
   STRATEGY_VALUES,

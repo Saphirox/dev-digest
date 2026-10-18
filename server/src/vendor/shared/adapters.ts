@@ -140,6 +140,26 @@ export interface CommitFilesPayload {
   files: CommitFile[];
 }
 
+/** One completed GitHub Actions workflow run (Export-to-CI ingest). */
+export interface WorkflowRunSummary {
+  id: number;
+  /** Re-run counter; attempt 2 replaces attempt 1 of the same run id. */
+  attempt: number;
+  head_sha: string;
+  html_url: string;
+  /** PR the run belongs to, when GitHub links one. */
+  pr_number: number | null;
+  started_at: string | null;
+}
+
+/** Outcome of reading one JSON file out of a run artifact (size-capped). */
+export type ArtifactJsonResult =
+  | { kind: 'missing' }
+  | { kind: 'too_large' }
+  /** The archive or its result file could not be read (corrupt zip, bad encoding). */
+  | { kind: 'invalid' }
+  | { kind: 'ok'; text: string };
+
 export interface GitHubClient {
   listPullRequests(repo: RepoRef): Promise<PrMeta[]>;
   getPullRequest(repo: RepoRef, n: number): Promise<PrDetail>;
@@ -162,6 +182,25 @@ export interface GitHubClient {
   /** The open PR whose head is `branch`, if any (so re-publish reuses it). */
   findOpenPr(repo: RepoRef, branch: string): Promise<{ url: string } | null>;
   getIssue(repo: RepoRef, n: number): Promise<IssueMeta>;
+  /** The repository's default branch name (the PR base for Export-to-CI). */
+  getDefaultBranch(repo: RepoRef): Promise<string>;
+  /** Completed `pull_request` runs of `workflowFile`, newest first, at most `limit`. */
+  listWorkflowRuns(
+    repo: RepoRef,
+    workflowFile: string,
+    limit: number,
+  ): Promise<WorkflowRunSummary[]>;
+  /**
+   * Read `<name>.json` from the run artifact called `name`. Refuses before the
+   * download when the artifact is over `maxBytes`, and again when the unzipped
+   * file is.
+   */
+  downloadArtifactJson(
+    repo: RepoRef,
+    runId: number,
+    name: string,
+    maxBytes: number,
+  ): Promise<ArtifactJsonResult>;
   /** GET /user — for "posting as @user". */
   currentLogin(): Promise<string>;
   /**

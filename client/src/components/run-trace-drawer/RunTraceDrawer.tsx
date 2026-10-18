@@ -25,6 +25,9 @@ export interface RunTraceDrawerProps {
   findings?: FindingRecord[];
   /** When true, the drawer defaults to the live log and streams SSE. */
   running?: boolean;
+  /** Keep the loading note while a just-finished run's trace is still being
+      saved (404 retried). Opt-in: the PR page opens historical runs. */
+  awaitTrace?: boolean;
   onClose: () => void;
 }
 
@@ -39,6 +42,7 @@ export default function RunTraceDrawer({
   prNumber,
   findings = [],
   running = false,
+  awaitTrace = false,
   onClose,
 }: RunTraceDrawerProps) {
   const t = useTranslations("runs");
@@ -46,7 +50,9 @@ export default function RunTraceDrawer({
   const { events, running: liveRunning } = useRunEvents(running ? [runId] : []);
   // Load the persisted trace once we're not (or no longer) running.
   const stillRunning = running && liveRunning;
-  const { data: trace, isLoading } = useRunTrace(runId, !stillRunning);
+  const { data: trace, isLoading } = useRunTrace(runId, !stillRunning, {
+    awaitMissing: awaitTrace,
+  });
 
   // Copy the model's raw output to the clipboard (footer button), with a brief
   // visual confirmation. Disabled until the trace (and its raw output) loads.

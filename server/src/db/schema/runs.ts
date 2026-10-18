@@ -37,6 +37,8 @@ export const agentRuns = pgTable('agent_runs', {
   score: integer('score'),
   /** Findings that tripped the agent's gate (severity ≥ ciFailOn). */
   blockers: integer('blockers'),
+  /** Parent of a multi-agent fan-out; NULL for a single-agent run. */
+  multiAgentRunId: uuid('multi_agent_run_id').references(() => multiAgentRuns.id, { onDelete: 'set null' }),
 }, (t) => ({
   /**
    * Both hot reads of this table filter by pr_id and take the newest rows
@@ -44,6 +46,8 @@ export const agentRuns = pgTable('agent_runs', {
    * (`latestCostByPr`), the latter across every PR on the page.
    */
   prRanAtIdx: index('agent_runs_pr_ran_at_idx').on(t.prId, t.ranAt.desc()),
+  /** `GET /multi-runs/:id` reads every child of one parent. */
+  multiRunIdx: index('agent_runs_multi_agent_run_idx').on(t.multiAgentRunId),
 }));
 
 /** Whole trace of one run as a SINGLE jsonb document. */

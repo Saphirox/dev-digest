@@ -67,8 +67,8 @@ task is written in.
   Behaviour without a test, or a test that does not actually exercise the
   AC's trigger and response, is `not-met` — say which half is missing.
 - **`met-manual` — the only exception to the test rule.** For an AC that
-  no unit or integration test can exercise (visual layout, an interaction
-  that only e2e could drive), and only when `test-writer` listed it under
+  no unit, integration or e2e test can exercise (visual layout, a hover-only
+  affordance, anything that needs a real model call), and only when `test-writer` listed it under
   *Not covered* with that reason: the behaviour is in the code, and the
   spec's saved design frame (`specs/images/spec-NNNN/*.png`) is named as
   what a person must compare the screen against. It never counts as `met`

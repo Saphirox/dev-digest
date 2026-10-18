@@ -35,3 +35,8 @@ export function githubBlobUrl(
   }
   return url;
 }
+
+/** Only github.com links are rendered as links (run metadata is untrusted). */
+export function isGithubUrl(url: string | null | undefined): url is string {
+  return typeof url === "string" && url.startsWith(`${HOST}/`);
+}

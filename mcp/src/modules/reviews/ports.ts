@@ -48,7 +48,7 @@ export interface StartReviewRunRecord {
 }
 
 export interface ReviewsStore {
-  /** `POST /pulls/:id/review` with a single `agentId` (never `all:true`). */
+  /** `POST /pulls/:id/review` with `{ agentIds: [agentId] }` — exactly one agent (never several or all). */
   startReview(prId: string, agentId: string): Promise<StartReviewRunRecord[]>;
   /** `GET /pulls/:id/runs` — full run history, any status. */
   listRuns(prId: string): Promise<RunStatusRecord[]>;

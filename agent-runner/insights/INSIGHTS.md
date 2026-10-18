@@ -12,6 +12,7 @@ See also: `insights/gotchas.md` for known quirks at project start.
 ## What Doesn't Work
 
 2026-07-08 — `pnpm typecheck` in `agent-runner` fails with `Cannot find module 'zod'` / `'openai'` errors pointing at `reviewer-core/src/llm/*.ts` if `reviewer-core/node_modules` was never installed. Because this repo is NOT a monorepo (no `pnpm-workspace.yaml`, no hoisting across packages), TypeScript's `moduleResolution: "Bundler"` walks up the ancestor directories of the *importing file* — `reviewer-core/src/llm/` → `reviewer-core/` → repo root — and never reaches `agent-runner/node_modules` (a sibling, not an ancestor). Fix: `cd reviewer-core && pnpm install` once (creates gitignored `node_modules`, touches no tracked files) — this is also required for `cd server && pnpm typecheck` to pass cleanly, so it is not agent-runner-specific. ref: agent-runner/tsconfig.json:20
+- 2026-10-10 · Supersedes 2026-07-08 "`ncc build src/index.ts -o dist` fully inlines": the build now also emits `dist/300.index.js` (node-domexception, pulled by a dynamic `__nccwpck_require__.e(300)` for `fileFromPath` inside the `openai` SDK's formdata code) and `dist/package.json` (`{"type":"module"}`). `dist/index.js` alone is NOT self-contained, so Export to CI (plan 0018 step 10) cannot ship it as one file. Found with `./node_modules/.bin/ncc build src/index.ts -o dist` (ncc 0.38.4). `agent-runner/package.json` (`build`)
 
 ## Codebase Patterns
 

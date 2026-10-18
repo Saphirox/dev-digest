@@ -42,7 +42,11 @@
     "severityPill": "{count} {severity, select, CRITICAL {Critical} WARNING {Warning} other {Suggestion}}"
   },
   "runReview": {
-    "runAll": "Run all enabled agents",
+    "pickAgents": "Pick agents to run",
+    "clear": "Clear",
+    "runMulti": "Run multi-agent review ({count})",
+    "noAgents": "No agents yet — create one",
+    "estimate": "~{duration}",
     "configureAgents": "Configure agents…",
     "running": "Running…",
     "runReview": "Run Review",

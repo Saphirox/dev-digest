@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { Toggle, EmptyState } from "@devdigest/ui";
 import type { FindingRecord } from "@devdigest/shared";
 import { useFindingAction } from "@/lib/hooks/reviews";
-import { FindingCard } from "../FindingCard";
+import { FindingCard } from "@/components/finding-card";
 import { SeverityPills } from "./_components/SeverityPills";
 import { useFindingKeyboardNav } from "./useFindingKeyboardNav";
 import { useFindingsFilter } from "./useFindingsFilter";

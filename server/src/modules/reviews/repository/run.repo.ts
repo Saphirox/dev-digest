@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import type { Db, DbExecutor } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { RunSummary, RunTrace } from '@devdigest/shared';
@@ -48,7 +48,13 @@ export async function listRunsForPull(
     .leftJoin(t.agents, eq(t.agents.id, t.agentRuns.agentId))
     .where(and(eq(t.agentRuns.workspaceId, workspaceId), eq(t.agentRuns.prId, prId)))
     .orderBy(desc(t.agentRuns.ranAt));
-  return rows.map(({ run, agentName }) => ({
+  return rows.map(({ run, agentName }) => toRunSummary(run, agentName));
+}
+
+type AgentRunRow = typeof t.agentRuns.$inferSelect;
+
+function toRunSummary(run: AgentRunRow, agentName: string | null): RunSummary {
+  return {
     run_id: run.id,
     agent_id: run.agentId,
     agent_name: agentName ?? null,
@@ -65,7 +71,7 @@ export async function listRunsForPull(
     ran_at: run.ranAt ? run.ranAt.toISOString() : null,
     score: run.score,
     blockers: run.blockers,
-  }));
+  };
 }
 
 /**
@@ -137,6 +143,105 @@ export async function createAgentRun(
     })
     .returning({ id: t.agentRuns.id });
   return row!.id;
+}
+
+/** The agents a multi-agent fan-out starts, in the order their runs are listed. */
+export interface MultiRunAgent {
+  agentId: string;
+  provider: string | null;
+  model: string | null;
+}
+
+/**
+ * Create the `multi_agent_runs` parent and one `running` child `agent_runs` row
+ * per agent in ONE transaction — either the whole fan-out exists or none of it.
+ * Children come back in the input order.
+ */
+export async function createMultiAgentRun(
+  db: Db,
+  values: { workspaceId: string; prId: string; agents: MultiRunAgent[] },
+): Promise<{ multiRunId: string; runs: { runId: string; agentId: string }[] }> {
+  return db.transaction(async (tx) => {
+    const [parent] = await tx
+      .insert(t.multiAgentRuns)
+      .values({ workspaceId: values.workspaceId, prId: values.prId })
+      .returning({ id: t.multiAgentRuns.id });
+    const multiRunId = parent!.id;
+    const runs: { runId: string; agentId: string }[] = [];
+    for (const agent of values.agents) {
+      const [row] = await tx
+        .insert(t.agentRuns)
+        .values({
+          workspaceId: values.workspaceId,
+          agentId: agent.agentId,
+          prId: values.prId,
+          provider: agent.provider,
+          model: agent.model,
+          status: 'running',
+          source: 'local',
+          multiAgentRunId: multiRunId,
+        })
+        .returning({ id: t.agentRuns.id });
+      runs.push({ runId: row!.id, agentId: agent.agentId });
+    }
+    return { multiRunId, runs };
+  });
+}
+
+export interface MultiAgentRunHead {
+  id: string;
+  prId: string;
+  prNumber: number;
+  prTitle: string;
+  ranAt: string;
+}
+
+/** The parent row + its PR's number/title; undefined outside the workspace. */
+export async function getMultiAgentRun(
+  db: Db,
+  workspaceId: string,
+  id: string,
+): Promise<MultiAgentRunHead | undefined> {
+  const [row] = await db
+    .select({
+      id: t.multiAgentRuns.id,
+      prId: t.multiAgentRuns.prId,
+      ranAt: t.multiAgentRuns.ranAt,
+      prNumber: t.pullRequests.number,
+      prTitle: t.pullRequests.title,
+    })
+    .from(t.multiAgentRuns)
+    .innerJoin(t.pullRequests, eq(t.pullRequests.id, t.multiAgentRuns.prId))
+    .where(and(eq(t.multiAgentRuns.workspaceId, workspaceId), eq(t.multiAgentRuns.id, id)));
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    prId: row.prId,
+    prNumber: row.prNumber,
+    prTitle: row.prTitle,
+    ranAt: row.ranAt.toISOString(),
+  };
+}
+
+/**
+ * The child runs of one multi-agent run, in agent list order
+ * (`agents.created_at, agents.id`) — NOT insert time: the single-transaction
+ * insert gives every child the same `ran_at`. Deleted agents (NULL) sort last.
+ */
+export async function listRunsForMultiRun(
+  db: Db,
+  workspaceId: string,
+  multiRunId: string,
+): Promise<RunSummary[]> {
+  const rows = await db
+    .select({ run: t.agentRuns, agentName: t.agents.name })
+    .from(t.agentRuns)
+    .leftJoin(t.agents, eq(t.agents.id, t.agentRuns.agentId))
+    .where(
+      and(eq(t.agentRuns.workspaceId, workspaceId), eq(t.agentRuns.multiAgentRunId, multiRunId)),
+    )
+    .orderBy(asc(t.agents.createdAt), asc(t.agents.id), asc(t.agentRuns.id));
+  return rows.map(({ run, agentName }) => toRunSummary(run, agentName));
 }
 
 /** Terminal values written onto an agent_run when it finishes. */

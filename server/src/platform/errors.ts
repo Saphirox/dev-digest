@@ -51,3 +51,11 @@ export class InvalidContextPathError extends AppError {
     );
   }
 }
+
+/** A GitHub write was refused for lack of permission (e.g. a token without the `workflow` scope). */
+export class GitHubPermissionError extends AppError {
+  constructor(message = 'GitHub refused the write') {
+    super('github_permission', message, 403);
+    this.name = 'GitHubPermissionError';
+  }
+}
